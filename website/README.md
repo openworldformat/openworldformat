@@ -27,7 +27,7 @@ Cloudflare static-assets Worker (`wrangler.toml`); no Worker script.
 
 | Path | What it is |
 |---|---|
-| `zola.toml` | site config |
+| `config.toml` | site config (named for Zola 0.22.0, which CI installs) |
 | `templates/` | hand-written base/index/section/page templates |
 | `static/style.css` | one stylesheet, light/dark via `light-dark()` |
 | `content/_index.md` | the front page |

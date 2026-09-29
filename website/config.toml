@@ -1,6 +1,8 @@
 # openworldformat.org — a Zola 0.22 site, no theme, no build step beyond
-# `zola build`. The spec pages are copied in from ../spec by scripts/build.sh
-# so the markdown has one source of truth in the repository root.
+# `zola build`. Named config.toml (not zola.toml) because Zola 0.22.0 —
+# what CI installs — only finds config.toml by default. The spec pages are
+# copied in from ../spec by scripts/build.sh so the markdown has one source
+# of truth in the repository root.
 
 base_url = "https://openworldformat.org"
 title = "Open World Format"
