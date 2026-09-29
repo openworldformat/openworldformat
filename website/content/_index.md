@@ -28,7 +28,10 @@ sessions.
 
 The [JSON Schema](https://github.com/openworldformat/openworldformat/blob/main/schema/world.schema.json)
 is normative; the [conformance worlds](https://github.com/openworldformat/openworldformat/tree/main/conformance)
-define correct rendering.
+define correct rendering — and you can watch them draw:
+**[open the live viewer](world.html?src=conformance/shapes.json)**, the
+reference three.js renderer running the whole suite in this tab. The same
+page opens any manifest: `world.html?src=…`.
 
 ## Try it in a minute
 

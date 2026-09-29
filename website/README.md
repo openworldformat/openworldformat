@@ -9,8 +9,10 @@ with a 185-lines-behind viewer copy).
 ## Run
 
 ```bash
-./scripts/build.sh    # render spec pages in, then zola build
-zola serve            # http://127.0.0.1:1111 (after a build, or run render_spec.py once)
+npm install && npx playwright install chromium   # once
+npm run check         # build + render every conformance world headless
+./scripts/build.sh    # build only
+zola serve            # http://127.0.0.1:1111 (after a build)
 ```
 
 ## Deploy
@@ -30,4 +32,7 @@ Cloudflare static-assets Worker (`wrangler.toml`); no Worker script.
 | `static/style.css` | one stylesheet, light/dark via `light-dark()` |
 | `content/_index.md` | the front page |
 | `content/spec/` | **generated** by `scripts/render_spec.py` — never edit; edit `../spec` |
-| `scripts/` | `render_spec.py`, `build.sh`, `deploy.sh` |
+| `static/world.html` | the live demo: any manifest, `world.html?src=…` |
+| `static/conformance/`, `static/viewer/` | **generated** by `scripts/assemble.mjs` — edit `../conformance`, `../examples`, `../viewer/src/render.js` |
+| `static/vendor/three/` | three.js (MIT), committed and self-hosted so the site makes no third-party requests |
+| `scripts/` | `render_spec.py`, `assemble.mjs`, `check.mjs` (the headless render check), `build.sh`, `deploy.sh` |

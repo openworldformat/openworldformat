@@ -2,4 +2,7 @@ target/
 node_modules/
 website/public/
 website/content/spec/
+website/static/conformance/
+website/static/viewer/
+website/.wrangler/
 .DS_Store

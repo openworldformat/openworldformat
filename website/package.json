@@ -1,0 +1,13 @@
+{
+  "name": "openworldformat-website",
+  "private": true,
+  "type": "module",
+  "description": "openworldformat.org — Zola site plus the live demo's assemble step and Playwright render check.",
+  "scripts": {
+    "build": "python3 scripts/render_spec.py && node scripts/assemble.mjs && zola build",
+    "check": "npm run build && node scripts/check.mjs"
+  },
+  "devDependencies": {
+    "playwright": "1.56.1"
+  }
+}

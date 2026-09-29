@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>Open World Format — live viewer</title>
+  <meta name="description" content="Render any Open World Format manifest in the browser: the conformance suite, drawn by the reference three.js viewer.">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background: #05060a; color: #f2f3f7; font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+    #scene { position: absolute; inset: 0; }
+    #scene canvas { display: block; }
+    .panel { position: absolute; background: rgba(5, 6, 10, 0.72); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 10px; backdrop-filter: blur(8px); }
+    #top { top: 12px; left: 12px; right: 12px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; padding: 10px 12px; }
+    #top a.brand { color: #fff; text-decoration: none; font-weight: 600; letter-spacing: 0.02em; }
+    #top select, #top button, #controls button { background: rgba(255,255,255,0.08); color: #fff; border: 1px solid rgba(255,255,255,0.22); border-radius: 6px; padding: 6px 10px; font: inherit; cursor: pointer; }
+    #top select:hover, #top button:hover, #controls button:hover { background: rgba(255,255,255,0.16); }
+    #title { font-weight: 600; }
+    #meta { opacity: 0.75; }
+    #status { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); padding: 12px 18px; display: none; max-width: 90vw; }
+    #controls { bottom: 16px; right: 16px; display: flex; gap: 8px; padding: 8px; }
+    #caption { bottom: 70px; left: 50%; transform: translateX(-50%); padding: 10px 18px; max-width: min(560px, 90vw); text-align: center; display: none; }
+    #help { bottom: 16px; left: 16px; padding: 8px 12px; opacity: 0.8; }
+    @media (max-width: 640px) { #help { display: none; } #controls { bottom: 12px; right: 12px; } }
+  </style>
+</head>
+<body>
+  <div id="scene"></div>
+  <div id="top" class="panel">
+    <a class="brand" href="/">Open World Format</a>
+    <label for="picker">World</label>
+    <select id="picker" aria-label="Choose a world">
+      <option value="conformance/shapes.json">Shapes</option>
+      <option value="conformance/materials.json">Materials</option>
+      <option value="conformance/lights.json">Lights</option>
+      <option value="conformance/behaviors.json">Behaviors</option>
+      <option value="conformance/textures.json">Textures</option>
+      <option value="conformance/instances.json">Instances</option>
+      <option value="conformance/triggers.json">Triggers</option>
+      <option value="conformance/hierarchy_tours.json">Hierarchy &amp; tour</option>
+      <option value="conformance/soundtrack.json">Soundtrack &amp; modulation</option>
+      <option value="conformance/hello-world.json">hello-world (the example package)</option>
+    </select>
+    <span id="title"></span>
+    <span id="meta"></span>
+    <a id="download" href="#" download>manifest.json</a>
+  </div>
+  <div id="status" class="panel">Loading…</div>
+  <div id="caption" class="panel"></div>
+  <div id="controls" class="panel">
+    <button id="tour-btn" style="display:none">Start Tour</button>
+    <button id="audio-btn" style="display:none">Sound On</button>
+  </div>
+  <div id="help" class="panel">Drag to orbit · Scroll to zoom · WASD + Space/Shift to move</div>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "./vendor/three/build/three.module.min.js",
+      "three/addons/": "./vendor/three/examples/jsm/"
+    }
+  }
+  </script>
+  <script type="module">
+    import { createWorldViewer, VIEWER_VERSION } from './viewer/world-viewer.js';
+
+    const params = new URLSearchParams(location.search);
+    const picker = document.getElementById('picker');
+    const status = document.getElementById('status');
+    const container = document.getElementById('scene');
+    let viewer = null;
+
+    function show(text) { status.textContent = text; status.style.display = text ? 'block' : 'none'; }
+
+    async function open(src) {
+      show('Loading…');
+      viewer?.dispose();
+      try {
+        const response = await fetch(src);
+        if (!response.ok) throw new Error(`${src}: ${response.status}`);
+        const manifest = await response.json();
+        viewer = createWorldViewer(container, manifest, {
+          assetBase: 'conformance/assets/',
+          tourButton: document.getElementById('tour-btn'),
+          audioButton: document.getElementById('audio-btn'),
+          tourCaption: document.getElementById('caption'),
+        });
+        window.owfViewer = viewer; // for the headless render check
+        const info = viewer.sceneInfo();
+        document.getElementById('title').textContent = manifest.meta?.name ?? src;
+        document.getElementById('meta').textContent =
+          `schema ${manifest.version} · ${info.entityCount} entities`;
+        document.getElementById('download').href = src;
+        show(null);
+      } catch (e) {
+        show(`Couldn't load ${src}: ${e.message}`);
+        window.owfViewer = null;
+      }
+    }
+
+    picker.addEventListener('change', () => open(picker.value));
+
+    const initial = params.get('src') ?? picker.value;
+    if ([...picker.options].some((o) => o.value === initial)) picker.value = initial;
+    open(picker.value);
+  </script>
+</body>
+</html>

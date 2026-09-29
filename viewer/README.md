@@ -1,14 +1,26 @@
 # openworldformat (npm)
 
-The Open World Format reference fold: parse a `.world` manifest and fold
-its session log, in pure JavaScript with no dependencies. No engine, no
-renderer — the document semantics, exactly as
-[the spec](https://openworldformat.org) states them, in the smallest
-implementation that passes the format's own tests.
+The Open World Format reference package. The core — parse a `.world`
+manifest, fold its session log — is pure JavaScript with no dependencies:
+the document semantics, exactly as [the spec](https://openworldformat.org)
+states them, in the smallest implementation that passes the format's own
+tests. The reference three.js renderer rides along under
+`openworldformat/render`.
 
-The 3D reference viewer (three.js) is a planned sibling package; this one
-comes first because everything — viewers, editors, servers, save systems
-— starts by parsing and folding.
+The reference 3D renderer ships in the same package as
+`openworldformat/render` (three.js is a peer dependency):
+
+```js
+import { createWorldViewer } from "openworldformat/render";
+const viewer = createWorldViewer(container, manifest, { assetBase: "assets/" });
+```
+
+`createWorldViewer` draws a manifest the way the conformance suite pins
+it and returns `sceneInfo()`, `startTour`, `toggleAudio`, `applyOps`
+(for live session ops) and `dispose`. Provenance: copied verbatim from
+the LocalGPT web viewer, which rendered the suite in production before
+this repository existed; when this copy becomes upstream, the LocalGPT
+apps consume it from here instead of keeping a second copy.
 
 ## Install
 

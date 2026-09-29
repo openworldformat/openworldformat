@@ -18,7 +18,7 @@ jobs:
         working-directory: viewer/
 
   website:
-    name: openworldformat.org (zola)
+    name: openworldformat.org (zola + render check)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -27,7 +27,16 @@ jobs:
           curl -sL https://github.com/getzola/zola/releases/download/v0.22.0/zola-v0.22.0-x86_64-unknown-linux-gnu.tar.gz \
             | sudo tar xz -C /usr/local/bin
           zola --version
-      - run: ./scripts/build.sh
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+        working-directory: website/
+      - run: npx playwright install --with-deps chromium
+        working-directory: website/
+      # Build, then render every conformance world headless in Chromium:
+      # "compliance means rendering these" — tested, not stated.
+      - run: npm run check
         working-directory: website/
       - run: zola check --skip-external-links
         working-directory: website/
