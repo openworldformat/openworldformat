@@ -1,0 +1,24 @@
+# openworldformat.org — a Zola 0.22 site, no theme, no build step beyond
+# `zola build`. The spec pages are copied in from ../spec by scripts/build.sh
+# so the markdown has one source of truth in the repository root.
+
+base_url = "https://openworldformat.org"
+title = "Open World Format"
+description = "An open format for .world packages: the scene, the history that built it, and what happened in it."
+
+generate_feeds = false
+build_search_index = false
+
+[markdown]
+smart_punctuation = true
+bottom_footnotes = true
+github_alerts = true
+
+# Code blocks follow the reader's light/dark preference via CSS light-dark().
+[markdown.highlighting]
+light_theme = "github-light"
+dark_theme = "github-dark"
+
+[extra]
+repo = "https://github.com/openworldformat/openworldformat"
+npm = "https://www.npmjs.com/package/openworldformat"

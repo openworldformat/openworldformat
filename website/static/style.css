@@ -1,0 +1,97 @@
+:root {
+  --ink: light-dark(#1f2430, #e6e9f0);
+  --muted: light-dark(#5b6472, #9aa3b2);
+  --line: light-dark(#e3e6ec, #2c313c);
+  --surface: light-dark(#ffffff, #171a21);
+  --wash: light-dark(#f4f6fa, #1d212b);
+  --accent: light-dark(#0b62c4, #5aa9ff);
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  color-scheme: light dark;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font: 16px/1.65 var(--sans);
+  color: var(--ink);
+  background: var(--surface);
+}
+
+header, main, footer {
+  max-width: 46rem;
+  margin: 0 auto;
+  padding: 0 1.25rem;
+}
+
+header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding-top: 1.6rem;
+  padding-bottom: .4rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.brand .mark { font-weight: 700; }
+nav a { margin-left: 1.1rem; color: var(--muted); text-decoration: none; }
+nav a:hover { color: var(--accent); }
+
+main { padding-top: 1.6rem; padding-bottom: 3rem; }
+
+h1, h2, h3 { line-height: 1.25; }
+h2, h3 { margin-top: 2em; }
+
+a { color: var(--accent); }
+
+code, pre {
+  font-family: var(--mono);
+  font-size: .92em;
+}
+
+code {
+  background: var(--wash);
+  padding: .12em .35em;
+  border-radius: 4px;
+}
+
+pre {
+  background: var(--wash);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: .9rem 1.1rem;
+  overflow-x: auto;
+}
+
+pre code { background: none; padding: 0; }
+
+table { border-collapse: collapse; width: 100%; }
+th, td { border: 1px solid var(--line); padding: .35rem .6rem; text-align: left; }
+th { background: var(--wash); }
+
+blockquote {
+  margin: 1.2em 0;
+  padding: .2rem 1rem;
+  border-left: 3px solid var(--accent);
+  color: var(--muted);
+}
+
+.hero {
+  margin-top: 2.2rem;
+}
+.hero h1 { font-size: 2rem; margin-bottom: .3rem; }
+.hero p.tagline { font-size: 1.15rem; color: var(--muted); margin-top: 0; }
+
+.page-list { list-style: none; padding: 0; }
+.page-list li { padding: .45rem 0; border-bottom: 1px solid var(--line); }
+.page-list a { text-decoration: none; font-weight: 600; }
+.page-list a:hover { text-decoration: underline; }
+
+footer {
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: .9rem;
+  padding-top: 1rem;
+  padding-bottom: 2.5rem;
+}

@@ -1,0 +1,10 @@
+# Cloudflare Worker for openworldformat.org: static assets only, no Worker
+# script. Deploy with scripts/deploy.sh, which runs `zola build` first.
+name = "openworldformat"
+compatibility_date = "2026-09-29"
+
+[assets]
+directory = "./public"
+# Zola writes pretty URLs (page/index.html) and a root 404.html.
+html_handling = "auto-trailing-slash"
+not_found_handling = "404-page"

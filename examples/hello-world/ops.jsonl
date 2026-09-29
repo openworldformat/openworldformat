@@ -1,0 +1,5 @@
+{"revision":1,"timestamp_ms":1790000000123,"author":{"peer":3,"name":"maya"},"ops":[{"SpawnEntity":{"entity":{"id":100,"name":"lantern","transform":{"position":[-12.0,0.0,3.0]},"shape":{"Cylinder":{"radius":0.12,"height":0.9}},"material":{"color":[0.16,0.15,0.13,1.0],"emissive":[1.0,0.75,0.35,1.0]}}}}]}
+{"revision":1,"timestamp_ms":1790000000131,"author":{"name":"llm"},"ops":[{"tool":"spawn_primitive","args":{"name":"lantern","shape":"cylinder"},"result_hash":"sha256:8f14e45fceea167a5a36dedd4bea2543f"}]}
+{"revision":1,"timestamp_ms":1790000001400,"ops":[{"state":{"score.tour":1}}]}
+{"revision":1,"timestamp_ms":1790000001402,"author":{"name":"visitor-7"},"ops":[{"input":{"actor":"visitor-7","position":[-11.4,1.8,3.4],"click":100}}]}
+{"revision":1,"timestamp_ms":1790000002000,"ops":[{"clock":{"playing":true,"position_s":41.5}}]}

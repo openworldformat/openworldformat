@@ -1,0 +1,61 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  viewer:
+    name: Reference fold (node)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm test
+        working-directory: viewer/
+
+  website:
+    name: openworldformat.org (zola)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Zola 0.22
+        run: |
+          curl -sL https://github.com/getzola/zola/releases/download/v0.22.0/zola-v0.22.0-x86_64-unknown-linux-gnu.tar.gz \
+            | sudo tar xz -C /usr/local/bin
+          zola --version
+      - run: ./scripts/build.sh
+        working-directory: website/
+      - run: zola check --skip-external-links
+        working-directory: website/
+
+  schema:
+    name: Schema and conformance are valid JSON
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: |
+          node -e '
+          const fs = require("fs");
+          const files = ["schema/world.schema.json",
+            ...fs.readdirSync("conformance").filter(f => f.endsWith(".json"))
+              .map(f => "conformance/" + f),
+            "examples/hello-world/manifest.json",
+            "examples/hello-world/package.json"];
+          for (const f of files) { JSON.parse(fs.readFileSync(f, "utf8")); console.log("ok", f); }
+          '
+      - name: Every conformance world declares schema version 3
+        run: |
+          node -e '
+          const fs = require("fs");
+          for (const f of fs.readdirSync("conformance").filter(f => f.endsWith(".json"))) {
+            const w = JSON.parse(fs.readFileSync("conformance/" + f, "utf8"));
+            if (w.version !== 3) throw new Error(f + " is at schema " + w.version);
+            console.log("v3", f);
+          }'

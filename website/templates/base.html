@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}{{ config.title }}{% endblock title %}</title>
+  <meta name="description" content="{{ config.description }}">
+  <link rel="stylesheet" href="{{ get_url(path="style.css") }}">
+</head>
+<body>
+  <header>
+    <a class="brand" href="{{ config.base_url }}">
+      <span class="mark">{{ config.title }}</span>
+    </a>
+    <nav>
+      <a href="{{ config.base_url }}spec/">Spec</a>
+      <a href="{{ config.extra.repo }}">Repository</a>
+      <a href="{{ config.extra.npm }}">npm</a>
+    </nav>
+  </header>
+  <main>
+    {% block content %}{% endblock content %}
+  </main>
+  <footer>
+    <p>Draft 0.1 · schema 3 · <a href="{{ config.extra.repo }}">github.com/openworldformat</a> · Apache-2.0</p>
+  </footer>
+</body>
+</html>

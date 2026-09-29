@@ -1,0 +1,36 @@
+{
+  "name": "openworldformat",
+  "version": "0.0.1",
+  "description": "The Open World Format reference package: parse a .world manifest and fold its session log. Pure JS, no engine, no dependencies.",
+  "type": "module",
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "files": [
+    "src",
+    "README.md"
+  ],
+  "scripts": {
+    "test": "node --test"
+  },
+  "keywords": [
+    "3d",
+    "world",
+    "gltf",
+    "scene",
+    "format",
+    "session",
+    "crdt",
+    "replay"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/openworldformat/openworldformat.git",
+    "directory": "viewer"
+  },
+  "license": "Apache-2.0",
+  "engines": {
+    "node": ">=20"
+  }
+}
