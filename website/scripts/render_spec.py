@@ -24,7 +24,7 @@ SPEC = REPO / "spec"
 DEST = REPO / "website" / "content" / "spec"
 
 # Reading order; README becomes the section index.
-ORDER = ["README.md", "world.md", "package.md", "session.md", "profiles.md", "versioning.md"]
+ORDER = ["README.md", "world.md", "package.md", "session.md", "state.md", "profiles.md", "versioning.md"]
 REPO_URL = "https://github.com/openworldformat/openworldformat"
 
 

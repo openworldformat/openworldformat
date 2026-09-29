@@ -58,6 +58,7 @@ descendants; it stops at the first entry that no longer applies.
 | `classifyOp(op)` | recognize an op by shape — edits first |
 | `editOps(entry)` | an entry's edits, in order |
 | `foldLog(manifest, entries)` | the document at the last entry |
+| `foldState(stateDoc, entries)` | the game state at the last entry (declared fields, map subkeys, tolerant of the undeclared) |
 | `SUPPORTED_SCHEMA_VERSION` | the manifest schema this reads (3) |
 
 ## Test

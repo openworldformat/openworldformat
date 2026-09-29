@@ -19,9 +19,10 @@ manifest schema version 3. The normative definitions are:
    metadata, integrity.
 3. [The session log](session.md) — L1: the ops that build a world and
    the history around them.
-4. [Profiles and extensions](profiles.md) — what an implementation must,
+4. [The state document](state.md) — L0: where the game is.
+5. [Profiles and extensions](profiles.md) — what an implementation must,
    may and must-ignore.
-5. [Versioning policy](versioning.md) — the compatibility contract.
+6. [Versioning policy](versioning.md) — the compatibility contract.
 
 ## The one invariant
 
@@ -46,11 +47,8 @@ engine's.
 
 ## Open items (before 1.0)
 
-- The typed **state document** (`state.json`): namespaced, typed state
-  declared per world, with the log carrying deltas. The log's `state`
-  op exists; the document schema does not yet.
-- The **extension registry**: namespaced extensions with reference
-  implementations and conformance cases.
-- The replay **determinism contract** in prose: semantic replay (same
-  fold, same trigger outcomes, approximately the same frames) — never
-  bit-exactness.
+- The state document is specified (experimental until 1.0) but has no
+  JSON Schema yet; it joins `world.schema.json` when it settles.
+- The **extension registry** accepts its first real extension (physics,
+  tracking the glTF drafts, is the expected first).
+- More prose around replay determinism as implementers arrive.

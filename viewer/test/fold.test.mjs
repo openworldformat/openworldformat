@@ -11,6 +11,7 @@ import {
   parseLogLine,
   editOps,
   foldLog,
+  foldState,
 } from "../src/index.js";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
@@ -144,6 +145,41 @@ test("a batch applies all-or-nothing", () => {
     }),
   );
   assert.throws(() => foldLog(base, [batch]), /no entity 99999/);
+});
+
+test("state folds over the declaration, tolerating the undeclared", () => {
+  const stateDoc = JSON.parse(readFileSync(
+    path.join(root, "examples/hello-world/state.json"), "utf8"));
+  const result = foldState(stateDoc, entries);
+  // The example's log sets score.tour to 1; the declaration's initial was 0.
+  assert.equal(result.values["score.tour"], 1);
+  assert.deepEqual(result.undeclared, []);
+
+  const richer = {
+    format_version: 1,
+    fields: {
+      "score.main": { type: "int", initial: 0 },
+      inventory: { type: "map", initial: {} },
+      "has.map": { type: "bool", initial: false },
+    },
+  };
+  const ops = [
+    { state: { "score.main": 5 } },
+    { state: { "inventory.rope": 1, "inventory.torch": 2 } },
+    { state: { "inventory.rope": null } },
+    { state: { "has.map": true } },
+    { state: { "has.map": null } },
+    { state: { "unknown.key": 7 } },
+    { state: { "unknown.key": null } },
+  ].map((op, i) => parseLogLine(JSON.stringify({
+    revision: 1, author: { name: "t" }, ops: [op], timestamp_ms: i,
+  })));
+  const folded = foldState(richer, ops);
+  assert.equal(folded.values["score.main"], 5);
+  assert.deepEqual(folded.values.inventory, { torch: 2 });
+  assert.equal(folded.values["has.map"], false); // null reset the initial
+  assert.ok(!("unknown.key" in folded.values)); // set, carried, then removed
+  assert.deepEqual(folded.undeclared, ["unknown.key"]);
 });
 
 test("a torn line loses at most itself", () => {

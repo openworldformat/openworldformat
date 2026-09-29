@@ -77,11 +77,21 @@ derived, never authoritative, deletable without loss — the fold from the
 base reaches the same state. Compaction (folding to a new base and
 keeping the old log for history) changes nothing observable.
 
-## Replay
+## Replay and determinism
 
-- **Structural replay** — fold to any revision: exact by construction.
-- **Playthrough replay** — re-run triggers offline over `input` and
-  `state` entries: faithful, not bit-exact (input is sampled).
-- The spec defines **semantic replay** only. Bit-exact cross-engine
-  replay is not achievable and MUST NOT be promised by implementations
-  of this format.
+Three levels, and only the first two are part of this format:
+
+1. **Structural replay** — fold to any revision. Exact by construction:
+   the fold *is* the document's history. Anything that folds to the same
+   state — on any machine, in any language — is conformant here.
+2. **Semantic replay** — re-run triggers and behaviors offline over the
+   log's `input` and `state` entries. The contract: the same fold plus
+   the same inputs produce the same trigger outcomes and the same
+   state trajectory. Frames are *approximately* the same — input is
+   sampled (~10 Hz), behaviors are functions of folded time, and
+   renderers draw.
+3. **Bit-exact replay** — the same pixels. **Not part of this format,
+   and MUST NOT be promised by implementations of it.** Floats, physics
+   ordering and renderer differences make it a lie waiting to be caught;
+   `package.json`'s `seed` is reserved for engines that want to try
+   anyway, and means nothing to the contract above.

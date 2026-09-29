@@ -1,0 +1,6 @@
+{
+  "format_version": 1,
+  "fields": {
+    "score.tour": { "type": "int", "initial": 0 }
+  }
+}

@@ -98,6 +98,64 @@ export function editOps(entry) {
 }
 
 // ---------------------------------------------------------------------------
+// State folding
+// ---------------------------------------------------------------------------
+
+/**
+ * Fold a session log's `state` ops over a state document: the values at
+ * the last entry. Separate from the document fold — state ops never
+ * touch entities — and equally tolerant: keys nothing declares are
+ * carried, not refused (spec/state.md).
+ *
+ * @param {object} stateDoc parsed `state.json` ({format_version, fields})
+ * @param {array} entries parsed log entries, in order
+ * @returns {{values: object, undeclared: string[]}}
+ */
+export function foldState(stateDoc, entries) {
+  const fields = stateDoc?.fields ?? {};
+  const values = {};
+  for (const [key, field] of Object.entries(fields)) {
+    values[key] = structuredClone(field.initial ?? null);
+  }
+  const undeclared = new Set();
+
+  for (const entry of entries) {
+    const classified = entry.classified ?? entry.ops.map(classifyOp);
+    for (const c of classified) {
+      if (c.kind !== "state") continue;
+      for (const [key, value] of Object.entries(c.value)) {
+        if (key in fields) {
+          // A declared field: set it, or reset it to its initial value.
+          values[key] = value === null
+            ? structuredClone(fields[key].initial ?? null)
+            : structuredClone(value);
+          continue;
+        }
+        // Maybe a subkey of a declared map field: "inventory.rope" under
+        // the declared map "inventory".
+        const dot = key.indexOf(".");
+        if (dot > 0) {
+          const base = key.slice(0, dot);
+          const inner = key.slice(dot + 1);
+          if (base in fields && fields[base].type === "map") {
+            const map = values[base] ?? {};
+            if (value === null) delete map[inner];
+            else map[inner] = structuredClone(value);
+            values[base] = map;
+            continue;
+          }
+        }
+        // Declared by no one: carry it, and say so.
+        if (value === null) delete values[key];
+        else values[key] = structuredClone(value);
+        undeclared.add(key);
+      }
+    }
+  }
+  return { values, undeclared: [...undeclared] };
+}
+
+// ---------------------------------------------------------------------------
 // Folding
 // ---------------------------------------------------------------------------
 

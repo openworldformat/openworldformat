@@ -33,9 +33,11 @@ extension only with:
 2. a reference implementation, and
 3. conformance cases.
 
-Until the registry exists, extension fields are reserved for
-experiment, and producers MUST NOT ship them in packages marked
-`format_version: 1`.
+The registry is [`spec/extensions/registry.json`](extensions/registry.json)
+— empty by design until the first extension earns its entry; physics,
+tracking the glTF drafts, is the expected first. Until an extension is
+registered, its fields are reserved for experiment, and producers MUST
+NOT ship them in packages marked `format_version: 1`.
 
 Extensions align with adjacent standards rather than competing with
 them: physics extensions SHOULD track the glTF physics drafts

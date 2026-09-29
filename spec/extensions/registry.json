@@ -1,0 +1,4 @@
+{
+  "comment": "The extension registry: namespaced extensions with a spec page, a reference implementation and conformance cases (CONTRIBUTING.md). Empty until the first extension lands; physics, tracking the glTF drafts, is the expected first.",
+  "extensions": {}
+}
