@@ -40,6 +40,7 @@
       <option value="conformance/triggers.json">Triggers</option>
       <option value="conformance/hierarchy_tours.json">Hierarchy &amp; tour</option>
       <option value="conformance/soundtrack.json">Soundtrack &amp; modulation</option>
+      <option value="conformance/physics.json">Physics (at rest)</option>
       <option value="conformance/hello-world.json">hello-world (the example package)</option>
     </select>
     <span id="title"></span>
@@ -103,7 +104,7 @@
 
     const initial = params.get('src') ?? picker.value;
     if ([...picker.options].some((o) => o.value === initial)) picker.value = initial;
-    open(picker.value);
+    open(initial); // the URL's src wins — the picker is a menu, not a gate
   </script>
 </body>
 </html>

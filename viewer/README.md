@@ -63,6 +63,32 @@ descendants; it stops at the first entry that no longer applies.
 | `foldState(stateDoc, entries)` | the game state at the last entry (declared fields, map subkeys, tolerant of the undeclared) |
 | `SUPPORTED_SCHEMA_VERSION` | the manifest schema this reads (3) |
 
+## The physics extension (`openworldformat/physics`)
+
+The reference implementation of [`ext-physics`](../spec/extensions/physics.md)
+0.1: bodies are declared, never simulated by the document — but the
+contract needs an executable half, and this is it.
+
+```js
+import { simulatePhysics, trajectoryOp, foldTrajectories, runOutcomes }
+  from "openworldformat/physics";
+
+const sim = simulatePhysics(manifest, { until_s: 6 }); // deterministic
+sim.contacts;  // impacts: {t_s, body, other, position, normal_speed}
+sim.resting;   // where each dynamic body ended up
+const op = trajectoryOp(sim);       // the playback op — ≤10 Hz samples
+const track = foldTrajectories(entries); // scrub it back, no solver
+runOutcomes(manifest, outcomesDoc); // the conformance assertions
+```
+
+The solver is deliberately minimal — spheres against floors and
+axis-aligned statics, fixed 1/120 s semi-implicit Euler, sleep on rest —
+so the conformance outcome assertions run anywhere and in CI. It is
+reference-grade, not production physics; conforming engines use real
+ones. Deterministic within an engine (no randomness, document order,
+IEEE-754 doubles); across engines, only the semantic contract holds —
+never bit-exact, per the spec.
+
 ## Test
 
 ```bash

@@ -56,9 +56,12 @@ const EDIT_KEYS = new Set([
 /**
  * Classify one op by its shape, edits first — the compatibility rule: a
  * log written before the history kinds existed parses as edits, and an
- * edit serializes today exactly as it always did.
+ * edit serializes today exactly as it always did. Extension ops
+ * (`ext-*`, single key, object value) are recognized as a kind of their
+ * own and, like every history kind, fold to nothing for the document.
  * @param {object} op
- * @returns {{kind: "edit"|"tool"|"input"|"state"|"clock"|"unknown", edit?: string, value?: object}}
+ * @returns {{kind: "edit"|"tool"|"input"|"state"|"clock"|"merge"|"extension"|"unknown",
+ *            edit?: string, name?: string, value?: object}}
  */
 export function classifyOp(op) {
   if (op === null || typeof op !== "object" || Array.isArray(op)) {
@@ -73,6 +76,10 @@ export function classifyOp(op) {
   if (op.state && typeof op.state === "object") return { kind: "state", value: op.state };
   if (op.clock && typeof op.clock === "object") return { kind: "clock", value: op.clock };
   if (op.merge && typeof op.merge === "object") return { kind: "merge", value: op.merge };
+  if (keys.length === 1 && /^ext-[a-z0-9-]+$/.test(keys[0]) &&
+      op[keys[0]] !== null && typeof op[keys[0]] === "object") {
+    return { kind: "extension", name: keys[0], value: op[keys[0]] };
+  }
   return { kind: "unknown" };
 }
 
@@ -330,6 +337,16 @@ function applyEdit(state, edit, value) {
         "triggers",
       ]) {
         if (field in patch) {
+          if (patch[field] === null) delete entity[field];
+          else entity[field] = patch[field];
+        }
+      }
+      // Extension fields ride along: any `ext-*` key patches like the
+      // known ones — set, or clear on null — so a physics component (or
+      // any future extension's) survives a modify round-trip. The core
+      // schema leaves room for them; must-ignore is the reader's side.
+      for (const field of Object.keys(patch)) {
+        if (field.startsWith("ext-")) {
           if (patch[field] === null) delete entity[field];
           else entity[field] = patch[field];
         }

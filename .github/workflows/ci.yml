@@ -53,8 +53,10 @@ jobs:
           node -e '
           const fs = require("fs");
           const files = ["schema/world.schema.json",
+            "schema/extensions/ext-physics.schema.json",
             ...fs.readdirSync("conformance").filter(f => f.endsWith(".json"))
               .map(f => "conformance/" + f),
+            "conformance/outcomes/physics.json",
             "examples/hello-world/manifest.json",
             "examples/hello-world/package.json"];
           for (const f of files) { JSON.parse(fs.readFileSync(f, "utf8")); console.log("ok", f); }

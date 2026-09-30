@@ -49,8 +49,10 @@ engine's.
 
 - The state document is specified (experimental until 1.0) but has no
   JSON Schema yet; it joins `world.schema.json` when it settles.
-- The **extension registry** accepts its first real extension (physics,
-  tracking the glTF drafts, is the expected first).
+- The **extension registry** holds its first extension —
+  [`ext-physics`](extensions/physics.md) 0.1, experimental: one
+  implementer (the JS reference); a second is required before it
+  leaves experimental.
 - Branching histories are specified and implemented in the reference
   fold ([rfcs/branching-histories.md](rfcs/branching-histories.md)); no
   producer writes branches yet, and the viewer has no branch rail.

@@ -1,4 +1,16 @@
 {
-  "comment": "The extension registry: namespaced extensions with a spec page, a reference implementation and conformance cases (CONTRIBUTING.md). Empty until the first extension lands; physics, tracking the glTF drafts, is the expected first.",
-  "extensions": {}
+  "comment": "The extension registry: namespaced extensions with a spec page, a reference implementation and conformance cases (CONTRIBUTING.md). An extension leaves experimental when a second implementer signs off.",
+  "extensions": {
+    "ext-physics": {
+      "version": "0.1.0",
+      "status": "experimental",
+      "spec": "spec/extensions/physics.md",
+      "rfc": "spec/rfcs/ext-physics.md",
+      "schema": "schema/extensions/ext-physics.schema.json",
+      "implementation": "viewer/src/physics.js (npm openworldformat/physics)",
+      "conformance": ["conformance/physics.json", "conformance/outcomes/physics.json"],
+      "tracks": ["KHR_physics_rigid_bodies", "KHR_implicit_shapes"],
+      "notes": "One implementer (the JS reference); a second is required before experimental lifts. Semantic outcomes are the contract — bit-exact cross-engine trajectories are never promised."
+    }
+  }
 }
