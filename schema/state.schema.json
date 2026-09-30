@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "StateDocument",
+  "description": "The typed state document (state.json): what a world's game state is and its initial values — score, inventory, quests, flags. A save game is base + state declaration + a player's session log (spec/state.md). Experimental until 1.0 pins it, like the document it describes.",
+  "type": "object",
+  "properties": {
+    "format_version": {
+      "description": "The state document's own version.",
+      "type": "integer",
+      "const": 1
+    },
+    "fields": {
+      "description": "The declared fields, keyed by dotted name. A dot-prefix is a namespace by convention (score., quest., inv.); a world's own state SHOULD stay in one namespace.",
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "description": "The field's type.",
+            "enum": ["int", "float", "bool", "string", "map", "list", "json"]
+          },
+          "initial": {
+            "description": "The field's initial value; absent means null (or the empty map, for map fields)."
+          }
+        },
+        "required": ["type"],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": ["format_version", "fields"],
+  "additionalProperties": false
+}

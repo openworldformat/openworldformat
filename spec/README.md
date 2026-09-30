@@ -47,8 +47,9 @@ engine's.
 
 ## Open items (before 1.0)
 
-- The state document is specified (experimental until 1.0) but has no
-  JSON Schema yet; it joins `world.schema.json` when it settles.
+- The state document is specified (experimental until 1.0) with its own
+  [`schema/state.schema.json`](../schema/state.schema.json); it joins
+  `world.schema.json` in the generated core when it settles.
 - The **extension registry** holds its first extension —
   [`ext-physics`](extensions/physics.md) 0.1, experimental: two
   implementers (the JS and Rust references) running the same outcome

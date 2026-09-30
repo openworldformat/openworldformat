@@ -51,5 +51,6 @@ file:
   the process that ran it.
 
 The state document is new (draft 0.1): the log's `state` op kind is
-stable, the declaration above is the proposed shape, and producers
+stable, the declaration's machine-readable shape is
+[`schema/state.schema.json`](../schema/state.schema.json), and producers
 SHOULD treat it as experimental until 1.0 pins it.

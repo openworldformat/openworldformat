@@ -75,5 +75,8 @@ jobs:
           npx -y ajv-cli@5 validate -s schema/world.schema.json \
             -d "conformance/*.json" -d "examples/*/manifest.json" \
             --spec=draft2020 --strict=false
+          npx -y ajv-cli@5 validate -s schema/state.schema.json \
+            -d "examples/*/state.json" \
+            --spec=draft2020 --strict=false
           npx -y ajv-cli@5 compile -s schema/extensions/ext-physics.schema.json \
             --spec=draft2020 --strict=false
