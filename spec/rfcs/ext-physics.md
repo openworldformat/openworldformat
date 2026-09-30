@@ -87,6 +87,8 @@ All three are cheaper than any alternative's failure mode.
   renderer without the extension draws it at rest) and
   `conformance/outcomes/physics.json` (the machine-checkable outcomes,
   run by both references in their CI).
-- Not yet: a producer shipping a package that uses the extension (the
-  gate for leaving experimental); joints and constraints; character
+- Not yet: a producer outside the spec repository shipping a package
+  that uses the extension (the gate for leaving experimental —
+  [`examples/the-drop-test`](../../examples/the-drop-test/) is the
+  first shipped package); joints and constraints; character
   controllers; mesh-level colliders.

@@ -725,7 +725,16 @@ export function createWorldViewer(container, manifest, options = {}) {
       object.receiveShadow = true;
     } else if (def.mesh_asset) {
       object = new THREE.Group();
-      const placeholder = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshBasicMaterial({ color: 0x888888, wireframe: true }));
+      // Capability tiers (rfcs/capability-tiers.md): a mesh may name its
+      // cheaper sibling — a parametric `fallback` shape. It draws while
+      // the mesh loads, and stays when the mesh can't (or the renderer
+      // won't): the declared silhouette instead of a wireframe guess.
+      const fallbackShape = def.mesh_asset.fallback;
+      const placeholder = fallbackShape
+        ? new THREE.Mesh(createGeometry(fallbackShape), createMaterial(def.material, assetBase))
+        : new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshBasicMaterial({ color: 0x888888, wireframe: true }));
+      placeholder.castShadow = Boolean(fallbackShape);
+      placeholder.receiveShadow = Boolean(fallbackShape);
       object.add(placeholder);
       if (gltfLoader) {
         gltfLoader.load(assetBase + def.mesh_asset.path, (gltf) => {
@@ -734,7 +743,7 @@ export function createWorldViewer(container, manifest, options = {}) {
           node.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
           applyNodeOverrides(node, def.mesh_asset.node_overrides);
           object.add(node);
-        }, undefined, () => { /* keep the placeholder */ });
+        }, undefined, () => { /* keep the fallback (or the wireframe) */ });
       }
     } else if (!hasLight) {
       object = new THREE.Group();
@@ -932,6 +941,19 @@ export function createWorldViewer(container, manifest, options = {}) {
     records.push(rec);
     byName.set(def.name, rec);
     byId.set(String(def.id), rec);
+  }
+  // Capability tiers (rfcs/capability-tiers.md): lights carry an optional
+  // `priority`; over this renderer's punctual-light budget, the least
+  // important are hidden — dropped from the tail, never rejected.
+  // Document order breaks ties; a world without priorities is unchanged.
+  {
+    const budget = 16; // three.js shader cost grows per light
+    const lights = records.filter((r) => r.light)
+      .map((r) => ({ record: r, priority: r.def.light?.priority ?? 0 }));
+    if (lights.length > budget) {
+      lights.sort((a, b) => b.priority - a.priority); // stable: ties keep document order
+      for (const { record } of lights.slice(budget)) record.light.visible = false;
+    }
   }
   for (const rec of records) attachRecord(rec);
   for (const rec of records) initDynamics(rec);

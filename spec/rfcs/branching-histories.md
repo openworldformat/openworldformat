@@ -1,8 +1,10 @@
 # RFC: Branching histories — forks, refs and merge provenance
 
 **Status:** implemented in the reference layer (the JS fold and the Rust
-session layer); no producer writes branches yet. Adds to draft 0.2;
-nothing here changes what a linear log means.
+session layer); the first producer to write branches is
+[`examples/speedrun-fork`](../../examples/speedrun-fork/) — a challenge
+chain where each run is a tip — but no app writes branches yet. Adds to
+draft 0.2; nothing here changes what a linear log means.
 
 ## The problem
 

@@ -70,3 +70,10 @@ jobs:
             if (w.version !== 3) throw new Error(f + " is at schema " + w.version);
             console.log("v3", f);
           }'
+      - name: The schema has teeth — every world validates against it
+        run: |
+          npx -y ajv-cli@5 validate -s schema/world.schema.json \
+            -d "conformance/*.json" -d "examples/*/manifest.json" \
+            --spec=draft2020 --strict=false
+          npx -y ajv-cli@5 compile -s schema/extensions/ext-physics.schema.json \
+            --spec=draft2020 --strict=false

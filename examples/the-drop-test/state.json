@@ -1,0 +1,6 @@
+{
+  "format_version": 1,
+  "fields": {
+    "score.switch": { "type": "int", "initial": 0 }
+  }
+}

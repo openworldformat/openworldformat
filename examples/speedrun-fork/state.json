@@ -1,0 +1,7 @@
+{
+  "format_version": 1,
+  "fields": {
+    "run.kai": { "type": "float", "initial": 0.0 },
+    "run.noor": { "type": "float", "initial": 0.0 }
+  }
+}

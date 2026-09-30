@@ -1,0 +1,19 @@
+{
+  "format_version": 1,
+  "name": "speedrun-fork",
+  "profiles": [
+    "viewer",
+    "player",
+    "session"
+  ],
+  "base_revision": 0,
+  "head_revision": 2,
+  "refs": {
+    "main": "e2",
+    "run-kai": "e3",
+    "run-noor": "e4"
+  },
+  "forked_from": null,
+  "seed": null,
+  "updated_ms": 1790000220000
+}

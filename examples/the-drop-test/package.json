@@ -1,0 +1,19 @@
+{
+  "format_version": 1,
+  "name": "the-drop-test",
+  "profiles": [
+    "viewer",
+    "player",
+    "session"
+  ],
+  "extensions": [
+    "ext-physics"
+  ],
+  "base_revision": 0,
+  "head_revision": 1,
+  "refs": {
+    "main": "line-2"
+  },
+  "seed": null,
+  "updated_ms": 1790000100300
+}

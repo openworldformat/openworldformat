@@ -13,7 +13,7 @@
       ],
       "conformance": ["conformance/physics.json", "conformance/outcomes/physics.json"],
       "tracks": ["KHR_physics_rigid_bodies", "KHR_implicit_shapes"],
-      "notes": "Two implementers, both running the same outcome assertions in CI (npm test here; cargo test -p localgpt-world-physics in LocalGPT). Still experimental until a producer ships a package using the extension. Semantic outcomes are the contract — bit-exact cross-engine trajectories are never promised."
+      "notes": "Two implementers, both running the same outcome assertions in CI (npm test here; cargo test -p localgpt-world-physics in LocalGPT). The first package shipped using the extension is examples/the-drop-test. Still experimental until a producer outside this repository ships one. Semantic outcomes are the contract — bit-exact cross-engine trajectories are never promised."
     }
   }
 }

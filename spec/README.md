@@ -55,6 +55,8 @@ engine's.
   assertions; it leaves experimental when a producer ships a package
   using it.
 - Branching histories are specified and implemented in the reference
-  fold ([rfcs/branching-histories.md](rfcs/branching-histories.md)); no
-  producer writes branches yet, and the viewer has no branch rail.
+  fold ([rfcs/branching-histories.md](rfcs/branching-histories.md));
+  [`examples/speedrun-fork`](../examples/speedrun-fork/) is the first
+  package to write them (a challenge chain: two runs, one fork each).
+  No app writes branches yet, and the viewer has no branch rail.
 - More prose around replay determinism as implementers arrive.

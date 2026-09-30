@@ -3,7 +3,9 @@
 **Status: experimental.** Two implementers — the JS reference
 (`openworldformat/physics`) and the Rust reference (LocalGPT's
 `world-physics` crate) — both running the same conformance outcome
-assertions. It leaves experimental when a producer ships a package
+assertions, and one shipped package using the extension
+([`examples/the-drop-test`](../../examples/the-drop-test/)). It leaves
+experimental when a producer outside this repository ships a package
 using it ([CONTRIBUTING](../../CONTRIBUTING.md)). It tracks the glTF
 physics drafts (`KHR_physics_rigid_bodies`, `KHR_implicit_shapes`) and
 the OMI proposals: field names follow the drafts where they do not fight
