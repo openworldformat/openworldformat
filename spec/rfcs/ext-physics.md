@@ -76,9 +76,17 @@ All three are cheaper than any alternative's failure mode.
   solver (spheres, floors, axis-aligned statics; fixed 1/120 s
   semi-implicit Euler), trajectory write/fold, and the runner for the
   conformance outcome assertions.
+- **Rust reference** (LocalGPT's `world-physics` crate): the second
+  implementer — `SessionOp::Extension` in the session layer, `extra`
+  maps so extension fields ride entities, environments and patches,
+  the same solver step for step, the same outcome runner, and the
+  fixtures mirrored with a drift test against this repository's
+  copies. The two engines agree on the outcomes; they do not agree on
+  the bits, which is the contract.
 - **Conformance:** `conformance/physics.json` (a renderable world — a
   renderer without the extension draws it at rest) and
-  `conformance/outcomes/physics.json` (the machine-checkable outcomes).
-- Not yet: a second implementer (required before the extension leaves
-  experimental, per [CONTRIBUTING](../../CONTRIBUTING.md)); joints and
-  constraints; character controllers; mesh-level colliders.
+  `conformance/outcomes/physics.json` (the machine-checkable outcomes,
+  run by both references in their CI).
+- Not yet: a producer shipping a package that uses the extension (the
+  gate for leaving experimental); joints and constraints; character
+  controllers; mesh-level colliders.

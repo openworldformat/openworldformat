@@ -1,5 +1,5 @@
 {
-  "comment": "The extension registry: namespaced extensions with a spec page, a reference implementation and conformance cases (CONTRIBUTING.md). An extension leaves experimental when a second implementer signs off.",
+  "comment": "The extension registry: namespaced extensions with a spec page, a reference implementation and conformance cases (CONTRIBUTING.md). An extension is experimental until two implementers sign off and a producer ships it.",
   "extensions": {
     "ext-physics": {
       "version": "0.1.0",
@@ -7,10 +7,13 @@
       "spec": "spec/extensions/physics.md",
       "rfc": "spec/rfcs/ext-physics.md",
       "schema": "schema/extensions/ext-physics.schema.json",
-      "implementation": "viewer/src/physics.js (npm openworldformat/physics)",
+      "implementations": [
+        "viewer/src/physics.js (npm openworldformat/physics)",
+        "LocalGPT crates/world-physics (Rust, localgpt-world-physics)"
+      ],
       "conformance": ["conformance/physics.json", "conformance/outcomes/physics.json"],
       "tracks": ["KHR_physics_rigid_bodies", "KHR_implicit_shapes"],
-      "notes": "One implementer (the JS reference); a second is required before experimental lifts. Semantic outcomes are the contract — bit-exact cross-engine trajectories are never promised."
+      "notes": "Two implementers, both running the same outcome assertions in CI (npm test here; cargo test -p localgpt-world-physics in LocalGPT). Still experimental until a producer ships a package using the extension. Semantic outcomes are the contract — bit-exact cross-engine trajectories are never promised."
     }
   }
 }

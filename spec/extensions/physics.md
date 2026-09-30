@@ -1,8 +1,10 @@
 # The physics extension (`ext-physics`), version 0.1
 
-**Status: experimental.** One implementer (the JS reference); a second
-implementer's sign-off is required before the extension leaves
-experimental ([CONTRIBUTING](../../CONTRIBUTING.md)). It tracks the glTF
+**Status: experimental.** Two implementers — the JS reference
+(`openworldformat/physics`) and the Rust reference (LocalGPT's
+`world-physics` crate) — both running the same conformance outcome
+assertions. It leaves experimental when a producer ships a package
+using it ([CONTRIBUTING](../../CONTRIBUTING.md)). It tracks the glTF
 physics drafts (`KHR_physics_rigid_bodies`, `KHR_implicit_shapes`) and
 the OMI proposals: field names follow the drafts where they do not fight
 this format, and diverge where the drafts assume a scene-graph engine.
@@ -126,14 +128,28 @@ extension by passing the outcomes; the assertion kinds are:
 | `rest` | a body's resting position is within `tolerance` of `near` |
 | `bounces` | a body's impacts above 0.5 m/s number at least `min` |
 
-## Reference implementation
+## Reference implementations
 
-`openworldformat/physics` (in this repository, `viewer/src/physics.js`)
-is the reference: the op kind in the fold, `ext-*` patch passthrough, a
-deliberately minimal deterministic solver — spheres against floors and
-axis-aligned statics, fixed 1/120 s semi-implicit Euler, sleep on rest —
-trajectory write/fold, and the outcome runner. It exists to make the
-conformance cases executable by anyone and the contract testable in CI;
-it is not production physics, and conforming engines are expected to
-use real ones. Static rotations are ignored by the reference (axis
-aligned colliders only); production engines are not so limited.
+Two, in two languages, running the same conformance outcome assertions
+from `conformance/outcomes/physics.json` in their own CI:
+
+- **JS** — `openworldformat/physics` (in this repository,
+  `viewer/src/physics.js`): the op kind in the fold, `ext-*` patch
+  passthrough, the solver, trajectory write/fold, and the outcome
+  runner.
+- **Rust** — LocalGPT's `world-physics` crate
+  (`localgpt-world-physics`): `SessionOp::Extension` in the session
+  layer, `extra` maps on entities and the environment so extension
+  fields ride the fold (including patches — null clears, in JSON and
+  RON alike), the same solver algorithm step for step, and the same
+  outcome runner.
+
+Both are deliberately minimal — spheres against floors and
+axis-aligned statics, fixed 1/120 s semi-implicit Euler, sleep on rest
+— so the conformance cases are executable by anyone and the contract
+is testable in CI. They are reference-grade, not production physics;
+conforming engines are expected to use real ones. That the two engines
+agree on outcomes without agreeing on bits is the contract working:
+cross-engine trajectories are never promised, cross-engine outcomes
+are. Static rotations are ignored by the references (axis-aligned
+colliders only); production engines are not so limited.
