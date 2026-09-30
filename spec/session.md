@@ -54,6 +54,7 @@ its shape:
 | `input` | an app, sampled (~10 Hz) while recording | no — playthrough replay |
 | `state` | an app, when host state changes | no — the game state no document holds |
 | `clock` | an app, on transport events | no — performances, song worlds, tours |
+| `merge` | an app, merging a fork | no — provenance that a batch came from a branch |
 
 Edits are `SpawnEntity`, `DeleteEntity`, `ModifyEntity` (an entity id
 plus a field patch), `SetEnvironment`, `SetCamera`, `SetAmbience`,
@@ -69,6 +70,22 @@ reference rule: op kinds are recognized by shape, edits first — so a log
 containing only edits (every log written before this format had history
 kinds) parses unchanged, and an edit serializes today exactly as it
 always did.
+
+## Entry identity, forks and branches
+
+An entry may carry an `id` (its identity — content hashes recommended,
+opaque to readers) and a `parent` (the entry it builds on). A **branch**
+is an entry whose parent already has a child; a **tip** is an entry that
+is nobody's parent. Folding generalizes: **state at any tip is a fold of
+the path** — walk parent links from tip to base, fold that chain. A log
+with no ids is a chain in file order (a reader synthesizes
+`line-<n>` ids), so branching is purely additive and old readers see a
+linear prefix. `revision` stays the room's total order; `parent` records
+causality — sequence is not causality.
+
+Forks and refs live in `package.json` ([the package](package.md)); the
+`merge` op records where a merged batch came from. See
+[`rfcs/branching-histories.md`](rfcs/branching-histories.md).
 
 ## Snapshots
 

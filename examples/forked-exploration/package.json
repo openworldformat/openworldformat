@@ -1,0 +1,17 @@
+{
+  "format_version": 1,
+  "name": "castle-exploration",
+  "profiles": [
+    "viewer",
+    "session"
+  ],
+  "base_revision": 0,
+  "head_revision": 4,
+  "refs": {
+    "main": "e3",
+    "moat-variant": "e5"
+  },
+  "forked_from": null,
+  "seed": null,
+  "updated_ms": 1790000000500
+}

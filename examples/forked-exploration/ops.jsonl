@@ -1,0 +1,5 @@
+{"id":"e1","revision":1,"author":{"name":"maya"},"ops":[{"SpawnEntity":{"entity":{"id":100,"name":"keep","transform":{"position":[0.0,0.0,0.0]}}}}],"timestamp_ms":1790000000100}
+{"id":"e2","revision":2,"author":{"name":"maya"},"ops":[{"SpawnEntity":{"entity":{"id":101,"name":"wall","transform":{"position":[4.0,0.0,0.0]}}}}],"timestamp_ms":1790000000200,"parent":"e1"}
+{"id":"e3","revision":3,"author":{"name":"maya"},"ops":[{"SpawnEntity":{"entity":{"id":102,"name":"garden","transform":{"position":[0.0,0.0,6.0]}}}}],"timestamp_ms":1790000000300,"parent":"e2"}
+{"id":"e4","revision":3,"author":{"name":"llm"},"ops":[{"SpawnEntity":{"entity":{"id":103,"name":"moat","transform":{"position":[0.0,0.0,-6.0]}}}}],"timestamp_ms":1790000000400,"parent":"e2"}
+{"id":"e5","revision":4,"author":{"name":"host"},"ops":[{"merge":{"branch":"moat-variant"}}],"timestamp_ms":1790000000500,"parent":"e4"}

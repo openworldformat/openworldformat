@@ -1,6 +1,6 @@
 # The Open World Format specification
 
-**Status: draft 0.1.** This specification describes `.world` packages at
+**Status: draft 0.2.** This specification describes `.world` packages at
 manifest schema version 3. The normative definitions are:
 
 1. [`schema/world.schema.json`](../schema/world.schema.json) — the world
@@ -51,4 +51,7 @@ engine's.
   JSON Schema yet; it joins `world.schema.json` when it settles.
 - The **extension registry** accepts its first real extension (physics,
   tracking the glTF drafts, is the expected first).
+- Branching histories are specified and implemented in the reference
+  fold ([rfcs/branching-histories.md](rfcs/branching-histories.md)); no
+  producer writes branches yet, and the viewer has no branch rail.
 - More prose around replay determinism as implementers arrive.

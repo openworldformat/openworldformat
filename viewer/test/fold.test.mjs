@@ -12,6 +12,8 @@ import {
   editOps,
   foldLog,
   foldState,
+  buildHistory,
+  foldPath,
 } from "../src/index.js";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
@@ -180,6 +182,60 @@ test("state folds over the declaration, tolerating the undeclared", () => {
   assert.equal(folded.values["has.map"], false); // null reset the initial
   assert.ok(!("unknown.key" in folded.values)); // set, carried, then removed
   assert.deepEqual(folded.undeclared, ["unknown.key"]);
+});
+
+test("a forked history folds per tip: same prefix, different worlds", () => {
+  const forkedDir = path.join(root, "examples/forked-exploration");
+  const manifest = parseManifest(readFileSync(path.join(forkedDir, "manifest.json"), "utf8"));
+  const entries = readFileSync(path.join(forkedDir, "ops.jsonl"), "utf8")
+    .split("\n").filter((l) => l.trim() !== "").map(parseLogLine);
+
+  const history = buildHistory(entries);
+  // Two tips: the trunk's garden end, and the moat variant.
+  assert.deepEqual([...history.tips].sort(), ["e3", "e5"]);
+  // The fork point has both children.
+  assert.deepEqual(history.children.get("e2").sort(), ["e3", "e4"]);
+
+  const trunk = foldPath(manifest, entries, "e3");
+  assert.ok(trunk.entities.some((e) => e.name === "garden"));
+  assert.ok(!trunk.entities.some((e) => e.name === "moat"));
+  assert.deepEqual(trunk.path, ["e1", "e2", "e3"]);
+
+  const variant = foldPath(manifest, entries, "e5");
+  assert.ok(variant.entities.some((e) => e.name === "moat"));
+  assert.ok(!variant.entities.some((e) => e.name === "garden"));
+  assert.deepEqual(variant.path, ["e1", "e2", "e4", "e5"]);
+
+  // Default tip is the last entry in file order; the merge record folds
+  // to nothing, so the variant's document is unchanged by it.
+  assert.equal(variant.entities.length, foldPath(manifest, entries, "e4").entities.length);
+
+  // Unknown tips refuse loudly.
+  assert.throws(() => foldPath(manifest, entries, "e99"), /no entry 'e99'/);
+});
+
+test("a log with no ids is a chain, and mixed logs work", () => {
+  const manifest = parseManifest(manifestText);
+  // The hello-world log has no ids: one tip, the last line.
+  const history = buildHistory(entries);
+  assert.deepEqual(history.tips, [`line-${entries.length - 1}`]);
+  const state = foldPath(manifest, entries);
+  assert.equal(state.entities.length, manifest.entities.length + 1); // the lantern
+
+  // Mixed: an id-bearing branch grafted onto a synthesized chain.
+  const chain = [
+    { revision: 1, author: { name: "t" }, ops: [{ SpawnEntity: { entity: { id: 900, name: "a" } } }], timestamp_ms: 0 },
+    { revision: 2, author: { name: "t" }, ops: [{ SpawnEntity: { entity: { id: 901, name: "b" } } }], timestamp_ms: 1 },
+    { id: "x", parent: "line-0", revision: 2, author: { name: "t" },
+      ops: [{ SpawnEntity: { entity: { id: 902, name: "c" } } }], timestamp_ms: 2 },
+  ].map((e) => parseLogLine(JSON.stringify(e)));
+  const mixed = buildHistory(chain);
+  assert.deepEqual([...mixed.tips].sort(), ["line-1", "x"]);
+  assert.equal(foldPath(manifest, chain, "x").entities.filter((e) => e.id === 902).length, 1);
+});
+
+test("merge ops classify and fold to nothing", () => {
+  assert.equal(classifyOp({ merge: { branch: "moat-variant" } }).kind, "merge");
 });
 
 test("a torn line loses at most itself", () => {

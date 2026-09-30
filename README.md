@@ -16,7 +16,7 @@ sessions.
 
 ## Status
 
-Draft 0.1, describing schema version 3. The schema, the conformance
+Draft 0.2, describing schema version 3. The schema, the conformance
 worlds and a reference fold implementation are in this repository and
 tested in CI; two renderers (Bevy, three.js) already draw the conformance
 suite in the format's origin project. Expect churn until 1.0; the

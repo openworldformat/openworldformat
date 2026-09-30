@@ -72,6 +72,7 @@ export function classifyOp(op) {
   if (op.input && typeof op.input.actor === "string") return { kind: "input", value: op.input };
   if (op.state && typeof op.state === "object") return { kind: "state", value: op.state };
   if (op.clock && typeof op.clock === "object") return { kind: "clock", value: op.clock };
+  if (op.merge && typeof op.merge === "object") return { kind: "merge", value: op.merge };
   return { kind: "unknown" };
 }
 
@@ -153,6 +154,84 @@ export function foldState(stateDoc, entries) {
     }
   }
   return { values, undeclared: [...undeclared] };
+}
+
+// ---------------------------------------------------------------------------
+// Branching histories
+// ---------------------------------------------------------------------------
+
+/**
+ * Give every entry an id and a parent, per spec/session.md: an entry's
+ * own `id` if present, else a synthesized `line-<n>`; its `parent` if
+ * present, else the previous entry (null for the first). A log with no
+ * ids is therefore a chain in file order.
+ */
+function withIdentity(entries) {
+  const byId = new Map();
+  const ordered = [];
+  let previous = null;
+  for (let n = 0; n < entries.length; n++) {
+    const raw = entries[n];
+    const id = typeof raw.id === "string" ? raw.id : `line-${n}`;
+    if (byId.has(id)) {
+      throw new Error(`duplicate entry id '${id}'`);
+    }
+    const parent = typeof raw.parent === "string" ? raw.parent : previous;
+    if (parent !== null && !byId.has(parent) && parent !== undefined) {
+      throw new Error(`entry '${id}' names parent '${parent}', which isn't in the log`);
+    }
+    const entry = { ...raw, id, parent: parent ?? null };
+    byId.set(id, entry);
+    ordered.push(entry);
+    previous = id;
+  }
+  return { ordered, byId };
+}
+
+/**
+ * The history of a log: entries with identity, and its shape.
+ *
+ * @param {array} entries parsed log entries, in file order
+ * @returns {{ordered: array, byId: Map, children: Map<string, string[]>, tips: string[]}}
+ */
+export function buildHistory(entries) {
+  const { ordered, byId } = withIdentity(entries);
+  const children = new Map(ordered.map((e) => [e.id, []]));
+  for (const entry of ordered) {
+    if (entry.parent !== null && children.has(entry.parent)) {
+      children.get(entry.parent).push(entry.id);
+    }
+  }
+  const tips = ordered.filter((e) => children.get(e.id).length === 0).map((e) => e.id);
+  return { ordered, byId, children, tips };
+}
+
+/**
+ * Fold one path of the history: the document at `tip` (default: the last
+ * entry in file order), reached by walking parent links to the base and
+ * folding that chain. A branch is just a different tip.
+ *
+ * @param {object} manifest the base world document
+ * @param {array} entries parsed log entries, in file order
+ * @param {string} [tip] an entry id from buildHistory
+ * @returns {object} the fold state (as foldLog returns), plus `path` ids
+ * @throws on an unknown tip, or the first entry that no longer applies
+ */
+export function foldPath(manifest, entries, tip) {
+  const { ordered, byId } = withIdentity(entries);
+  const last = ordered.length ? ordered[ordered.length - 1].id : null;
+  const target = tip ?? last;
+  if (!byId.has(target)) {
+    throw new Error(`no entry '${target}' in this log`);
+  }
+  const chain = [];
+  for (let id = target; id !== null; id = byId.get(id).parent) {
+    chain.push(byId.get(id));
+  }
+  chain.reverse();
+  const state = foldLog(manifest, chain);
+  state.path = chain.map((e) => e.id);
+  return state;
 }
 
 // ---------------------------------------------------------------------------

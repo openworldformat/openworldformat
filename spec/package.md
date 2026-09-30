@@ -23,6 +23,8 @@ thing.world/
   "profiles": ["viewer", "player", "session"],
   "base_revision": 0,
   "head_revision": 3,
+  "refs": { "main": "e3" },
+  "forked_from": null,
   "seed": null,
   "world_sha256": "…",
   "log_sha256": "…",
@@ -36,6 +38,8 @@ thing.world/
 | `profiles` | Which profiles the package uses; readers ignore unknown ones. |
 | `base_revision` | The revision `manifest.json` (or the newest snapshot) holds. |
 | `head_revision` | The newest revision the log reaches. |
+| `refs` | Named tips of the history (`main` is the trunk's); pointers, never data. |
+| `forked_from` | When this package began as a fork: which package, at which entry. |
 | `seed` | Reserved for deterministic replay. |
 | `world_sha256` / `log_sha256` | Integrity: SHA-256 of `manifest.json` and of `ops.jsonl` as of head. |
 

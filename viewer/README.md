@@ -57,7 +57,9 @@ descendants; it stops at the first entry that no longer applies.
 | `parseLogLine(line)` | parse one `ops.jsonl` line, ops classified |
 | `classifyOp(op)` | recognize an op by shape — edits first |
 | `editOps(entry)` | an entry's edits, in order |
-| `foldLog(manifest, entries)` | the document at the last entry |
+| `foldLog(manifest, entries)` | the document at the last entry (the linear fold) |
+| `buildHistory(entries)` | ids, parents, children and tips of a branching log |
+| `foldPath(manifest, entries, tip?)` | the document at a tip — fork anywhere, fold that path |
 | `foldState(stateDoc, entries)` | the game state at the last entry (declared fields, map subkeys, tolerant of the undeclared) |
 | `SUPPORTED_SCHEMA_VERSION` | the manifest schema this reads (3) |
 
