@@ -9,6 +9,7 @@ description = "The Open World Format research package: parse and fold a .world i
 readme = "README.md"
 requires-python = ">=3.10"
 license = "Apache-2.0"
+authors = [{ name = "The Open World Format contributors" }]
 keywords = [
   "3d",
   "world",
@@ -21,7 +22,20 @@ keywords = [
   "benchmark",
   "dataset",
 ]
-urls = { Repository = "https://github.com/openworldformat/openworldformat", Documentation = "https://openworldformat.org" }
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "Intended Audience :: Science/Research",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+  "Topic :: File Formats",
+  "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+urls = { Repository = "https://github.com/openworldformat/openworldformat", Documentation = "https://openworldformat.org", Homepage = "https://openworldformat.org" }
 
 [tool.setuptools]
 packages = ["openworldformat"]
