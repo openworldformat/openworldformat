@@ -1,10 +1,12 @@
 // world-viewer.js — the Open World Format reference 3D renderer.
 //
-// Provenance: copied verbatim from
-// localgpt/crates/world-export/js/world-viewer.js (Apache-2.0), which drew
-// the conformance suite in production before this repository existed. When
-// this copy becomes the upstream, the LocalGPT apps consume it from the
-// openworldformat npm package instead of keeping a second copy.
+// Provenance: born as localgpt's crates/world-export/js/world-viewer.js
+// (Apache-2.0), which drew the conformance suite in production before this
+// repository existed. This file is upstream now — the LocalGPT apps vendor
+// it from the published package (their scripts/sync-viewer.sh, byte-checked
+// in their CI) and songworld assembles it from the tarball; renderer
+// changes release here first, on npm, and flow out. Keep it that way: one
+// renderer, released once, consumed everywhere.
 //
 // Input: a `WorldManifest` as JSON (crate `localgpt-world-types`; schema in
 // `crates/world-types/world.schema.json`). Output: a three.js scene that
