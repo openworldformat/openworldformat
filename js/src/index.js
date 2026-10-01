@@ -6,6 +6,9 @@
 // document, history kinds fold to nothing, ops are recognized by shape
 // (edits first), and a batch applies all-or-nothing.
 //
+// The types below speak the schema's language (schema/world.schema.json
+// `$defs`): JSDoc, checked and emitted as .d.ts by `npm run build:types`.
+//
 // Spec: https://openworldformat.org  ·  schema version 3
 
 /** The manifest schema version this fold reads. */
@@ -15,13 +18,127 @@ export const SUPPORTED_SCHEMA_VERSION = 3;
 export const SUPPORTED_FORMAT_VERSION = 1;
 
 // ---------------------------------------------------------------------------
+// Document types (the schema's $defs, as far as the fold reads them)
+// ---------------------------------------------------------------------------
+
+/** A 3-component vector, as the format serializes it: [x, y, z]. */
+/** @typedef {[number, number, number]} Vec3 */
+
+/** Transform in world space (or parent-relative if parented). */
+/**
+ * @typedef {Record<string, unknown> & {
+ *   position?: Vec3, rotation_degrees?: Vec3, scale?: Vec3, visible?: boolean
+ * }} WorldTransform
+ */
+
+/** A parametric primitive, externally tagged: {Sphere: {radius}}, {Cuboid: {x, y, z}}, ... */
+/** @typedef {Record<string, Record<string, number>>} Shape */
+
+/**
+ * One entity: component slots are all optional — an entity is what it
+ * declares. Any `ext-*` key rides along untouched (the extension fields
+ * the fold carries, per must-ignore).
+ * @typedef {Record<string, unknown> & {
+ *   id: number, name: string, parent?: number|null,
+ *   transform?: WorldTransform, chunk?: [number, number],
+ *   shape?: Shape, material?: any, light?: any, audio?: any, mesh_asset?: any,
+ *   behaviors?: any[], modulations?: any[], triggers?: any[],
+ *   instance_of?: any, creation_id?: number
+ * }} WorldEntity
+ */
+
+/** World metadata. */
+/** @typedef {Record<string, unknown> & {name?: string}} WorldMeta */
+
+/** Environment settings (background, ambient light, fog). */
+/**
+ * @typedef {Record<string, unknown> & {
+ *   background_color?: Vec3, fog_color?: Vec3, fog_density?: number,
+ *   ambient_color?: Vec3, ambient_intensity?: number
+ * }} EnvironmentDef
+ */
+
+/** Camera definition. */
+/**
+ * @typedef {Record<string, unknown> & {
+ *   position?: Vec3, look_at?: Vec3, fov_degrees?: number
+ * }} CameraDef
+ */
+
+/** Top-level world manifest — everything needed to save/load a world. */
+/**
+ * @typedef {Record<string, unknown> & {
+ *   version: number, meta?: WorldMeta, entities: WorldEntity[],
+ *   environment?: EnvironmentDef|null, camera?: CameraDef|null, ambience?: any[],
+ *   creations?: any[], next_entity_id?: number,
+ *   avatar?: any, soundtrack?: any, tours?: any[]
+ * }} WorldManifest
+ */
+
+/** One parsed ops.jsonl line: an entry, its ops classified on parse. */
+/**
+ * @typedef {object} LogEntry
+ * @property {number} revision
+ * @property {unknown} [author]
+ * @property {number} [timestamp_ms]
+ * @property {any[]} ops
+ * @property {string} [id]
+ * @property {string|null} [parent]
+ * @property {ClassifiedOp[]} [classified]
+ */
+
+/** One op, recognized by shape — the compatibility rule, executable. */
+/**
+ * @typedef {{kind: "edit", edit: string, value: any}} ClassifiedEdit
+ * @typedef {{kind: "tool"|"input"|"state"|"clock"|"merge", value: any}} ClassifiedHistory
+ * @typedef {{kind: "extension", name: string, value: any}} ClassifiedExtension
+ * @typedef {{kind: "unknown"}} ClassifiedUnknown
+ * @typedef {ClassifiedEdit|ClassifiedHistory|ClassifiedExtension|ClassifiedUnknown} ClassifiedOp
+ */
+
+/** An entry with identity resolved: an id and a parent, always. */
+/** @typedef {LogEntry & {id: string, parent: string|null}} IdentifiedEntry */
+
+/**
+ * The document at a point in the log — what foldLog and foldPath return.
+ * `byId` and `names` are the fold's internal indexes (rebuilt as it goes);
+ * `path` is set by foldPath only: the entry ids that were folded.
+ *
+ * @typedef {object} FoldState
+ * @property {string} name the world's name (manifest meta)
+ * @property {WorldEntity[]} entities base plus every applied edit
+ * @property {EnvironmentDef|null} environment
+ * @property {CameraDef|null} camera
+ * @property {any[]} ambience
+ * @property {Map<string, any>} audioEmitters
+ * @property {number} appliedEdits
+ * @property {Map<number, WorldEntity>} byId
+ * @property {Set<string>} names
+ * @property {string[]} [path]
+ */
+
+/** A declared state field (schema/state.schema.json). */
+/**
+ * @typedef {object} StateField
+ * @property {"int"|"float"|"bool"|"string"|"map"|"list"|"json"} type
+ * @property {any} [initial]
+ */
+
+/** The typed state document (state.json). */
+/**
+ * @typedef {object} StateDocument
+ * @property {number} format_version
+ * @property {Record<string, StateField>} fields
+ */
+
+// ---------------------------------------------------------------------------
 // Parsing
 // ---------------------------------------------------------------------------
 
 /**
  * Parse and sanity-check a world document.
  * @param {string} json the manifest's JSON text
- * @returns {object} the manifest
+ * @returns {WorldManifest} the manifest
  * @throws when the text isn't JSON or the schema version isn't supported
  */
 export function parseManifest(json) {
@@ -59,9 +176,8 @@ const EDIT_KEYS = new Set([
  * edit serializes today exactly as it always did. Extension ops
  * (`ext-*`, single key, object value) are recognized as a kind of their
  * own and, like every history kind, fold to nothing for the document.
- * @param {object} op
- * @returns {{kind: "edit"|"tool"|"input"|"state"|"clock"|"merge"|"extension"|"unknown",
- *            edit?: string, name?: string, value?: object}}
+ * @param {Record<string, any>} op
+ * @returns {ClassifiedOp}
  */
 export function classifyOp(op) {
   if (op === null || typeof op !== "object" || Array.isArray(op)) {
@@ -88,7 +204,7 @@ export function classifyOp(op) {
  * are the writer's crash, not the reader's — the caller decides whether
  * to skip (the spec says skip the last one, count the rest).
  * @param {string} line one line of ops.jsonl
- * @returns {{revision: number, author: object, timestamp_ms: number, ops: array, classified: array}}
+ * @returns {LogEntry}
  */
 export function parseLogLine(line) {
   const entry = JSON.parse(line);
@@ -98,11 +214,19 @@ export function parseLogLine(line) {
   return { ...entry, classified: entry.ops.map(classifyOp) };
 }
 
-/** An entry's edits, in order — the ops that change the document. */
+/**
+ * @param {ClassifiedOp} c
+ * @returns {c is ClassifiedEdit}
+ */
+const isEdit = (c) => c.kind === "edit";
+
+/** An entry's edits, in order — the ops that change the document.
+ * @param {LogEntry} entry
+ * @returns {ClassifiedEdit[]} */
 export function editOps(entry) {
   return entry.classified === undefined
-    ? entry.ops.map(classifyOp).filter((c) => c.kind === "edit")
-    : entry.classified.filter((c) => c.kind === "edit");
+    ? entry.ops.map(classifyOp).filter(isEdit)
+    : entry.classified.filter(isEdit);
 }
 
 // ---------------------------------------------------------------------------
@@ -115,13 +239,13 @@ export function editOps(entry) {
  * touch entities — and equally tolerant: keys nothing declares are
  * carried, not refused (spec/state.md).
  *
- * @param {object} stateDoc parsed `state.json` ({format_version, fields})
- * @param {array} entries parsed log entries, in order
- * @returns {{values: object, undeclared: string[]}}
+ * @param {StateDocument} stateDoc parsed `state.json` ({format_version, fields})
+ * @param {LogEntry[]} entries parsed log entries, in order
+ * @returns {{values: Record<string, any>, undeclared: string[]}}
  */
 export function foldState(stateDoc, entries) {
   const fields = stateDoc?.fields ?? {};
-  const values = {};
+  const values = /** @type {Record<string, any>} */ ({});
   for (const [key, field] of Object.entries(fields)) {
     values[key] = structuredClone(field.initial ?? null);
   }
@@ -172,6 +296,8 @@ export function foldState(stateDoc, entries) {
  * own `id` if present, else a synthesized `line-<n>`; its `parent` if
  * present, else the previous entry (null for the first). A log with no
  * ids is therefore a chain in file order.
+ * @param {LogEntry[]} entries
+ * @returns {{ordered: IdentifiedEntry[], byId: Map<string, IdentifiedEntry>}}
  */
 function withIdentity(entries) {
   const byId = new Map();
@@ -198,18 +324,19 @@ function withIdentity(entries) {
 /**
  * The history of a log: entries with identity, and its shape.
  *
- * @param {array} entries parsed log entries, in file order
- * @returns {{ordered: array, byId: Map, children: Map<string, string[]>, tips: string[]}}
+ * @param {LogEntry[]} entries parsed log entries, in file order
+ * @returns {{ordered: IdentifiedEntry[], byId: Map<string, IdentifiedEntry>,
+ *            children: Map<string, string[]>, tips: string[]}}
  */
 export function buildHistory(entries) {
   const { ordered, byId } = withIdentity(entries);
   const children = new Map(ordered.map((e) => [e.id, []]));
   for (const entry of ordered) {
     if (entry.parent !== null && children.has(entry.parent)) {
-      children.get(entry.parent).push(entry.id);
+      /** @type {string[]} */ (children.get(entry.parent)).push(entry.id);
     }
   }
-  const tips = ordered.filter((e) => children.get(e.id).length === 0).map((e) => e.id);
+  const tips = ordered.filter((e) => /** @type {string[]} */ (children.get(e.id)).length === 0).map((e) => e.id);
   return { ordered, byId, children, tips };
 }
 
@@ -218,22 +345,22 @@ export function buildHistory(entries) {
  * entry in file order), reached by walking parent links to the base and
  * folding that chain. A branch is just a different tip.
  *
- * @param {object} manifest the base world document
- * @param {array} entries parsed log entries, in file order
+ * @param {WorldManifest} manifest the base world document
+ * @param {LogEntry[]} entries parsed log entries, in file order
  * @param {string} [tip] an entry id from buildHistory
- * @returns {object} the fold state (as foldLog returns), plus `path` ids
+ * @returns {FoldState} the fold state (as foldLog returns), plus `path` ids
  * @throws on an unknown tip, or the first entry that no longer applies
  */
 export function foldPath(manifest, entries, tip) {
   const { ordered, byId } = withIdentity(entries);
   const last = ordered.length ? ordered[ordered.length - 1].id : null;
   const target = tip ?? last;
-  if (!byId.has(target)) {
+  if (target === null || !byId.has(target)) {
     throw new Error(`no entry '${target}' in this log`);
   }
   const chain = [];
-  for (let id = target; id !== null; id = byId.get(id).parent) {
-    chain.push(byId.get(id));
+  for (let id = /** @type {string|null} */ (target); id !== null; id = /** @type {IdentifiedEntry} */ (byId.get(id)).parent) {
+    chain.push(/** @type {IdentifiedEntry} */ (byId.get(id)));
   }
   chain.reverse();
   const state = foldLog(manifest, chain);
@@ -245,12 +372,15 @@ export function foldPath(manifest, entries, tip) {
 // Folding
 // ---------------------------------------------------------------------------
 
-/** @returns {string} why the fold refused, as an Error */
+/** @param {string} message @returns {Error} why the fold refused */
 function invalid(message) {
   return new Error(`invalid: ${message}`);
 }
 
-/** Apply one edit op to a fold state, all-or-nothing. Throws on refusal. */
+/** Apply one edit op to a fold state, all-or-nothing. Throws on refusal.
+ * @param {FoldState} state
+ * @param {string} edit
+ * @param {any} value */
 function applyEdit(state, edit, value) {
   switch (edit) {
     case "SpawnEntity": {
@@ -389,11 +519,16 @@ function applyEdit(state, edit, value) {
   }
 }
 
-/** A deep-copied trial state, with its id/name maps rebuilt. */
+/** A deep-copied trial state, with its id/name maps rebuilt.
+ * @param {FoldState} state
+ * @returns {{state: FoldState}} */
 function freshTrial(state) {
   const entities = structuredClone(state.entities);
   return {
     state: {
+      // name and appliedEdits ride along for the shape; commit ignores them.
+      name: state.name,
+      appliedEdits: state.appliedEdits,
       entities,
       environment: structuredClone(state.environment),
       camera: structuredClone(state.camera),
@@ -405,7 +540,9 @@ function freshTrial(state) {
   };
 }
 
-/** Commit a trial's document fields and rebuilt maps onto the fold state. */
+/** Commit a trial's document fields and rebuilt maps onto the fold state.
+ * @param {FoldState} state
+ * @param {{state: FoldState}} trial */
 function commitTrial(state, trial) {
   state.entities = trial.state.entities;
   state.environment = trial.state.environment;
@@ -419,15 +556,14 @@ function commitTrial(state, trial) {
 /**
  * Fold log entries over a manifest: the document at the last entry.
  *
- * @param {object} manifest a parsed manifest (the base, at base_revision)
- * @param {array} entries parsed log entries, in order
- * @returns {{name: string, entities: array, environment, camera, ambience,
- *            audioEmitters: Map, appliedEdits: number}}
+ * @param {WorldManifest} manifest a parsed manifest (the base, at base_revision)
+ * @param {LogEntry[]} entries parsed log entries, in order
+ * @returns {FoldState}
  * @throws at the first entry that no longer applies — the fold stops there,
  *   exactly as the specification's readers do.
  */
 export function foldLog(manifest, entries) {
-  const state = {
+  const state = /** @type {FoldState} */ ({
     name: manifest.meta?.name ?? "",
     entities: structuredClone(manifest.entities),
     environment: manifest.environment ?? null,
@@ -435,7 +571,9 @@ export function foldLog(manifest, entries) {
     ambience: manifest.ambience ?? [],
     audioEmitters: new Map(),
     appliedEdits: 0,
-  };
+    byId: new Map(),
+    names: new Set(),
+  });
   state.byId = new Map(state.entities.map((e) => [e.id, e]));
   state.names = new Set(state.entities.map((e) => e.name));
 

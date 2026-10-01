@@ -19,6 +19,12 @@
 
 import { classifyOp } from "./index.js";
 
+/** @typedef {import('./index.js').Vec3} Vec3 */
+/** @typedef {import('./index.js').WorldEntity} WorldEntity */
+/** @typedef {import('./index.js').WorldManifest} WorldManifest */
+/** @typedef {import('./index.js').EnvironmentDef} EnvironmentDef */
+/** @typedef {import('./index.js').LogEntry} LogEntry */
+
 /** The extension this module implements. */
 export const EXTENSION_NAME = "ext-physics";
 
@@ -43,18 +49,101 @@ const DEFAULTS = {
   linear_damping: 0.0,
 };
 
+/**
+ * An entity's `ext-physics` component: body kind, material parameters,
+ * and an optional explicit collider (a sphere radius, a cuboid's
+ * extents, or "shape" to use the parametric shape).
+ * @typedef {Record<string, any> & {
+ *   body?: "dynamic"|"kinematic"|"static",
+ *   mass?: number, restitution?: number, friction?: number,
+ *   gravity_scale?: number, linear_damping?: number, collider?: any
+ * }} PhysicsComponent
+ */
+
+/**
+ * A world to simulate: a manifest, or what foldLog/foldPath returned.
+ * @typedef {Record<string, unknown> & {
+ *   entities?: WorldEntity[], environment?: EnvironmentDef|null
+ * }} PhysicsWorld
+ */
+
+/**
+ * A dynamic body as the solver sees it.
+ * @typedef {object} PhysicsBody
+ * @property {number} id
+ * @property {string} name
+ * @property {Vec3} position
+ * @property {Vec3} velocity
+ * @property {number} radius the sphere the reference simulates
+ * @property {number} mass
+ * @property {number} restitution
+ * @property {number} friction
+ * @property {number} gravityScale
+ * @property {number} damping
+ * @property {boolean} asleep
+ */
+
+/** A static collider that is the floor at a y (a Plane). */
+/** @typedef {{kind: "floor", id: number, name: string, y: number}} FloorCollider */
+
+/** A static collider that is an axis-aligned box. */
+/** @typedef {{kind: "box", id: number, name: string, min: Vec3, max: Vec3}} BoxCollider */
+
+/** @typedef {FloorCollider|BoxCollider} StaticCollider */
+
+/** A dynamic entity's collider: a sphere, or a box around its extents. */
+/** @typedef {{kind: "sphere", radius: number}|{kind: "box", extents: Vec3}} EntityCollider */
+
+/** One recorded impact. */
+/**
+ * @typedef {object} PhysicsContact
+ * @property {number} t_s
+ * @property {string} body
+ * @property {string} other
+ * @property {Vec3} position
+ * @property {number} normal_speed
+ */
+
+/** One sampled moment, all dynamic bodies. */
+/** @typedef {{t_s: number, bodies: Record<string, Vec3>}} PhysicsSample */
+
+/** What simulatePhysics returns. */
+/**
+ * @typedef {object} SimulationResult
+ * @property {PhysicsSample[]} samples at sample_dt_s, from t=0
+ * @property {PhysicsContact[]} contacts every impact, in order
+ * @property {{body: string, other: string, t_s: number}[]} bounces the impacts ≥ BOUNCE_SPEED
+ * @property {Record<string, Vec3>} resting where each dynamic body ended up
+ * @property {number} settled_s when all bodies slept (or when it stopped)
+ */
+
+/**
+ * @param {number} x @param {number} y @param {number} z
+ * @returns {Vec3}
+ */
 const v3 = (x, y, z) => [x, y, z];
+/**
+ * @param {number[]} a @param {number[]} b
+ * @returns {Vec3}
+ */
 const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+/** @param {number[]} a @param {number[]} b @returns {number} */
 const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+/** @param {number[]} a @returns {number} */
 const len = (a) => Math.sqrt(dot(a, a));
+/** @param {number} v @param {number} lo @param {number} hi @returns {number} */
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 
-/** An entity's `ext-physics` component, or undefined. */
+/** An entity's `ext-physics` component, or undefined.
+ * @param {WorldEntity} entity
+ * @returns {PhysicsComponent|undefined} */
 function component(entity) {
-  return entity[EXTENSION_NAME];
+  return /** @type {PhysicsComponent|undefined} */ (entity[EXTENSION_NAME]);
 }
 
-/** The entity's parametric shape as a bounding box [x, y, z] extents. */
+/** The entity's parametric shape as a bounding box [x, y, z] extents.
+ * @param {WorldEntity} entity
+ * @returns {Vec3|null} */
 function shapeExtents(entity) {
   const s = entity.shape;
   if (!s || typeof s !== "object") return null;
@@ -77,7 +166,9 @@ function shapeExtents(entity) {
 }
 
 /** An entity's collider: {kind:"sphere", radius} or {kind:"box", extents},
- * from the explicit collider when present, else the parametric shape. */
+ * from the explicit collider when present, else the parametric shape.
+ * @param {WorldEntity} entity
+ * @returns {EntityCollider|null} */
 function colliderOf(entity) {
   const c = component(entity)?.collider;
   if (c && typeof c === "object") {
@@ -103,19 +194,19 @@ function colliderOf(entity) {
  * for completeness; the reference treats them as static colliders (they
  * move by behaviors, which live outside this solver).
  *
- * @param {object} state a manifest or a fold result ({entities, environment})
- * @returns {{gravity: number[], dynamic: object[], kinematic: object[], statics: object[]}}
+ * @param {PhysicsWorld} state a manifest or a fold result ({entities, environment})
+ * @returns {{gravity: Vec3, dynamic: PhysicsBody[], kinematic: {id: number, name: string}[], statics: StaticCollider[]}}
  */
 export function collectPhysics(state) {
-  const gravity = state.environment?.[EXTENSION_NAME]?.gravity
-    ?? DEFAULT_GRAVITY;
-  const dynamic = [];
-  const kinematic = [];
-  const statics = [];
+  const ext = /** @type {PhysicsComponent|undefined} */ (state.environment?.[EXTENSION_NAME]);
+  const gravity = ext?.gravity ?? DEFAULT_GRAVITY;
+  /** @type {PhysicsBody[]} */ const dynamic = [];
+  /** @type {{id: number, name: string}[]} */ const kinematic = [];
+  /** @type {StaticCollider[]} */ const statics = [];
   for (const entity of state.entities ?? []) {
     const c = component(entity);
     if (!c) continue;
-    const position = [...(entity.transform?.position ?? [0, 0, 0])];
+    const position = /** @type {Vec3} */ ([...(entity.transform?.position ?? [0, 0, 0])]);
     const collider = colliderOf(entity);
     if (c.body === "dynamic") {
       // Dynamics are spheres in the reference: the collider's radius, or
@@ -147,6 +238,12 @@ export function collectPhysics(state) {
   return { gravity, dynamic, kinematic, statics };
 }
 
+/**
+ * @param {StaticCollider[]} statics
+ * @param {WorldEntity} entity
+ * @param {Vec3} position
+ * @param {EntityCollider|null} collider
+ */
 function pushStatic(statics, entity, position, collider) {
   // A Plane is the floor at its y (the reference ignores its rotation);
   // anything else is an axis-aligned box around its extents.
@@ -170,9 +267,12 @@ function pushStatic(statics, entity, position, collider) {
   });
 }
 
-/** Resolve one body against one static. Returns the impact speed, or -1. */
+/** Resolve one body against one static. Returns the impact speed, or -1.
+ * @param {PhysicsBody} body
+ * @param {StaticCollider} stat
+ * @returns {number} */
 function resolveContact(body, stat) {
-  let n;
+  /** @type {Vec3} */ let n;
   if (stat.kind === "floor") {
     const pen = stat.y + body.radius - body.position[1];
     if (pen <= 0) return -1;
@@ -188,7 +288,7 @@ function resolveContact(body, stat) {
     const d = sub(p, c);
     const dist = len(d);
     if (dist >= body.radius) return -1;
-    n = dist > 0 ? d.map((x) => x / dist) : v3(0, 1, 0);
+    n = dist > 0 ? /** @type {Vec3} */ (d.map((x) => x / dist)) : v3(0, 1, 0);
     body.position = [c[0] + n[0] * body.radius, c[1] + n[1] * body.radius, c[2] + n[2] * body.radius];
   }
   const vn = dot(body.velocity, n);
@@ -211,9 +311,9 @@ function resolveContact(body, stat) {
  * order, sleep on rest. Contacts are recorded on impact (normal speed
  * ≥ SLEEP_SPEED); impacts at or above BOUNCE_SPEED are bounces.
  *
- * @param {object} state a manifest or a fold result
- * @param {object} [opts] {until_s, dt_s, sample_dt_s}
- * @returns {{samples: array, contacts: array, bounces: array, resting: object, settled_s: number}}
+ * @param {PhysicsWorld} state a manifest or a fold result
+ * @param {{until_s?: number, dt_s?: number, sample_dt_s?: number}} [opts]
+ * @returns {SimulationResult}
  */
 export function simulatePhysics(state, opts = {}) {
   const dt = opts.dt_s ?? 1 / 120;
@@ -221,9 +321,9 @@ export function simulatePhysics(state, opts = {}) {
   const sampleDt = opts.sample_dt_s ?? 0.1;
   const { gravity, dynamic, statics } = collectPhysics(state);
 
-  const samples = [];
-  const contacts = [];
-  const bounces = [];
+  /** @type {PhysicsSample[]} */ const samples = [];
+  /** @type {PhysicsContact[]} */ const contacts = [];
+  /** @type {{body: string, other: string, t_s: number}[]} */ const bounces = [];
   let t = 0;
   let nextSample = 0;
   let allAsleepAt = null;
@@ -262,7 +362,7 @@ export function simulatePhysics(state, opts = {}) {
             t_s: Number(t.toFixed(4)),
             body: body.name,
             other: stat.name,
-            position: [...body.position],
+            position: /** @type {Vec3} */ ([...body.position]),
             normal_speed: Number(impact.toFixed(4)),
           });
           if (impact >= BOUNCE_SPEED) {
@@ -299,11 +399,11 @@ export function simulatePhysics(state, opts = {}) {
  * transforms of dynamic bodies, for playback without a solver. The op
  * folds to nothing for the document; this reads what it carried.
  *
- * @param {array} entries parsed log entries, in order
- * @returns {{bodies: object, span_s: number}}
+ * @param {LogEntry[]} entries parsed log entries, in order
+ * @returns {{bodies: Record<string, {t_s: number, position: any}[]>, span_s: number}}
  */
 export function foldTrajectories(entries) {
-  const bodies = {};
+  /** @type {Record<string, {t_s: number, position: any}[]>} */ const bodies = {};
   let span = 0;
   for (const entry of entries) {
     const classified = entry.classified ?? entry.ops.map(classifyOp);
@@ -329,12 +429,12 @@ export function foldTrajectories(entries) {
  * per-body sample lists): the writer's half of playback. Sample at or
  * below 10 Hz, per the spec.
  *
- * @param {{samples: array}} sim a simulatePhysics result
- * @returns {object} the op — put it in an entry's ops array
+ * @param {Pick<SimulationResult, "samples">} sim a simulatePhysics result
+ * @returns {{"ext-physics": {t_s: number[], bodies: Record<string, Vec3[]>}}} the op — put it in an entry's ops array
  */
 export function trajectoryOp(sim) {
   const t_s = sim.samples.map((s) => s.t_s);
-  const bodies = {};
+  /** @type {Record<string, Vec3[]>} */ const bodies = {};
   for (const s of sim.samples) {
     for (const [name, p] of Object.entries(s.bodies)) {
       (bodies[name] ?? (bodies[name] = [])).push(p);
@@ -348,17 +448,17 @@ export function trajectoryOp(sim) {
  * check every assertion. This is the extension's conformance — outcome
  * predicates, not pixels.
  *
- * @param {object} manifest the world (parsed)
- * @param {object} outcomes {simulate_s, options?, expect: [...]}
- * @returns {{ok: boolean, failures: string[], simulation: object}}
+ * @param {PhysicsWorld} manifest the world (parsed)
+ * @param {any} outcomes {simulate_s, options?, expect: [...]}
+ * @returns {{ok: boolean, failures: string[], simulation: SimulationResult}}
  */
 export function runOutcomes(manifest, outcomes) {
   const sim = simulatePhysics(manifest, {
     until_s: outcomes.simulate_s,
     ...(outcomes.options ?? {}),
   });
-  const failures = [];
-  const nameOf = (assertion) => JSON.stringify(assertion);
+  /** @type {string[]} */ const failures = [];
+  const nameOf = (/** @type {any} */ assertion) => JSON.stringify(assertion);
 
   for (const assertion of outcomes.expect ?? []) {
     if (Array.isArray(assertion.contact)) {

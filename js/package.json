@@ -4,17 +4,30 @@
   "description": "The Open World Format reference package: parse and fold a .world in pure JS, plus the reference three.js renderer.",
   "type": "module",
   "main": "src/index.js",
+  "types": "dist/index.d.ts",
   "exports": {
-    ".": "./src/index.js",
-    "./render": "./src/render.js",
-    "./physics": "./src/physics.js"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.js"
+    },
+    "./render": {
+      "types": "./dist/render.d.ts",
+      "default": "./src/render.js"
+    },
+    "./physics": {
+      "types": "./dist/physics.d.ts",
+      "default": "./src/physics.js"
+    }
   },
   "files": [
     "README.md",
-    "src"
+    "src",
+    "dist"
   ],
   "scripts": {
-    "test": "node --test"
+    "test": "node --test",
+    "build:types": "tsc -p tsconfig.json",
+    "prepublishOnly": "npm run build:types"
   },
   "keywords": [
     "3d",
@@ -29,7 +42,7 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/openworldformat/openworldformat.git",
-    "directory": "viewer"
+    "directory": "js"
   },
   "license": "Apache-2.0",
   "engines": {
@@ -37,5 +50,10 @@
   },
   "peerDependencies": {
     "three": ">=0.170"
+  },
+  "devDependencies": {
+    "@types/three": "^0.186.0",
+    "three": "^0.186.1",
+    "typescript": "^7.0.2"
   }
 }

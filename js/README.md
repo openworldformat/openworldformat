@@ -49,6 +49,25 @@ The fold applies the spec's rules: only `edit` ops change the document;
 all-or-nothing; ids and names stay unique; deleting an entity deletes its
 descendants; it stops at the first entry that no longer applies.
 
+## Types
+
+The package ships TypeScript declarations, and the source stays what it
+always was: the types are JSDoc in the JavaScript, checked `strict` and
+emitted to `dist/*.d.ts` by `npm run build:types` (publishing runs it —
+`prepublishOnly`). No build step touches the code that runs.
+
+```ts
+import { foldLog, type WorldManifest, type LogEntry } from "openworldformat";
+```
+
+The exported types speak the schema's language — `Vec3`, `WorldEntity`,
+`WorldManifest`, `LogEntry`, `FoldState`, `SimulationResult`,
+`ViewerOptions` — so `state.entities[0].transform?.position` is a
+`Vec3`, not `any`. `openworldformat/physics` follows the same rule.
+Checking code that uses `openworldformat/render`'s types also needs
+`@types/three` (a dev dependency, like it is here); the runtime is
+unchanged — peer `three`, nothing else.
+
 ## API
 
 | Export | What it does |
