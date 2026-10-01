@@ -228,32 +228,141 @@ pub struct ComplianceMeta {
 }
 
 /// Environment settings.
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct EnvironmentDef {
     /// Background/sky color, sRGB-encoded RGBA in `0..=1`.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub background_color: Option<[f32; 4]>,
     /// Ambient light brightness in Bevy's `GlobalAmbientLight` units
     /// (default 80; the web viewer scales it with `AMBIENT_SCALE`).
-    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ambient_intensity: Option<f32>,
     /// Ambient light color, sRGB-encoded RGBA in `0..=1`.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ambient_color: Option<[f32; 4]>,
     /// Exponential fog density (0.0 = no fog).
-    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub fog_density: Option<f32>,
     /// Fog color, sRGB-encoded RGBA in `0..=1`; the background color when
     /// unset.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub fog_color: Option<[f32; 4]>,
     /// Extension fields (`ext-*`), namespaced and must-ignored: what a
     /// reader doesn't understand rides along unchanged (the physics
     /// extension's gravity lives here today). An empty map serializes to
     /// nothing.
-    #[serde(default, flatten)]
     pub extra: std::collections::BTreeMap<String, serde_json::Value>,
+}
+
+// Hand-written for the same reason as WorldEntity's: flatten can't read
+// RON's named-struct form, and world.ron is full of it.
+impl Serialize for EnvironmentDef {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        // See WorldEntity: struct-form without extension fields (RON
+        // named, readable), map-form with them; JSON is identical
+        // either way, and `Some` is written explicitly so RON's strict
+        // `deserialize_option` round-trips (JSON ignores the markers).
+        use crate::entity::{SomeRef, interned};
+        use serde::ser::{SerializeMap, SerializeStruct};
+        fn opt<M, T: Serialize>(
+            store: &mut M,
+            key: &'static str,
+            value: &Option<T>,
+        ) -> Result<(), M::Error>
+        where
+            M: Fields,
+        {
+            if value.is_some() {
+                store.field(key, &SomeRef(value))
+            } else {
+                Ok(())
+            }
+        }
+        // One trait over both serde stores so `opt` serves both forms.
+        trait Fields {
+            type Error;
+            fn field<T: Serialize + ?Sized>(
+                &mut self,
+                key: &'static str,
+                value: &T,
+            ) -> Result<(), Self::Error>;
+        }
+        struct StructForm<'a, S>(&'a mut S);
+        impl<S: SerializeStruct> Fields for StructForm<'_, S> {
+            type Error = S::Error;
+            fn field<T: Serialize + ?Sized>(
+                &mut self,
+                key: &'static str,
+                value: &T,
+            ) -> Result<(), S::Error> {
+                self.0.serialize_field(key, value)
+            }
+        }
+        struct MapForm<'a, S>(&'a mut S);
+        impl<S: SerializeMap> Fields for MapForm<'_, S> {
+            type Error = S::Error;
+            fn field<T: Serialize + ?Sized>(
+                &mut self,
+                key: &'static str,
+                value: &T,
+            ) -> Result<(), S::Error> {
+                self.0.serialize_entry(key, value)
+            }
+        }
+        if self.extra.is_empty() {
+            let mut s = serializer.serialize_struct("EnvironmentDef", 5)?;
+            let mut form = StructForm(&mut s);
+            opt(&mut form, "background_color", &self.background_color)?;
+            opt(&mut form, "ambient_intensity", &self.ambient_intensity)?;
+            opt(&mut form, "ambient_color", &self.ambient_color)?;
+            opt(&mut form, "fog_density", &self.fog_density)?;
+            opt(&mut form, "fog_color", &self.fog_color)?;
+            s.end()
+        } else {
+            let mut m = serializer.serialize_map(Some(5 + self.extra.len()))?;
+            let mut form = MapForm(&mut m);
+            opt(&mut form, "background_color", &self.background_color)?;
+            opt(&mut form, "ambient_intensity", &self.ambient_intensity)?;
+            opt(&mut form, "ambient_color", &self.ambient_color)?;
+            opt(&mut form, "fog_density", &self.fog_density)?;
+            opt(&mut form, "fog_color", &self.fog_color)?;
+            for (key, value) in &self.extra {
+                m.serialize_entry(interned(key), value)?;
+            }
+            m.end()
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for EnvironmentDef {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        struct Visitor;
+        impl<'de> serde::de::Visitor<'de> for Visitor {
+            type Value = EnvironmentDef;
+            fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+                f.write_str("an environment block")
+            }
+            fn visit_map<A: serde::de::MapAccess<'de>>(
+                self,
+                mut map: A,
+            ) -> Result<EnvironmentDef, A::Error> {
+                let mut env = EnvironmentDef::default();
+                while let Some(key) = map.next_key::<String>()? {
+                    match key.as_str() {
+                        "background_color" => env.background_color = map.next_value()?,
+                        "ambient_intensity" => env.ambient_intensity = map.next_value()?,
+                        "ambient_color" => env.ambient_color = map.next_value()?,
+                        "fog_density" => env.fog_density = map.next_value()?,
+                        "fog_color" => env.fog_color = map.next_value()?,
+                        _ => {
+                            let value: serde_json::Value = map.next_value()?;
+                            env.extra.insert(key, value);
+                        }
+                    }
+                }
+                Ok(env)
+            }
+        }
+        // `deserialize_any`: the one entry that accepts RON named-struct
+        // syntax AND map syntax AND JSON objects — see the impl note above.
+        deserializer.deserialize_any(Visitor)
+    }
 }
 
 /// Camera definition.

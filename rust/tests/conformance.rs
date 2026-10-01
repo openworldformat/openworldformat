@@ -141,3 +141,67 @@ fn the_physics_conformance_outcomes_pass_under_this_solver() {
     assert_eq!(result.failures, Vec::<String>::new());
     assert!(result.ok);
 }
+
+#[test]
+fn hand_authored_ron_named_structs_parse() {
+    // The regression this pins: serde(flatten) forces map-form
+    // deserialization, which rejects RON's named-struct syntax — the
+    // form every hand-written world.ron uses. The hand-written serde
+    // on WorldEntity/EnvironmentDef/EntityPatch enters through
+    // deserialize_struct and reads both forms plus JSON objects.
+    //
+    // One authoring constraint RON itself imposes: a named struct's
+    // keys are identifiers, so `ext-physics` (the dash) cannot be
+    // spelled there — hand-authored RON carries extension fields by
+    // writing that one value in map form, quoted keys and all, or by
+    // shipping JSON. Serialization always round-trips either way.
+    let text = r#"
+(
+    version: 3,
+    meta: (name: "ron-form"),
+    environment: Some((
+        background_color: Some((0.1, 0.2, 0.3, 1.0)),
+        ambient_intensity: Some(0.5),
+    )),
+    entities: [
+        (
+            id: (1),
+            name: ("ball"),
+            transform: (position: (0.0, 5.0, 0.0)),
+            shape: Some(Sphere(radius: 0.3)),
+        ),
+    ],
+    next_entity_id: 2,
+)
+"#;
+    let manifest: Manifest = ron::from_str(text).expect("named-struct RON parses");
+    assert_eq!(manifest.entities.len(), 1);
+    assert_eq!(
+        manifest.environment.as_ref().unwrap().ambient_intensity,
+        Some(0.5)
+    );
+
+    // Extension fields survive RON's own output (the map form
+    // serialization emits) — round-trip, not folk syntax.
+    let mut entity = openworldformat::WorldEntity::new(2, "late");
+    entity.extra.insert(
+        "ext-physics".into(),
+        serde_json::json!({ "body": "dynamic" }),
+    );
+    let ron_text = ron::to_string(&entity).unwrap();
+    let back: openworldformat::WorldEntity = ron::from_str(&ron_text).expect(&ron_text);
+    assert_eq!(back, entity);
+    assert_eq!(back.extra["ext-physics"]["body"], "dynamic");
+
+    // …and everywhere in JSON.
+    let json = serde_json::to_string(&entity).unwrap();
+    assert!(json.contains("\"ext-physics\""));
+    let back: openworldformat::WorldEntity = serde_json::from_str(&json).unwrap();
+    assert_eq!(back, entity);
+
+    // The full round trip keeps working in both dialects.
+    let ron_back = ron::to_string(&manifest).unwrap();
+    let _: Manifest = ron::from_str(&ron_back).expect(&ron_back);
+    let json_manifest = serde_json::to_string(&manifest).unwrap();
+    let _: Manifest = serde_json::from_str(&json_manifest).unwrap();
+}

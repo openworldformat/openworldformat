@@ -57,7 +57,7 @@ fn default_true() -> bool {
 
 /// A single entity in the world.  Component slots are all optional —
 /// any combination is valid (e.g., a glowing orb has shape + light + audio).
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct WorldEntity {
     /// Stable numeric identifier.
@@ -65,55 +65,242 @@ pub struct WorldEntity {
     /// Human-readable name.
     pub name: EntityName,
     /// Spatial transform.
-    #[serde(default)]
     pub transform: WorldTransform,
     /// Parent entity (for hierarchy).
-    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub parent: Option<EntityId>,
     /// Spatial chunk assignment (for large worlds).
-    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub chunk: Option<ChunkCoord>,
     /// If this entity belongs to a compound creation.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub creation_id: Option<CreationId>,
 
     // ---- Component slots (all optional) ----
     /// Parametric shape — never loses dimension info.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub shape: Option<Shape>,
     /// PBR material properties.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub material: Option<MaterialDef>,
     /// Light source — can coexist with shape (e.g., glowing orb).
-    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub light: Option<LightDef>,
     /// Behaviors stack — multiple can be active simultaneously.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub behaviors: Vec<BehaviorDef>,
     /// Audio source — spatial or ambient.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub audio: Option<AudioDef>,
     /// Reference to an imported mesh asset (alternative to Shape).
-    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub mesh_asset: Option<MeshAssetRef>,
     /// Signal-driven modulations (soundtrack energy, beat, oscillators)
     /// stacked on top of the authored values.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub modulations: Vec<ModulationDef>,
     /// Places a copy of a reusable creation here, with per-part overrides
     /// (see [`crate::instance`]).
-    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub instance_of: Option<InstanceOf>,
     /// Events and the actions they run (see [`crate::trigger`]).
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub triggers: Vec<TriggerDef>,
     /// Extension fields (`ext-*`), namespaced and must-ignored: what a
     /// reader doesn't understand rides along unchanged (the physics
     /// extension's body component lives here today). The typed fields
     /// above are the contract; this map is the sanctioned room around
     /// them. An empty map serializes to nothing.
-    #[serde(default, flatten)]
     pub extra: BTreeMap<String, serde_json::Value>,
+}
+
+// The hand-written serde matches what the derive + flatten produced in
+// JSON (a flat object, extras inline) while reading BOTH RON forms:
+// serde(flatten) forces map-form deserialization, which rejects RON's
+// named-struct syntax — the form every hand-authored world.ron uses.
+// Entering through `deserialize_any` accepts named structs, RON
+// map-form, and JSON objects alike.
+
+/// An `Option` that serializes `Some(x)` / `None` explicitly — RON
+/// writes the markers, JSON ignores them (value / null) — so one
+/// serializer serves both dialects and RON round-trips through the
+/// strict `deserialize_option`.
+pub(crate) struct SomeRef<'a, T>(pub(crate) &'a Option<T>);
+
+/// [`SomeRef`] over a borrowed inner — for `Option<Option<T>>` slots
+/// without cloning the value out.
+struct SomeRefBorrowed<'a, T>(&'a Option<&'a T>);
+impl<T: Serialize> Serialize for SomeRefBorrowed<'_, T> {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        match self.0 {
+            Some(value) => serializer.serialize_some(value),
+            None => serializer.serialize_none(),
+        }
+    }
+}
+impl<T: Serialize> Serialize for SomeRef<'_, T> {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        match self.0 {
+            Some(value) => serializer.serialize_some(value),
+            None => serializer.serialize_none(),
+        }
+    }
+}
+
+/// Extension keys interned to `&'static str` so struct-form
+/// serialization can emit them (`serialize_field` demands static keys).
+/// The set of extension namespaces is small and stable by design.
+pub(crate) fn interned(key: &str) -> &'static str {
+    use std::collections::HashMap;
+    use std::sync::{Mutex, OnceLock};
+    static TABLE: OnceLock<Mutex<HashMap<String, &'static str>>> = OnceLock::new();
+    let table = TABLE.get_or_init(|| Mutex::new(HashMap::new()));
+    let mut guard = table.lock().unwrap();
+    if let Some(existing) = guard.get(key) {
+        return existing;
+    }
+    let leaked: &'static str = Box::leak(key.to_string().into_boxed_str());
+    guard.insert(key.to_string(), leaked);
+    leaked
+}
+
+impl Serialize for WorldEntity {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        use serde::ser::SerializeStruct;
+        // Struct-form (RON named, readable) when there are no extension
+        // fields; map-form when there are — a dashed namespace key
+        // cannot be spelled as a RON identifier. JSON is identical
+        // either way, and JSON is the canonical dialect for
+        // extension-bearing packages.
+        if self.extra.is_empty() {
+            let mut s = serializer.serialize_struct("WorldEntity", 3)?;
+            s.serialize_field("id", &self.id)?;
+            s.serialize_field("name", &self.name)?;
+            s.serialize_field("transform", &self.transform)?;
+            fn slot<'a, M, T>(
+                s: &mut M,
+                key: &'static str,
+                value: &'a Option<T>,
+            ) -> Result<(), M::Error>
+            where
+                M: SerializeStruct,
+                T: Serialize + 'a,
+            {
+                s.serialize_field(key, &SomeRef(value))
+            }
+            slot(&mut s, "parent", &self.parent)?;
+            slot(&mut s, "chunk", &self.chunk)?;
+            slot(&mut s, "creation_id", &self.creation_id)?;
+            slot(&mut s, "shape", &self.shape)?;
+            slot(&mut s, "material", &self.material)?;
+            slot(&mut s, "light", &self.light)?;
+            if !self.behaviors.is_empty() {
+                s.serialize_field("behaviors", &self.behaviors)?;
+            }
+            slot(&mut s, "audio", &self.audio)?;
+            slot(&mut s, "mesh_asset", &self.mesh_asset)?;
+            if !self.modulations.is_empty() {
+                s.serialize_field("modulations", &self.modulations)?;
+            }
+            slot(&mut s, "instance_of", &self.instance_of)?;
+            if !self.triggers.is_empty() {
+                s.serialize_field("triggers", &self.triggers)?;
+            }
+            s.end()
+        } else {
+            self.serialize_map_form(serializer)
+        }
+    }
+}
+
+impl WorldEntity {
+    fn serialize_map_form<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        use serde::ser::SerializeMap;
+        let mut map = serializer.serialize_map(Some(3 + self.extra.len()))?;
+        map.serialize_entry("id", &self.id)?;
+        map.serialize_entry("name", &self.name)?;
+        map.serialize_entry("transform", &self.transform)?;
+        fn opt<M, T: Serialize>(
+            map: &mut M,
+            key: &'static str,
+            value: &Option<T>,
+        ) -> Result<(), M::Error>
+        where
+            M: serde::ser::SerializeMap,
+        {
+            if value.is_some() {
+                map.serialize_entry(key, &SomeRef(value))?;
+            }
+            Ok(())
+        }
+        opt(&mut map, "parent", &self.parent)?;
+        opt(&mut map, "chunk", &self.chunk)?;
+        opt(&mut map, "creation_id", &self.creation_id)?;
+        opt(&mut map, "shape", &self.shape)?;
+        opt(&mut map, "material", &self.material)?;
+        opt(&mut map, "light", &self.light)?;
+        opt(&mut map, "audio", &self.audio)?;
+        opt(&mut map, "mesh_asset", &self.mesh_asset)?;
+        opt(&mut map, "instance_of", &self.instance_of)?;
+        if !self.behaviors.is_empty() {
+            map.serialize_entry("behaviors", &self.behaviors)?;
+        }
+        if !self.modulations.is_empty() {
+            map.serialize_entry("modulations", &self.modulations)?;
+        }
+        if !self.triggers.is_empty() {
+            map.serialize_entry("triggers", &self.triggers)?;
+        }
+        for (key, value) in &self.extra {
+            map.serialize_entry(interned(key), value)?;
+        }
+        map.end()
+    }
+}
+
+impl<'de> Deserialize<'de> for WorldEntity {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        struct Visitor;
+        impl<'de> serde::de::Visitor<'de> for Visitor {
+            type Value = WorldEntity;
+            fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+                f.write_str("a world entity")
+            }
+            fn visit_map<A: serde::de::MapAccess<'de>>(
+                self,
+                mut map: A,
+            ) -> Result<WorldEntity, A::Error> {
+                let mut entity = WorldEntity::new(0, "");
+                entity.extra = BTreeMap::new();
+                while let Some(key) = map.next_key::<String>()? {
+                    match key.as_str() {
+                        "id" => entity.id = map.next_value()?,
+                        "name" => entity.name = map.next_value()?,
+                        "transform" => entity.transform = map.next_value()?,
+                        "parent" => entity.parent = map.next_value::<NullOr<_>>()?.into_option(),
+                        "chunk" => entity.chunk = map.next_value::<NullOr<_>>()?.into_option(),
+                        "creation_id" => {
+                            entity.creation_id = map.next_value::<NullOr<_>>()?.into_option()
+                        }
+                        "shape" => entity.shape = map.next_value::<NullOr<_>>()?.into_option(),
+                        "material" => {
+                            entity.material = map.next_value::<NullOr<_>>()?.into_option()
+                        }
+                        "light" => entity.light = map.next_value::<NullOr<_>>()?.into_option(),
+                        "behaviors" => entity.behaviors = map.next_value()?,
+                        "audio" => entity.audio = map.next_value::<NullOr<_>>()?.into_option(),
+                        "mesh_asset" => {
+                            entity.mesh_asset = map.next_value::<NullOr<_>>()?.into_option()
+                        }
+                        "modulations" => entity.modulations = map.next_value()?,
+                        "instance_of" => {
+                            entity.instance_of = map.next_value::<NullOr<_>>()?.into_option()
+                        }
+                        "triggers" => entity.triggers = map.next_value()?,
+                        _ => {
+                            let value: serde_json::Value = map.next_value()?;
+                            entity.extra.insert(key, value);
+                        }
+                    }
+                }
+                if entity.name.as_str().is_empty() {
+                    return Err(serde::de::Error::custom("an entity needs a name"));
+                }
+                Ok(entity)
+            }
+        }
+        // `deserialize_any`: the one entry that accepts RON named-struct
+        // syntax AND map syntax AND JSON objects — see the impl note above.
+        deserializer.deserialize_any(Visitor)
+    }
 }
 
 impl WorldEntity {
@@ -237,7 +424,7 @@ impl Serialize for EntityPatch {
             T: Serialize,
         {
             if let Some(inner) = value {
-                map.serialize_entry(key, inner)?;
+                map.serialize_entry(key, &SomeRefBorrowed(&Some(inner)))?;
             }
             Ok(())
         }
@@ -374,7 +561,9 @@ impl<'de> Deserialize<'de> for EntityPatch {
                 Ok(patch)
             }
         }
-        deserializer.deserialize_map(Visitor)
+        // `deserialize_any`: the one entry that accepts RON named-struct
+        // syntax AND map syntax AND JSON objects — see the impl note above.
+        deserializer.deserialize_any(Visitor)
     }
 }
 
@@ -523,6 +712,16 @@ fn json_close(a: &serde_json::Value, b: &serde_json::Value) -> bool {
                     .all(|(k, v)| y.get(k).is_some_and(|w| json_close(v, w)))
         }
         _ => a == b,
+    }
+}
+
+impl<T> NullOr<T> {
+    /// The tolerant option: `Some(x)`, bare `x`, or a clear.
+    fn into_option(self) -> Option<T> {
+        match self {
+            NullOr::Value(v) => Some(v),
+            NullOr::Null => None,
+        }
     }
 }
 
