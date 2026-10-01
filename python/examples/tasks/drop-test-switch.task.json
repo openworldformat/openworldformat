@@ -1,0 +1,21 @@
+{
+  "task": "the-drop-test: the switch scores",
+  "comment": "The recorded run, scored: the late ball joins the world and the physics contact crosses the switch's state field. No solver ran — the fold carried the score.",
+  "world": "../../../examples/the-drop-test",
+  "budget": {
+    "max_edits": 1
+  },
+  "goal": [
+    {
+      "exists": {
+        "entity": "ball_late"
+      }
+    },
+    {
+      "field": {
+        "name": "score.switch",
+        "at_least": 10
+      }
+    }
+  ]
+}

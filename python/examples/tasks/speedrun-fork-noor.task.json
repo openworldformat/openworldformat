@@ -1,0 +1,24 @@
+{
+  "task": "speedrun-fork: noor's run, on its own branch",
+  "comment": "Branch isolation as a task: folding tip e4 gives noor her time and leaves kai's at zero — the other run never happened on this branch.",
+  "world": "../../../examples/speedrun-fork",
+  "tip": "e4",
+  "budget": {
+    "max_edits": 2,
+    "max_ops": 12
+  },
+  "goal": [
+    {
+      "field": {
+        "name": "run.noor",
+        "equals": 7.91
+      }
+    },
+    {
+      "field": {
+        "name": "run.kai",
+        "equals": 0.0
+      }
+    }
+  ]
+}

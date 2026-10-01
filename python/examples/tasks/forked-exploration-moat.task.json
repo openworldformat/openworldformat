@@ -1,0 +1,18 @@
+{
+  "task": "forked-exploration: the moat variant wins this branch",
+  "comment": "The same course, a different world: on tip e5 the moat exists and the garden — the trunk's choice — was never spawned.",
+  "world": "../../../examples/forked-exploration",
+  "tip": "e5",
+  "goal": [
+    {
+      "exists": {
+        "entity": "moat"
+      }
+    },
+    {
+      "gone": {
+        "entity": "garden"
+      }
+    }
+  ]
+}

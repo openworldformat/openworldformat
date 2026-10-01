@@ -66,6 +66,67 @@ Reference-grade, not production physics; deterministic within an
 engine, semantic-only across engines, exactly as the core spec refuses
 bit-exactness.
 
+## Tasks: the benchmark harness
+
+A task is a world, a trajectory, and a goal — a list of predicates over
+what the fold produces. Scoring is therefore deterministic and needs no
+engine: fold the log, evaluate the predicates. `examples/tasks/` turns
+the repository's four example packages into a benchmark dataset, each
+package's own log its solution:
+
+```bash
+python -m openworldformat.eval examples/tasks/
+```
+
+```
+ok   the-drop-test: the switch scores  (1 edits, 6 ops, 1 authors, revision 1)
+ok   forked-exploration: the moat variant wins this branch  (3 edits, 4 ops, 3 authors, revision 4)
+ok   hello-world: hang the lantern  (1 edits, 5 ops, 3 authors, revision 1)
+ok   speedrun-fork: noor's run, on its own branch  (2 edits, 9 ops, 2 authors, revision 2)
+```
+
+A task file names the world and states the goal; a `tip` folds a branch
+(a run, a variant) instead of the head; a budget caps the cost:
+
+```json
+{
+  "task": "hello-world: hang the lantern",
+  "world": "../../../examples/hello-world",
+  "budget": { "max_edits": 1, "max_entries": 5 },
+  "goal": [
+    { "exists": { "entity": "lantern" } },
+    { "near": { "entity": "lantern", "position": [-12.0, 0.0, 3.0], "tolerance": 0.5 } },
+    { "field": { "name": "score.tour", "equals": 1 } }
+  ]
+}
+```
+
+| Predicate | Holds when |
+|---|---|
+| `{"exists": {"entity": name}}` | the fold holds an entity by that name |
+| `{"gone": {"entity": name}}` | it doesn't |
+| `{"near": {"entity", "position", "tolerance"=0.15}}` | the entity's folded position is within tolerance |
+| `{"field": {"name", "equals"?, "at_least"?, "at_most"?}}` | the state document's value compares |
+
+Budgets (`max_edits`, `max_ops`, `max_entries`, inclusive) are the cost
+side of a task: solve it, but not by a million edits. Metrics report
+the trajectory's shape — edits, ops, entries, authors (the audit
+trail's model-vs-visitor filter is one field), span, revision.
+
+To score an agent, don't write files at all — pass its ops to
+`run_task` the moment it emits them:
+
+```python
+from openworldformat.eval import run_task
+
+result = run_task(manifest, agent_entries, task, state_doc)
+result["ok"], result["failures"], result["metrics"]
+```
+
+This task language is deliberately library-level, not a spec
+extension; it graduates to `spec/extensions/` when a second implementer
+wants it.
+
 ## API
 
 | Export | What it does |
@@ -85,6 +146,8 @@ bit-exactness.
 `openworldformat.soundtrack` holds the soundtrack curves — `curve_at`,
 `beat_at`, `section_at`, `modulation_factor` — as plain functions over
 plain numbers, for analysis rather than playback.
+`openworldformat.eval` scores tasks (see above): `run_task`,
+`load_task_file`, and the `python -m openworldformat.eval` CLI.
 
 ## Test
 

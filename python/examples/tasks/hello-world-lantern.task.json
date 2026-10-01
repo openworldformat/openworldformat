@@ -1,0 +1,33 @@
+{
+  "task": "hello-world: hang the lantern",
+  "comment": "The repo's own example log, as a task — one edit spawns the lantern at the clearing's edge, and the tour state flips. The budget pins the cost: a single edit, five entries of history around it.",
+  "world": "../../../examples/hello-world",
+  "budget": {
+    "max_edits": 1,
+    "max_entries": 5
+  },
+  "goal": [
+    {
+      "exists": {
+        "entity": "lantern"
+      }
+    },
+    {
+      "near": {
+        "entity": "lantern",
+        "position": [
+          -12.0,
+          0.0,
+          3.0
+        ],
+        "tolerance": 0.5
+      }
+    },
+    {
+      "field": {
+        "name": "score.tour",
+        "equals": 1
+      }
+    }
+  ]
+}
