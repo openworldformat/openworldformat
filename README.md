@@ -33,6 +33,7 @@ suite in the format's origin project. Expect churn until 1.0; the
 | [`js/`](js/) | The reference npm package: parse and fold, no engine required |
 | [`rust/`](rust/) | the Rust reference on crates.io (`openworldformat`): document, session fold, branches, state, physics — extracted from LocalGPT's crates, which re-export it when they flip |
 | [`python/`](python/) | The research package (PyPI): parse and fold for benchmarks, datasets, notebooks |
+| [`swift/`](swift/) | The Apple-surface package (SwiftPM): parse and fold for iOS, iPadOS, visionOS and macOS apps |
 | [`website/`](website/) | [openworldformat.org](https://openworldformat.org) (Zola, no theme) |
 
 ## Try it in a minute
@@ -51,7 +52,9 @@ const world = foldLog(manifest, entries); // the world at head revision
 ```
 
 The same fold, for benchmarks and notebooks: `pip install
-openworldformat` — see [`python/`](python/).
+openworldformat` — see [`python/`](python/). The same fold, for Apple
+platforms: add this repository as a Swift package and `import
+OpenWorldFormat` — see [`swift/`](swift/).
 
 ## License
 

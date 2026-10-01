@@ -43,6 +43,14 @@ jobs:
       - run: python -m unittest discover -s tests -t .
         working-directory: python/
 
+  swift:
+    name: Apple-surface fold (swift)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: swift test
+        working-directory: swift/
+
   website:
     name: openworldformat.org (zola + render check)
     runs-on: ubuntu-latest
