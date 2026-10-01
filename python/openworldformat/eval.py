@@ -41,7 +41,7 @@ from . import (
     parse_manifest,
 )
 
-__all__ = ["run_task", "load_task_file", "main"]
+__all__ = ["run_task", "load_task_file", "entry_metrics", "main"]
 
 #: Default tolerance for the `near` predicate — the outcomes precedent.
 NEAR_TOLERANCE = 0.15
@@ -115,6 +115,24 @@ def _check_budget(budget: dict, metrics: dict) -> list:
     return failures
 
 
+def entry_metrics(chain: list, applied_edits: int) -> dict:
+    """The trajectory's shape: entries, ops, edits, authors, span, revision —
+    what task scoring and dataset tooling both want per recording. The
+    authors field is the audit trail's dimension: filter it on one name
+    and you have what that one author did, model or visitor."""
+    return {
+        "entries": len(chain),
+        "ops": sum(len(e.get("ops") or []) for e in chain),
+        "edits": applied_edits,
+        "revision": chain[-1].get("revision") if chain else None,
+        "authors": sorted({(e.get("author") or {}).get("name") for e in chain} - {None}),
+        "span_ms": (
+            chain[-1].get("timestamp_ms", 0) - chain[0].get("timestamp_ms", 0)
+            if len(chain) > 1 else 0
+        ),
+    }
+
+
 def run_task(manifest: dict, entries: list, task: dict, state_doc: dict | None = None) -> dict:
     """Score one trajectory against one task.
 
@@ -136,18 +154,7 @@ def run_task(manifest: dict, entries: list, task: dict, state_doc: dict | None =
         state = fold_log(manifest, entries)
         chain = list(entries)
     values = fold_state(state_doc or {}, chain)["values"]
-
-    metrics = {
-        "entries": len(chain),
-        "ops": sum(len(e.get("ops") or []) for e in chain),
-        "edits": state["applied_edits"],
-        "revision": chain[-1].get("revision") if chain else None,
-        "authors": sorted({(e.get("author") or {}).get("name") for e in chain} - {None}),
-        "span_ms": (
-            chain[-1].get("timestamp_ms", 0) - chain[0].get("timestamp_ms", 0)
-            if len(chain) > 1 else 0
-        ),
-    }
+    metrics = entry_metrics(chain, state["applied_edits"])
 
     goal = task.get("goal")
     if not isinstance(goal, list) or not goal:

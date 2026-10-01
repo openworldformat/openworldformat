@@ -149,6 +149,29 @@ benchmark authors have a floor to beat and a skeleton to copy. Its
 entries serialize to `ops.jsonl` like any recording: an agent run is a
 log, ready to join a dataset.
 
+## Dataset tooling: fold a corpus, compute one number
+
+A folder of `.world` packages is a dataset — each `ops.jsonl` a
+recording, each fold a row:
+
+```bash
+python -m openworldformat.dataset examples/
+```
+
+```
+world               entities  edits  ops  entries  authors               tips  span_s
+forked-exploration  5         4      5    5        host, llm, maya       2     0.4
+hello-world         14        1      5    5        llm, maya, visitor-7  1     1.877
+speedrun-fork       9         2      15   4        kai, maya, noor       2     20.0
+the-drop-test       7         1      6    2        host                  1     0.2
+```
+
+The authors column is the audit trail's dimension — model, host and
+visitor in one recording, separable by one field. The tips column
+counts branches; fold each with `fold_path` and the counterfactuals
+come with the corpus. `summarize(dir)` gives the row as a dict for
+notebooks.
+
 ## API
 
 | Export | What it does |
@@ -171,7 +194,9 @@ plain numbers, for analysis rather than playback.
 `openworldformat.eval` scores tasks (see above): `run_task`,
 `load_task_file`, and the `python -m openworldformat.eval` CLI.
 `openworldformat.agent` runs agents against them: `run_agent` and the
-`template_agent` baseline.
+`template_agent` baseline. `openworldformat.dataset` summarizes
+recordings — `summarize` and the `python -m openworldformat.dataset`
+report.
 
 ## Test
 
