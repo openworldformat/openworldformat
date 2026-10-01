@@ -18,3 +18,9 @@ schema = ["dep:schemars"]
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 schemars = { version = "1", optional = true }
+
+# The schema generator needs the feature it demonstrates; without it,
+# `cargo test` skips the example instead of failing to build it.
+[[example]]
+name = "schema"
+required-features = ["schema"]
