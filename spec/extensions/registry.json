@@ -9,8 +9,9 @@
       "schema": "schema/extensions/ext-physics.schema.json",
       "implementations": [
         "js/src/physics.js (npm openworldformat/physics)",
-        "LocalGPT crates/world-physics (Rust, localgpt-world-physics)",
-        "python/openworldformat/physics.py (PyPI openworldformat)"
+        "rust/src/physics.rs (crates.io openworldformat::physics)",
+        "python/openworldformat/physics.py (PyPI openworldformat)",
+        "LocalGPT crates/world-physics \u2014 the origin, pre-extraction; flips to the crate"
       ],
       "conformance": [
         "conformance/physics.json",
@@ -20,7 +21,7 @@
         "KHR_physics_rigid_bodies",
         "KHR_implicit_shapes"
       ],
-      "notes": "Three implementations (JS, Rust, Python), all running the same outcome assertions in their CI (npm test here; cargo test -p localgpt-world-physics in LocalGPT). The first package shipped using the extension is examples/the-drop-test. Still experimental until a producer outside this repository ships one. Semantic outcomes are the contract \u2014 bit-exact cross-engine trajectories are never promised."
+      "notes": "Three implementations (JS, Rust, Python \u2014 the Rust one now the extracted crates.io crate), all running the same outcome assertions in their CI (npm test here; cargo test -p localgpt-world-physics in LocalGPT). The first package shipped using the extension is examples/the-drop-test. Still experimental until a producer outside this repository ships one. Semantic outcomes are the contract \u2014 bit-exact cross-engine trajectories are never promised."
     }
   }
 }

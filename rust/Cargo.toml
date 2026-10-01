@@ -1,0 +1,20 @@
+[package]
+name = "openworldformat"
+version = "0.1.0"
+edition = "2024"
+license = "Apache-2.0"
+description = "The Open World Format Rust reference: the world document, the session fold (log, branches, state), and the ext-physics solver — serde-only, no engine required."
+readme = "README.md"
+repository = "https://github.com/openworldformat/openworldformat"
+keywords = ["3d", "world", "gltf", "scene", "format"]
+categories = ["game-development", "data-structures"]
+
+[features]
+# JSON Schema generation for the manifest (world.schema.json).
+# Off by default: the crate stays serde-only for the mobile targets.
+schema = ["dep:schemars"]
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+schemars = { version = "1", optional = true }

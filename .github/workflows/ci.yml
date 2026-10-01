@@ -23,6 +23,15 @@ jobs:
       - run: npm test
         working-directory: js/
 
+  rust:
+    name: Rust reference (cargo)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo test --features schema
+        working-directory: rust/
+
   python:
     name: Research fold (python)
     runs-on: ubuntu-latest
