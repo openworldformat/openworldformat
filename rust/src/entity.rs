@@ -117,7 +117,7 @@ pub(crate) struct SomeRef<'a, T>(pub(crate) &'a Option<T>);
 
 /// [`SomeRef`] over a borrowed inner — for `Option<Option<T>>` slots
 /// without cloning the value out.
-struct SomeRefBorrowed<'a, T>(&'a Option<&'a T>);
+struct SomeRefBorrowed<'a, T>(Option<&'a T>);
 impl<T: Serialize> Serialize for SomeRefBorrowed<'_, T> {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         match self.0 {
@@ -423,8 +423,16 @@ impl Serialize for EntityPatch {
             M: SerializeMap,
             T: Serialize,
         {
+            // One `Some`, not two: `Option<Option<T>>` is the patch's
+            // set-or-clear semantic, but the wire form is a single
+            // option (`Some(v)` sets, `None` clears) — RON's any-mode
+            // cannot serve options nested in options, and no reader
+            // wants `Some(Some(..))` anyway.
             if let Some(inner) = value {
-                map.serialize_entry(key, &SomeRefBorrowed(&Some(inner)))?;
+                match inner {
+                    Some(v) => map.serialize_entry(key, &SomeRefBorrowed(Some(v)))?,
+                    None => map.serialize_entry(key, &SomeRefBorrowed(None::<&T>))?,
+                }
             }
             Ok(())
         }
@@ -510,8 +518,62 @@ impl<'de, T: Deserialize<'de>> Deserialize<'de> for NullOr<T> {
             ) -> Result<Self::Value, D::Error> {
                 T::deserialize(deserializer).map(NullOr::Value)
             }
+            // Bare values arrive in RON's any-mode (and in JSON, where
+            // options are transparent); primitives bridge through
+            // serde_json::Value because its deserializer is lenient
+            // where the value.rs ones are not.
+            fn visit_bool<E: serde::de::Error>(self, v: bool) -> Result<Self::Value, E> {
+                T::deserialize(serde_json::Value::from(v))
+                    .map(NullOr::Value)
+                    .map_err(serde::de::Error::custom)
+            }
+            fn visit_i64<E: serde::de::Error>(self, v: i64) -> Result<Self::Value, E> {
+                T::deserialize(serde_json::Value::from(v))
+                    .map(NullOr::Value)
+                    .map_err(serde::de::Error::custom)
+            }
+            fn visit_u64<E: serde::de::Error>(self, v: u64) -> Result<Self::Value, E> {
+                T::deserialize(serde_json::Value::from(v))
+                    .map(NullOr::Value)
+                    .map_err(serde::de::Error::custom)
+            }
+            fn visit_f64<E: serde::de::Error>(self, v: f64) -> Result<Self::Value, E> {
+                T::deserialize(serde_json::Value::from(v))
+                    .map(NullOr::Value)
+                    .map_err(serde::de::Error::custom)
+            }
+            fn visit_str<E: serde::de::Error>(self, v: &str) -> Result<Self::Value, E> {
+                T::deserialize(serde_json::Value::from(v))
+                    .map(NullOr::Value)
+                    .map_err(serde::de::Error::custom)
+            }
+            fn visit_seq<A: serde::de::SeqAccess<'de>>(
+                self,
+                seq: A,
+            ) -> Result<Self::Value, A::Error> {
+                use serde::de::value::SeqAccessDeserializer;
+                T::deserialize(SeqAccessDeserializer::new(seq)).map(NullOr::Value)
+            }
+            fn visit_map<A: serde::de::MapAccess<'de>>(
+                self,
+                map: A,
+            ) -> Result<Self::Value, A::Error> {
+                use serde::de::value::MapAccessDeserializer;
+                T::deserialize(MapAccessDeserializer::new(map)).map(NullOr::Value)
+            }
+            fn visit_enum<A: serde::de::EnumAccess<'de>>(
+                self,
+                data: A,
+            ) -> Result<Self::Value, A::Error> {
+                use serde::de::value::EnumAccessDeserializer;
+                T::deserialize(EnumAccessDeserializer::new(data)).map(NullOr::Value)
+            }
         }
-        deserializer.deserialize_option(Visitor(std::marker::PhantomData))
+        // `deserialize_any`: RON's any-mode cannot serve
+        // `deserialize_option` (patch slots inside instances hit
+        // "Expected struct … but found Some"), so the visitor accepts
+        // `Some(x)`, bare `x`, and clears — in both dialects, and JSON.
+        deserializer.deserialize_any(Visitor(std::marker::PhantomData))
     }
 }
 
