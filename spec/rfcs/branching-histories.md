@@ -84,7 +84,7 @@ survive). No change to the linear log's meaning.
 
 ## Implementation status
 
-- **JS reference** (`viewer/src/index.js`): `buildHistory` (ids, parents,
+- **JS reference** (`js/src/index.js`): `buildHistory` (ids, parents,
   children, tips), `foldPath(manifest, entries, tip?)`, and the `merge`
   op kind in `classifyOp`. Tested over
   `examples/forked-exploration/`, whose log holds a real fork.

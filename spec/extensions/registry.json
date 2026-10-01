@@ -8,7 +8,7 @@
       "rfc": "spec/rfcs/ext-physics.md",
       "schema": "schema/extensions/ext-physics.schema.json",
       "implementations": [
-        "viewer/src/physics.js (npm openworldformat/physics)",
+        "js/src/physics.js (npm openworldformat/physics)",
         "LocalGPT crates/world-physics (Rust, localgpt-world-physics)"
       ],
       "conformance": ["conformance/physics.json", "conformance/outcomes/physics.json"],

@@ -1,7 +1,7 @@
 // Assemble the live demo's inputs into static/: the conformance worlds,
 // the example package's manifest, and the reference renderer. The copies
 // are gitignored — edit them where they live (../conformance, ../examples,
-// ../viewer/src/render.js) and re-assemble, the same rule localgpt.world
+// ../js/src/render.js) and re-assemble, the same rule localgpt.world
 // runs on. vendor/three (committed) is self-hosted so the site makes no
 // third-party requests.
 import { cp, mkdir, readdir, rm } from 'node:fs/promises';
@@ -31,6 +31,6 @@ await cp(
 );
 
 // The reference renderer.
-await cp(path.join(repo, 'viewer/src/render.js'), path.join(root, 'static/viewer/world-viewer.js'));
+await cp(path.join(repo, 'js/src/render.js'), path.join(root, 'static/viewer/world-viewer.js'));
 
 console.log(`assembled ${worlds.length} conformance worlds, the example manifest, and the renderer`);

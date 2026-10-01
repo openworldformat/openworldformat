@@ -6,7 +6,7 @@ on:
   pull_request:
 
 jobs:
-  viewer:
+  js:
     name: Reference fold (node)
     runs-on: ubuntu-latest
     steps:
@@ -15,7 +15,7 @@ jobs:
         with:
           node-version: 22
       - run: npm test
-        working-directory: viewer/
+        working-directory: js/
 
   website:
     name: openworldformat.org (zola + render check)

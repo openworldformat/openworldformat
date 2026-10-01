@@ -70,7 +70,7 @@ All three are cheaper than any alternative's failure mode.
 
 ## Implementation status
 
-- **JS reference** (`viewer/src/physics.js`, exported as
+- **JS reference** (`js/src/physics.js`, exported as
   `openworldformat/physics`): the extension op kind in the fold, patch
   passthrough for `ext-*` fields, a deliberately minimal deterministic
   solver (spheres, floors, axis-aligned statics; fixed 1/120 s

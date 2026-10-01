@@ -81,7 +81,7 @@ profiles — never maximalism.
 
 ## Implementation status
 
-- **Reference renderer** (`viewer/src/render.js`): honors `fallback`
+- **Reference renderer** (`js/src/render.js`): honors `fallback`
   shapes on mesh entities (drawn when the mesh can't load — the
   placeholder wireframe becomes the declared silhouette) and drops
   lights from the tail by `priority` when over its punctual-light

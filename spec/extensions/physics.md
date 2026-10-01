@@ -136,7 +136,7 @@ Two, in two languages, running the same conformance outcome assertions
 from `conformance/outcomes/physics.json` in their own CI:
 
 - **JS** — `openworldformat/physics` (in this repository,
-  `viewer/src/physics.js`): the op kind in the fold, `ext-*` patch
+  `js/src/physics.js`): the op kind in the fold, `ext-*` patch
   passthrough, the solver, trajectory write/fold, and the outcome
   runner.
 - **Rust** — LocalGPT's `world-physics` crate

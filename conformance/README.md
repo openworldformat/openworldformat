@@ -28,7 +28,7 @@ that cannot be pixel-diffed. `outcomes/physics.json` pairs with
 rest (that is its conformance), while an engine claiming `ext-physics`
 passes the assertions — contact, rest, bounces — under simulation or
 scrubbed playback ([spec/extensions/physics.md](../spec/extensions/physics.md)).
-The reference solver runs them in CI (`npm test` in `viewer/`).
+The reference solver runs them in CI (`npm test` in `js/`).
 
 Each world is a complete `manifest.json` — also valid base worlds for
 session tests. License: Apache-2.0, from the LocalGPT conformance suite.

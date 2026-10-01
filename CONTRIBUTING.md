@@ -13,7 +13,7 @@ lineage already uses:
 3. Changes to the data model land in the JSON Schema in the same PR,
    and bump the schema version per the [versioning policy](spec/versioning.md).
 4. Two implementers' sign-off (currently: the reference fold
-   implementation in `viewer/`, and a renderer) before merge.
+   implementation in `js/`, and a renderer) before merge.
 
 Schema-first: `schema/world.schema.json` is generated from the
 reference types, not hand-edited. Conformance-first: behavior is what
@@ -24,7 +24,7 @@ decide.
 
 - Conventional commits (`feat:`, `fix:`, `docs:`, `spec:`), no
   Co-Authored-By trailers.
-- `npm test` in `viewer/` and `zola build` in `website/` must pass; CI
+- `npm test` in `js/` and `zola build` in `website/` must pass; CI
   runs both.
 - Spec prose is English, second person, and states rules with
   MUST / SHOULD / MAY.

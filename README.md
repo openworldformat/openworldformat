@@ -30,7 +30,9 @@ suite in the format's origin project. Expect churn until 1.0; the
 | [`schema/`](schema/) | The normative JSON Schema (`world.schema.json`) |
 | [`conformance/`](conformance/) | Conformance worlds — compliance means rendering these |
 | [`examples/`](examples/) | Example `.world` packages |
-| [`viewer/`](viewer/) | The reference npm package: parse and fold, no engine required |
+| [`js/`](js/) | The reference npm package: parse and fold, no engine required |
+| [`rust/`](rust/) | placeholder — the Rust reference, extracted when a second Rust consumer appears (today: LocalGPT's crates) |
+| [`python/`](python/) | placeholder — the research surface: parse and fold for benchmarks, datasets, notebooks |
 | [`website/`](website/) | [openworldformat.org](https://openworldformat.org) (Zola, no theme) |
 
 ## Try it in a minute
