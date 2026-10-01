@@ -127,6 +127,28 @@ This task language is deliberately library-level, not a spec
 extension; it graduates to `spec/extensions/` when a second implementer
 wants it.
 
+## Agents: the benchmark's other half
+
+Scoring a recorded trajectory is one loop; scoring a live agent is the
+same loop with the recording still wet. `run_agent` keeps the entries,
+folds between steps so the agent observes its own edits, and scores
+with `run_task`:
+
+```python
+from openworldformat.agent import run_agent
+
+result = run_agent(manifest, task, state_doc)  # template_agent inside
+result["ok"], result["metrics"], result["entries"]
+```
+
+An agent is `f(document, values, task, entries) -> entry | None`: the
+folded world and state values as observation, one entry of ops as
+action, `None` to stop. The built-in `template_agent` is the baseline —
+a compiler from goal predicates to ops, not a brain; it exists so
+benchmark authors have a floor to beat and a skeleton to copy. Its
+entries serialize to `ops.jsonl` like any recording: an agent run is a
+log, ready to join a dataset.
+
 ## API
 
 | Export | What it does |
@@ -148,6 +170,8 @@ wants it.
 plain numbers, for analysis rather than playback.
 `openworldformat.eval` scores tasks (see above): `run_task`,
 `load_task_file`, and the `python -m openworldformat.eval` CLI.
+`openworldformat.agent` runs agents against them: `run_agent` and the
+`template_agent` baseline.
 
 ## Test
 
