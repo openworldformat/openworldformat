@@ -1,5 +1,9 @@
 target/
 node_modules/
+__pycache__/
+*.pyc
+*.egg-info/
+python/dist/
 website/public/
 website/content/spec/
 website/static/conformance/

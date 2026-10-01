@@ -24,8 +24,9 @@ decide.
 
 - Conventional commits (`feat:`, `fix:`, `docs:`, `spec:`), no
   Co-Authored-By trailers.
-- `npm test` in `js/` and `zola build` in `website/` must pass; CI
-  runs both.
+- `npm test` in `js/`, `python -m unittest discover -s tests -t .` in
+  `python/`, and `zola build` in `website/` must pass; CI runs all
+  three.
 - Spec prose is English, second person, and states rules with
   MUST / SHOULD / MAY.
 

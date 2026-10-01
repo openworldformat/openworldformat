@@ -32,7 +32,7 @@ suite in the format's origin project. Expect churn until 1.0; the
 | [`examples/`](examples/) | Example `.world` packages |
 | [`js/`](js/) | The reference npm package: parse and fold, no engine required |
 | [`rust/`](rust/) | placeholder — the Rust reference, extracted when a second Rust consumer appears (today: LocalGPT's crates) |
-| [`python/`](python/) | placeholder — the research surface: parse and fold for benchmarks, datasets, notebooks |
+| [`python/`](python/) | The research package (PyPI): parse and fold for benchmarks, datasets, notebooks |
 | [`website/`](website/) | [openworldformat.org](https://openworldformat.org) (Zola, no theme) |
 
 ## Try it in a minute
@@ -49,6 +49,9 @@ const entries = (await fs.readFile("examples/hello-world/ops.jsonl", "utf8"))
   .split("\n").filter(Boolean).map(parseLog);
 const world = foldLog(manifest, entries); // the world at head revision
 ```
+
+The same fold, for benchmarks and notebooks: `pip install
+openworldformat` — see [`python/`](python/).
 
 ## License
 

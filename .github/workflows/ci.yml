@@ -17,6 +17,17 @@ jobs:
       - run: npm test
         working-directory: js/
 
+  python:
+    name: Research fold (python)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m unittest discover -s tests -t .
+        working-directory: python/
+
   website:
     name: openworldformat.org (zola + render check)
     runs-on: ubuntu-latest
