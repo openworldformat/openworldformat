@@ -10,3 +10,5 @@ website/static/conformance/
 website/static/viewer/
 website/.wrangler/
 .DS_Store
+.build/
+.swiftbuild/

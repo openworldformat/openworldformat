@@ -49,7 +49,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: swift test
-        working-directory: swift/
 
   website:
     name: openworldformat.org (zola + render check)
