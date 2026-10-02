@@ -1,0 +1,90 @@
+// Package-wide types and the JSON accessors the fold speaks.
+//
+// kotlinx.serialization's JsonElement is the passthrough half of the
+// format (the role JSONValue plays in the Swift package): components,
+// extension fields and state values ride along untouched, nulls
+// included — a stored JsonNull is "present and null", a missing key
+// is "absent", and the patch semantics (absent = unchanged, null =
+// clear, value = set) need exactly that distinction.
+
+package org.openworldformat
+
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.doubleOrNull
+
+/** The manifest schema version this package reads. */
+const val SUPPORTED_SCHEMA_VERSION: Int = 3
+
+/** The package format version this package reads. */
+const val SUPPORTED_FORMAT_VERSION: Int = 1
+
+/** A refusal: parse errors say what the document lacks; fold refusals
+ *  carry the "invalid: " prefix the other references throw. */
+class WorldFormatException(message: String) : RuntimeException(message) {
+    companion object {
+        fun invalid(message: String) = WorldFormatException("invalid: $message")
+    }
+}
+
+/** The lenient parser the fold reads through. */
+val OWF_JSON: Json = Json
+
+// ---------------------------------------------------------------------------
+// JsonElement accessors — null-typed lookups, presence-preserving
+// ---------------------------------------------------------------------------
+
+/** The object, if this is one. */
+val JsonElement.obj: JsonObject?
+    get() = this as? JsonObject
+
+/** The array, if this is one. */
+val JsonElement.arr: JsonArray?
+    get() = this as? JsonArray
+
+/** The string, if this is a non-null string primitive. */
+val JsonElement.str: String?
+    get() = (this as? JsonPrimitive)?.takeIf { it !is JsonNull && it.isString }?.content
+
+/** The double, if this is a number. */
+val JsonElement.dbl: Double?
+    get() = (this as? JsonPrimitive)?.takeIf { it !is JsonNull }?.doubleOrNull
+
+/** The integer, if this is a number with no fractional part. */
+val JsonElement.int: Int?
+    get() = dbl?.let { d -> if (d == Math.floor(d) && abs(d) < 9.007199254740992E15) d.toInt() else null }
+
+/** The boolean, if this is one. */
+val JsonElement.bool: Boolean?
+    get() = (this as? JsonPrimitive)?.takeIf { it !is JsonNull }?.booleanOrNull
+
+/** Key lookup that reads like the other references: `op["args"]`. */
+operator fun JsonObject?.get(key: String): JsonElement? = this?.get(key)
+
+/** Explicit-null check — the distinction the patch semantics live on. */
+val JsonElement?.isNull: Boolean
+    get() = this is JsonNull
+
+/** A 3-component vector, as the format serializes it: [x, y, z]. */
+data class Vec3(val x: Double, val y: Double, val z: Double) {
+    companion object {
+        fun from(json: JsonElement?): Vec3? {
+            val a = json?.arr ?: return null
+            if (a.size < 3) return null
+            return Vec3(a[0].dbl ?: 0.0, a[1].dbl ?: 0.0, a[2].dbl ?: 0.0)
+        }
+    }
+}
+
+/** `ext-` followed by lowercase letters, digits and dashes (`ext-physics`). */
+fun isExtensionKey(key: String): Boolean {
+    if (!key.startsWith("ext-") || key.length <= 4) return false
+    return key.drop(4).all { c -> c in 'a'..'z' || c in '0'..'9' || c == '-' }
+}
+
+private fun abs(d: Double) = if (d < 0) -d else d
