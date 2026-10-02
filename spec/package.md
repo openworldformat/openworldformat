@@ -51,17 +51,22 @@ the same package render the same world. Asset references inside
 manifests also carry the hash, so a missing or changed file is detected,
 not silently drawn.
 
-Meshes are glTF (`.glb`); textures are PNG; audio is whatever the audio
-profile accepts. The package never invents leaf formats — it composes
-them.
+Meshes are glTF (`.glb`); textures are PNG; audio formats are determined by
+the Player profile (e.g., OGG, WAV, MP3). The package never invents leaf
+formats — it composes them.
 
 ## Integrity and tolerance
 
 Writers SHOULD refresh `log_sha256` and `head_revision` whenever the log
-appends, and MAY snapshot periodically (keyframes for seeking: read at
-revision N = nearest base-or-snapshot ≤ N, then fold forward).
+appends, and SHOULD snapshot periodically (e.g., every 1,000 revisions or
+5MB of log growth). Keyframes for seeking: read at revision N = nearest base-or-snapshot ≤ N, then fold forward).
 
 Readers MUST be tolerant: a torn last log line loses at most itself and
 is skipped (and countable); the fold stops at the first entry that no
 longer applies. Integrity hashes, when present, SHOULD be checked before
 trusting a package from a third party.
+
+Engines SHOULD implement a "Safe Mode" boot that explicitly warns the user
+if a session log contains operations from profiles or extensions they do
+not have installed. This prevents silent erasure of custom content when
+saving the world back to disk.

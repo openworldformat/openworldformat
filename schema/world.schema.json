@@ -1,19 +1,9 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "WorldManifest",
-  "description": "Top-level world manifest — everything needed to save/load a world.\n\nConventions every renderer follows (Bevy through `localgpt-world-bevy`,\nthree.js through the web viewer):\n\n- positions are world units, Y up;\n- rotations are XYZ Euler angles in degrees;\n- colours are RGBA in `0..=1`, sRGB-encoded, except `emissive`, which is\n  linear (values above 1 glow);\n- directional light intensity is lux, point and spot lights are lumens,\n  spot angles are radians;\n- asset paths are relative to the world's `assets/` folder.\n\nThe format names no engine: which renderer or engine version drew a\nworld is not part of it.",
+  "description": "Top-level world manifest \u2014 everything needed to save/load a world.\n\nConventions every renderer follows (Bevy through `localgpt-world-bevy`,\nthree.js through the web viewer):\n\n- positions are world units, Y up;\n- rotations are XYZ Euler angles in degrees;\n- colours are RGBA in `0..=1`, sRGB-encoded, except `emissive`, which is\n  linear (values above 1 glow);\n- directional light intensity is lux, point and spot lights are lumens,\n  spot angles are radians;\n- asset paths are relative to the world's `assets/` folder.\n\nThe format names no engine: which renderer or engine version drew a\nworld is not part of it.",
   "type": "object",
   "properties": {
-    "audio_files": {
-      "description": "Paths to audio spec files.",
-      "type": [
-        "array",
-        "null"
-      ],
-      "items": {
-        "type": "string"
-      }
-    },
     "avatar": {
       "description": "Avatar configuration.",
       "anyOf": [
@@ -24,23 +14,6 @@
           "type": "null"
         }
       ]
-    },
-    "avatar_file": {
-      "description": "Path to an avatar definition file.",
-      "type": [
-        "string",
-        "null"
-      ]
-    },
-    "behavior_files": {
-      "description": "Paths to behavior library files.",
-      "type": [
-        "array",
-        "null"
-      ],
-      "items": {
-        "type": "string"
-      }
     },
     "camera": {
       "description": "Default camera position/orientation.",
@@ -78,13 +51,6 @@
         }
       ]
     },
-    "layout_file": {
-      "description": "Path to a separate layout file (blockout regions, spatial graph).",
-      "type": [
-        "string",
-        "null"
-      ]
-    },
     "meta": {
       "description": "World metadata (name, description, biome, etc.).",
       "$ref": "#/$defs/WorldMeta"
@@ -92,19 +58,9 @@
     "next_entity_id": {
       "description": "Next entity ID to allocate.",
       "type": "integer",
-      "format": "uint64",
       "default": 1,
-      "minimum": 0
-    },
-    "region_files": {
-      "description": "Paths to per-region entity files.",
-      "type": [
-        "array",
-        "null"
-      ],
-      "items": {
-        "type": "string"
-      }
+      "minimum": 0,
+      "maximum": 9007199254740991
     },
     "soundtrack": {
       "description": "The song this world performs to, with the analysis that drives\nentity modulations.",
@@ -133,7 +89,8 @@
     }
   },
   "required": [
-    "meta"
+    "meta",
+    "version"
   ],
   "$defs": {
     "AlphaModeDef": {
@@ -186,11 +143,11 @@
           "default": "inverse_square"
         },
         "source": {
-          "description": "The sound source — what to play.",
+          "description": "The sound source \u2014 what to play.",
           "$ref": "#/$defs/AudioSource"
         },
         "volume": {
-          "description": "Volume multiplier (0.0–1.0).",
+          "description": "Volume multiplier (0.0\u20131.0).",
           "type": "number",
           "format": "float",
           "default": 1.0
@@ -201,7 +158,7 @@
       ]
     },
     "AudioKind": {
-      "description": "High-level audio category — determines mixing bus and behavior.",
+      "description": "High-level audio category \u2014 determines mixing bus and behavior.",
       "oneOf": [
         {
           "description": "Environmental background (wind, rain, etc.)",
@@ -221,7 +178,7 @@
       ]
     },
     "AudioSource": {
-      "description": "What sound to produce — unified taxonomy of all sound types.",
+      "description": "What sound to produce \u2014 unified taxonomy of all sound types.",
       "oneOf": [
         {
           "type": "object",
@@ -583,7 +540,7 @@
       }
     },
     "BehaviorDef": {
-      "description": "Declarative behavior definition — data, not code.\nEach variant fully describes a continuous animation that the tick system evaluates.",
+      "description": "Declarative behavior definition \u2014 data, not code.\nEach variant fully describes a continuous animation that the tick system evaluates.",
       "oneOf": [
         {
           "description": "Orbit around a center entity or point.",
@@ -987,7 +944,7 @@
       }
     },
     "CreationDef": {
-      "description": "A compound creation — a named group of entities that form a logical object.\n\nFor example, a \"house\" creation might consist of walls, roof, door, and\nchimney entities, with optional audio (fireplace) and lights (windows).",
+      "description": "A compound creation \u2014 a named group of entities that form a logical object.\n\nFor example, a \"house\" creation might consist of walls, roof, door, and\nchimney entities, with optional audio (fireplace) and lights (windows).",
       "type": "object",
       "properties": {
         "bbox_half": {
@@ -1048,21 +1005,21 @@
     "CreationId": {
       "description": "Unique identifier for a compound creation (group of entities).",
       "type": "integer",
-      "format": "uint64",
-      "minimum": 0
+      "minimum": 0,
+      "maximum": 9007199254740991
     },
     "EntityId": {
       "description": "Stable, monotonically increasing entity identifier.",
       "type": "integer",
-      "format": "uint64",
-      "minimum": 0
+      "minimum": 0,
+      "maximum": 9007199254740991
     },
     "EntityName": {
       "description": "Human-readable entity name. Unique within a world but may be renamed.",
       "type": "string"
     },
     "EntityPatch": {
-      "description": "Patch for modifying an existing entity.\n\nUses `Option<Option<T>>` semantics:\n- `None` — field not changed\n- `Some(None)` — field removed/cleared\n- `Some(Some(v))` — field set to `v`\n\nSerialize/Deserialize are hand-written (not derived) because the\nderived form has no room for extension keys: an `ext-*` key in a\npatch sets (or clears, on `null`) the entity's [`WorldEntity::extra`]\nentry, exactly as the fold's core fields patch — and `serde(flatten)`\ncan't be used here, since flattening collapses an explicit `null`\ninto an absent key and would erase the clear-field semantics above.",
+      "description": "Patch for modifying an existing entity.\n\nUses `Option<Option<T>>` semantics:\n- `None` \u2014 field not changed\n- `Some(None)` \u2014 field removed/cleared\n- `Some(Some(v))` \u2014 field set to `v`\n\nSerialize/Deserialize are hand-written (not derived) because the\nderived form has no room for extension keys: an `ext-*` key in a\npatch sets (or clears, on `null`) the entity's [`WorldEntity::extra`]\nentry, exactly as the fold's core fields patch \u2014 and `serde(flatten)`\ncan't be used here, since flattening collapses an explicit `null`\ninto an absent key and would erase the clear-field semantics above.",
       "type": "object",
       "properties": {
         "audio": {
@@ -1085,7 +1042,7 @@
           }
         },
         "extra": {
-          "description": "Extension fields (`ext-*`) this patch sets — or clears, on `None`.\nOther unknown keys are dropped, matching the reference fold.",
+          "description": "Extension fields (`ext-*`) this patch sets \u2014 or clears, on `None`.\nOther unknown keys are dropped, matching the reference fold.",
           "type": "object",
           "additionalProperties": true,
           "default": {}
@@ -1191,7 +1148,7 @@
       }
     },
     "EntityRef": {
-      "description": "Cross-entity reference — used in behaviors, parenting, audio attachment.\n\nLLMs produce `Name` references; these are resolved to `Id` on ingestion.\nSaved worlds should only contain `Id` references.",
+      "description": "Cross-entity reference \u2014 used in behaviors, parenting, audio attachment.\n\nLLMs produce `Name` references; these are resolved to `Id` on ingestion.\nSaved worlds should only contain `Id` references.",
       "anyOf": [
         {
           "description": "Stable reference by numeric ID (for persisted worlds).",
@@ -1533,7 +1490,7 @@
       "type": "object",
       "properties": {
         "range": {
-          "description": "`[value at signal 0, value at signal 1]` — a multiplier for\nmultiplicative targets, world units for `offset_y`.",
+          "description": "`[value at signal 0, value at signal 1]` \u2014 a multiplier for\nmultiplicative targets, world units for `offset_y`.",
           "type": "array",
           "default": [
             1.0,
@@ -2043,7 +2000,7 @@
           ]
         },
         {
-          "description": "A fixed value — for authoring and previews.",
+          "description": "A fixed value \u2014 for authoring and previews.",
           "type": "object",
           "properties": {
             "constant": {
@@ -2182,7 +2139,7 @@
       ]
     },
     "TourDef": {
-      "description": "A guided tour — a named, ordered sequence of waypoints through the world.",
+      "description": "A guided tour \u2014 a named, ordered sequence of waypoints through the world.",
       "type": "object",
       "properties": {
         "autostart": {
@@ -2696,11 +2653,11 @@
       ]
     },
     "WorldEntity": {
-      "description": "A single entity in the world.  Component slots are all optional —\nany combination is valid (e.g., a glowing orb has shape + light + audio).",
+      "description": "A single entity in the world.  Component slots are all optional \u2014\nany combination is valid (e.g., a glowing orb has shape + light + audio).",
       "type": "object",
       "properties": {
         "audio": {
-          "description": "Audio source — spatial or ambient.",
+          "description": "Audio source \u2014 spatial or ambient.",
           "anyOf": [
             {
               "$ref": "#/$defs/AudioDef"
@@ -2711,7 +2668,7 @@
           ]
         },
         "behaviors": {
-          "description": "Behaviors stack — multiple can be active simultaneously.",
+          "description": "Behaviors stack \u2014 multiple can be active simultaneously.",
           "type": "array",
           "default": [],
           "items": {
@@ -2762,7 +2719,7 @@
           ]
         },
         "light": {
-          "description": "Light source — can coexist with shape (e.g., glowing orb).",
+          "description": "Light source \u2014 can coexist with shape (e.g., glowing orb).",
           "anyOf": [
             {
               "$ref": "#/$defs/LightDef"
@@ -2818,7 +2775,7 @@
           ]
         },
         "shape": {
-          "description": "Parametric shape — never loses dimension info.",
+          "description": "Parametric shape \u2014 never loses dimension info.",
           "anyOf": [
             {
               "$ref": "#/$defs/Shape"

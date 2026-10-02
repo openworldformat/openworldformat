@@ -13,7 +13,7 @@ for in the format's lineage.
 ## Rules
 
 1. **Minor schema versions add optional fields.** A reader of version N
-   reads version N-1 worlds and skips fields it doesn't know
+   reads worlds of all versions ≤ N and skips fields it doesn't know
    ([must-ignore](profiles.md)).
 2. **Major schema versions may restructure, but must not silently drop
    data.** The lineage's schema 2→3 bump exists precisely because a
@@ -27,6 +27,14 @@ for in the format's lineage.
 4. **Conformance worlds are versioned with the schema.** An
    implementation claiming version N passes version N's suite. The suite
    is the definition of "renders correctly"; prose is the explanation.
+5. **Extensions are preserved forever.** Once an extension version is
+   registered, its spec page and conformance cases remain permanently.
+   Claiming version N of an extension means passing its version N cases
+   forever.
+6. **Library Versioning.** While the format is in draft (0.x), language
+   bindings SHOULD align their SemVer major/minor numbers with the spec
+   draft. After 1.0, bindings SHOULD use the schema version as their
+   major version.
 
 ## What implementers may rely on
 

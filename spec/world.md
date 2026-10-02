@@ -12,7 +12,7 @@ Every renderer follows these, so two renderers draw the same world the
 same way (the conformance worlds hold them to it):
 
 - Positions are world units (meters at 1:1 scale), **Y up**.
-- Rotations are XYZ Euler angles in **degrees**.
+- Rotations are **intrinsic** XYZ Euler angles in **degrees** (applied in X, Y, Z order relative to the local moving frame).
 - Colours are RGBA in `0..=1`, **sRGB-encoded**, except `emissive`,
   which is **linear** (values above 1 glow).
 - Directional light intensity is **lux**; point and spot lights are

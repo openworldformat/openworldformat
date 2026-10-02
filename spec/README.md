@@ -23,13 +23,14 @@ manifest schema version 3. The normative definitions are:
 5. [Profiles and extensions](profiles.md) — what an implementation must,
    may and must-ignore.
 6. [Versioning policy](versioning.md) — the compatibility contract.
+7. [Security and Privacy](security.md) — parsing robustness and user data.
 
 ## The one invariant
 
-> **State at any revision is a pure fold of the log over the base.**
+> **State at any tip is a pure fold of the path from base to tip.**
 
 ```
-fold(base, entries with revision > base_revision) == state at head
+fold(base, path from base to tip) == state at tip
 ```
 
 Everything the format offers is a consequence: rendering (fold nothing,

@@ -57,12 +57,18 @@ its shape:
 | `merge` | an app, merging a fork | no — provenance that a batch came from a branch |
 
 Edits are `SpawnEntity`, `DeleteEntity`, `ModifyEntity` (an entity id
-plus a field patch), `SetEnvironment`, `SetCamera`, `SetAmbience`,
+plus a field patch, where an absent key means unchanged, `null` means clear/remove, and a value sets it), `SetEnvironment`, `SetCamera`, `SetAmbience`,
 `SpawnAudioEmitter`, `RemoveAudioEmitter`, and `Batch` (all-or-nothing).
 Deleting an entity deletes its descendants. Every edit has a computable
 inverse; **undo is appending the inverse** — the log never rewinds.
+The inverse is computed at the time of the edit:
+- `SpawnEntity` inverses to `DeleteEntity`.
+- `DeleteEntity` inverses to a `Batch` of `SpawnEntity` ops containing a deep copy of the deleted tree.
+- `ModifyEntity` inverses to a `ModifyEntity` restoring the old values.
 
 ## Compatibility
+
+To prevent future collisions, the shape collision rule applies: **Edits MUST be PascalCase, History kinds MUST be lowercase.**
 
 New op kinds MUST fold to nothing for readers that don't know them, and
 readers MUST keep reading logs written before a kind existed. The
@@ -70,6 +76,12 @@ reference rule: op kinds are recognized by shape, edits first — so a log
 containing only edits (every log written before this format had history
 kinds) parses unchanged, and an edit serializes today exactly as it
 always did.
+
+### Folding and Invalid Operations
+During a fold, an operation may "no longer apply" to the current state. Such operations are skipped without failing the fold. The error taxonomy includes:
+- **Entity not found**: Attempting to modify or delete an entity that does not exist.
+- **Invalid patch**: A `ModifyEntity` patch that does not match the schema or attempts an invalid field transition.
+- **Already exists**: Attempting to spawn an entity with an ID that is currently in use.
 
 ## Entry identity, forks and branches
 
@@ -84,12 +96,12 @@ linear prefix. `revision` stays the room's total order; `parent` records
 causality — sequence is not causality.
 
 Forks and refs live in `package.json` ([the package](package.md)); the
-`merge` op records where a merged batch came from. See
+`merge` op records where a merged batch came from. When merging a branch, the merge authority must handle ID collisions. If the branch introduces entities with IDs that were concurrently allocated on the main branch, the merge authority MUST reallocate those colliding IDs and rewrite all their references within the merged batch. See
 [`rfcs/branching-histories.md`](rfcs/branching-histories.md).
 
 ## Snapshots
 
-A snapshot is the folded document written to `snapshots/rev-<N>.json`:
+A snapshot is the folded document written to `snapshots/entry-<id>.json` (or `snapshots/rev-<N>.json` for linear logs without explicit ids):
 derived, never authoritative, deletable without loss — the fold from the
 base reaches the same state. Compaction (folding to a new base and
 keeping the old log for history) changes nothing observable.
@@ -106,7 +118,7 @@ Three levels, and only the first two are part of this format:
    the same inputs produce the same trigger outcomes and the same
    state trajectory. Frames are *approximately* the same — input is
    sampled (~10 Hz), behaviors are functions of folded time, and
-   renderers draw.
+   renderers draw. During semantic replay, timers observe the session's recorded transport clock. After a seek, a timer observes the clock as dictated by the closest preceding `clock` entry.
 3. **Bit-exact replay** — the same pixels. **Not part of this format,
    and MUST NOT be promised by implementations of it.** Floats, physics
    ordering and renderer differences make it a lie waiting to be caught;

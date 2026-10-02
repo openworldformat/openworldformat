@@ -3,7 +3,7 @@
 Behavior is specified by what these worlds render to. An implementation
 claiming a profile renders the worlds of that profile; "renders" means
 the same scene, within the tolerance the format's conventions allow
-([spec/world.md](../spec/world.md)).
+([spec/world.md](../spec/world.md)). Tolerance: rendered geometry must fall within a 1mm bounding box difference, and colors within 1/256 sRGB threshold.
 
 | World | Covers |
 |---|---|
