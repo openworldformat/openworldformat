@@ -1244,7 +1244,8 @@
         "extra": {
           "description": "Extension fields (`ext-*`), namespaced and must-ignored: what a\nreader doesn't understand rides along unchanged (the physics\nextension's gravity lives here today). An empty map serializes to\nnothing.",
           "type": "object",
-          "additionalProperties": true
+          "additionalProperties": true,
+          "default": {}
         },
         "fog_color": {
           "description": "Fog color, sRGB-encoded RGBA in `0..=1`; the background color when\nunset.",
@@ -1267,10 +1268,7 @@
           ],
           "format": "float"
         }
-      },
-      "required": [
-        "extra"
-      ]
+      }
     },
     "FilterType": {
       "description": "Audio filter type.",
@@ -2715,6 +2713,7 @@
         "behaviors": {
           "description": "Behaviors stack — multiple can be active simultaneously.",
           "type": "array",
+          "default": [],
           "items": {
             "$ref": "#/$defs/BehaviorDef"
           }
@@ -2744,7 +2743,8 @@
         "extra": {
           "description": "Extension fields (`ext-*`), namespaced and must-ignored: what a\nreader doesn't understand rides along unchanged (the physics\nextension's body component lives here today). The typed fields\nabove are the contract; this map is the sanctioned room around\nthem. An empty map serializes to nothing.",
           "type": "object",
-          "additionalProperties": true
+          "additionalProperties": true,
+          "default": {}
         },
         "id": {
           "description": "Stable numeric identifier.",
@@ -2797,6 +2797,7 @@
         "modulations": {
           "description": "Signal-driven modulations (soundtrack energy, beat, oscillators)\nstacked on top of the authored values.",
           "type": "array",
+          "default": [],
           "items": {
             "$ref": "#/$defs/ModulationDef"
           }
@@ -2829,11 +2830,30 @@
         },
         "transform": {
           "description": "Spatial transform.",
-          "$ref": "#/$defs/WorldTransform"
+          "$ref": "#/$defs/WorldTransform",
+          "default": {
+            "position": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "rotation_degrees": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "scale": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "visible": true
+          }
         },
         "triggers": {
           "description": "Events and the actions they run (see [`crate::trigger`]).",
           "type": "array",
+          "default": [],
           "items": {
             "$ref": "#/$defs/TriggerDef"
           }
@@ -2841,12 +2861,7 @@
       },
       "required": [
         "id",
-        "name",
-        "transform",
-        "behaviors",
-        "modulations",
-        "triggers",
-        "extra"
+        "name"
       ]
     },
     "WorldMeta": {

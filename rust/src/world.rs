@@ -247,6 +247,7 @@ pub struct EnvironmentDef {
     /// reader doesn't understand rides along unchanged (the physics
     /// extension's gravity lives here today). An empty map serializes to
     /// nothing.
+    #[cfg_attr(feature = "schema", schemars(default))]
     pub extra: std::collections::BTreeMap<String, serde_json::Value>,
 }
 

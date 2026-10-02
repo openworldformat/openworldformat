@@ -65,6 +65,7 @@ pub struct WorldEntity {
     /// Human-readable name.
     pub name: EntityName,
     /// Spatial transform.
+    #[cfg_attr(feature = "schema", schemars(default))]
     pub transform: WorldTransform,
     /// Parent entity (for hierarchy).
     pub parent: Option<EntityId>,
@@ -81,6 +82,7 @@ pub struct WorldEntity {
     /// Light source — can coexist with shape (e.g., glowing orb).
     pub light: Option<LightDef>,
     /// Behaviors stack — multiple can be active simultaneously.
+    #[cfg_attr(feature = "schema", schemars(default))]
     pub behaviors: Vec<BehaviorDef>,
     /// Audio source — spatial or ambient.
     pub audio: Option<AudioDef>,
@@ -88,17 +90,20 @@ pub struct WorldEntity {
     pub mesh_asset: Option<MeshAssetRef>,
     /// Signal-driven modulations (soundtrack energy, beat, oscillators)
     /// stacked on top of the authored values.
+    #[cfg_attr(feature = "schema", schemars(default))]
     pub modulations: Vec<ModulationDef>,
     /// Places a copy of a reusable creation here, with per-part overrides
     /// (see [`crate::instance`]).
     pub instance_of: Option<InstanceOf>,
     /// Events and the actions they run (see [`crate::trigger`]).
+    #[cfg_attr(feature = "schema", schemars(default))]
     pub triggers: Vec<TriggerDef>,
     /// Extension fields (`ext-*`), namespaced and must-ignored: what a
     /// reader doesn't understand rides along unchanged (the physics
     /// extension's body component lives here today). The typed fields
     /// above are the contract; this map is the sanctioned room around
     /// them. An empty map serializes to nothing.
+    #[cfg_attr(feature = "schema", schemars(default))]
     pub extra: BTreeMap<String, serde_json::Value>,
 }
 
