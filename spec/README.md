@@ -48,14 +48,13 @@ engine's.
 
 ## Open items (before 1.0)
 
-- The state document is specified (experimental until 1.0) with its own
+- The state document is now pinned with its own
   [`schema/state.schema.json`](../schema/state.schema.json); it joins
-  `world.schema.json` in the generated core when it settles.
-- The **extension registry** holds its first extension —
-  [`ext-physics`](extensions/physics.md) 0.1, experimental: two
-  implementers (the JS and Rust references) running the same outcome
-  assertions; it leaves experimental when a producer ships a package
-  using it.
+  `world.schema.json` in the generated core.
+- The **extension registry** holds several experimental extensions:
+  [`ext-physics`](extensions/physics.md), [`ext-strict-determinism`](extensions/strict-determinism.md), 
+  [`ext-visibility`](extensions/visibility.md), [`ext-cinematography`](extensions/cinematography.md), 
+  and [`ext-provenance`](extensions/provenance.md). They leave experimental when a producer ships a package using them.
 - Branching histories are specified and implemented in the reference
   fold ([rfcs/branching-histories.md](rfcs/branching-histories.md));
   [`examples/speedrun-fork`](../examples/speedrun-fork/) is the first

@@ -22,6 +22,30 @@
         "KHR_implicit_shapes"
       ],
       "notes": "Three implementations (JS, Rust, Python \u2014 the Rust one now the extracted crates.io crate), all running the same outcome assertions in their CI (npm test here; cargo test -p localgpt-world-physics in LocalGPT). The first package shipped using the extension is examples/the-drop-test. Still experimental until a producer outside this repository ships one. Semantic outcomes are the contract \u2014 bit-exact cross-engine trajectories are never promised."
+    },
+    "ext-strict-determinism": {
+      "version": "0.1.0",
+      "status": "experimental",
+      "spec": "spec/extensions/strict-determinism.md",
+      "notes": "Ensures bit-exact simulation reproducibility across engines using fixed-point math and pinned floating-point rules."
+    },
+    "ext-visibility": {
+      "version": "0.1.0",
+      "status": "experimental",
+      "spec": "spec/extensions/visibility.md",
+      "notes": "Allows authors to conditionally hide entities (e.g. traps, GM secrets) from specific profiles until revealed."
+    },
+    "ext-cinematography": {
+      "version": "0.1.0",
+      "status": "experimental",
+      "spec": "spec/extensions/cinematography.md",
+      "notes": "Provides spline-based camera paths, explicit keyframed animation tracks, and depth-of-field focus targets."
+    },
+    "ext-provenance": {
+      "version": "0.1.0",
+      "status": "experimental",
+      "spec": "spec/extensions/provenance.md",
+      "notes": "Carries LLM lineage metadata such as prompt, model, and generation duration."
     }
   }
 }

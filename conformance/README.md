@@ -12,6 +12,7 @@ the same scene, within the tolerance the format's conventions allow
 | `lights.json` | directional, point, spot; intensity units |
 | `behaviors.json` | all behavior types running from load |
 | `hierarchy_tours.json` | parenting, camera, tour waypoints |
+| `hierarchy_rotations.json` | verifies intrinsic XYZ Euler composition and rotated parent-child hierarchies |
 | `textures.json` | texture maps (`assets/textures/`) |
 | `instances.json` | creations instanced with per-part overrides |
 | `triggers.json` | every trigger event and action |

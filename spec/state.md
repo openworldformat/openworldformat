@@ -31,7 +31,10 @@ file:
 - **The log carries deltas.** A `state` op maps dotted keys to values:
   `{"state": {"score.tour": 3}}`. A key naming a declared field sets it,
   and `null` resets it to its initial value. A key *under* a declared
-  `map` field (`inventory.rope`) sets that entry, and `null` removes it.
+  `map` field (`inventory.rope`) sets that entry, and `null` removes it. 
+  If a declared field exactly matches a dotted key (e.g., declaring 
+  `inventory.rope`), the declared field ALWAYS takes precedence over 
+  map sub-keys during resolution.
 - **State folds separately from the document.** `state` ops never touch
   the world document (the fold's rule); folding state is its own pass:
   `foldState(state.json, state ops) → values`. A world renders from the
@@ -50,7 +53,6 @@ file:
   `add_score` read and write declared fields, so interactivity survives
   the process that ran it.
 
-The state document is new (draft 0.1): the log's `state` op kind is
-stable, the declaration's machine-readable shape is
-[`schema/state.schema.json`](../schema/state.schema.json), and producers
-SHOULD treat it as experimental until 1.0 pins it.
+The state document is now pinned and fully normative: the log's `state` op kind is
+stable, and the declaration's machine-readable shape is defined in
+[`schema/state.schema.json`](../schema/state.schema.json).

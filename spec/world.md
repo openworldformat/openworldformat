@@ -8,15 +8,14 @@ states the rules the schema cannot.
 
 ## Conventions
 
-Every renderer follows these, so two renderers draw the same world the
-same way (the conformance worlds hold them to it):
+Every renderer follows these, so two renderers draw the same geometry and lighting intent, within their own tone mapping pipelines (the format does not pin exposure or ACES/Reinhardt output transforms):
 
 - Positions are world units (meters at 1:1 scale), **Y up**.
 - Rotations are **intrinsic** XYZ Euler angles in **degrees** (applied in X, Y, Z order relative to the local moving frame).
 - Colours are RGBA in `0..=1`, **sRGB-encoded**, except `emissive`,
   which is **linear** (values above 1 glow).
 - Directional light intensity is **lux**; point and spot lights are
-  **lumens**; spot angles are **radians**.
+  **lumens**; spot angles are **radians**. (Renderers SHOULD convert spot light lumens to candela using the cone angle at draw time).
 - Asset paths are relative to the package's `assets/` folder.
 
 The format names no engine. Which renderer drew a world is not part of
@@ -27,8 +26,10 @@ the world.
 An entity has a stable numeric `id` (monotonic, never reused within a
 world) and a unique, human-readable `name`. Cross-entity references —
 behaviors, parenting, audio attachment, orbit centers — may be written
-by **name** (what authors and models produce) and are resolved to **id**
-on ingestion; saved worlds contain ids. Never address entities by array
+by **name** (what authors and models produce) and MUST be resolved to **id**
+at ingestion time against the fold-so-far; saved worlds always contain ids. Delaying
+name resolution until fold time is strictly forbidden because it breaks log determinism
+when entities are renamed. Never address entities by array
 position: positions are a serialization detail, ids are the contract.
 
 ## Entities

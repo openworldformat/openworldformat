@@ -22,6 +22,10 @@ lineage dropped triggers and instanced parts on version-skew once, and
 that bug is why schema versions gate parsing loudly while everything
 else gates softly.
 
+### Strict Mode for Authoring
+
+While runtime consumers (viewers, players) MUST follow the must-ignore rule, authoring tools and validators SHOULD implement a "Strict Mode". In Strict Mode, unknown fields, unregistered extensions, and unmapped properties are treated as validation errors rather than ignored. This prevents silent typos during world generation and ensures emitted packages are fully compliant.
+
 ## Extensions
 
 Extensions are namespaced (`ext-physics`, `ext-avatars`, …) and carry

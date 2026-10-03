@@ -18,4 +18,8 @@ The session log (`ops.jsonl`) captures `input` operations natively. These operat
 
 When a save game (the base world plus a player's log) is circulated, it is not merely a record of the world's state—it is a high-fidelity behavioral recording of the player. Tools that package worlds for distribution SHOULD provide an option to strip `input` operations, unless the player explicitly intends to share a replay.
 
-Additionally, `meta.prompt` carries whatever the author typed to generate the world. This field is preserved into every distributed copy and may inadvertently leak personal text or sensitive generation inputs.
+Additionally, `meta.prompt` (or its equivalent in `ext-provenance`) carries whatever the author typed to generate the world. This field is preserved into every distributed copy and may inadvertently leak personal text or sensitive generation inputs.
+
+## 3. Authenticity and Identity
+
+The session log tracks operations via the `author` field, but this is an unauthenticated free-form object. While the package integrity hashes (`log_sha256`) prove the file hasn't been altered since the hash was generated, they do not prove *who* wrote it. Implementations MUST NOT rely on the `author` field for security or authorization decisions unless an external cryptographic layer (e.g., signed commits, multiplayer server authority) validates the identity.

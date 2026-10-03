@@ -51,7 +51,7 @@ its shape:
 |---|---|---|
 | `edit` (an `EditOp`) | the session authority, for anyone | **yes** — the only kind that does |
 | `tool` | an app, when a tool call runs | no — intent, recorded next to the edits it caused |
-| `input` | an app, sampled (~10 Hz) while recording | no — playthrough replay |
+| `input` | an app, sampled at a normative rate of exactly 10 Hz while recording | no — playthrough replay |
 | `state` | an app, when host state changes | no — the game state no document holds |
 | `clock` | an app, on transport events | no — performances, song worlds, tours |
 | `merge` | an app, merging a fork | no — provenance that a batch came from a branch |
@@ -85,8 +85,7 @@ During a fold, an operation may "no longer apply" to the current state. Such ope
 
 ## Entry identity, forks and branches
 
-An entry may carry an `id` (its identity — content hashes recommended,
-opaque to readers) and a `parent` (the entry it builds on). A **branch**
+An entry may carry an `id` (its identity) and a `parent` (the entry it builds on). To ensure identical IDs across forks, implementations computing content hashes MUST serialize the entry using a canonical JSON format (e.g., no whitespace, keys sorted alphabetically). A **branch**
 is an entry whose parent already has a child; a **tip** is an entry that
 is nobody's parent. Folding generalizes: **state at any tip is a fold of
 the path** — walk parent links from tip to base, fold that chain. A log
@@ -103,8 +102,9 @@ Forks and refs live in `package.json` ([the package](package.md)); the
 
 A snapshot is the folded document written to `snapshots/entry-<id>.json` (or `snapshots/rev-<N>.json` for linear logs without explicit ids):
 derived, never authoritative, deletable without loss — the fold from the
-base reaches the same state. Compaction (folding to a new base and
-keeping the old log for history) changes nothing observable.
+base reaches the same state. 
+
+Compaction occurs when a producer writes a new base manifest to discard history. The producer MUST update `package.json`'s `base_revision`, rename the old log to `ops.archive.jsonl` (or delete it entirely), and start a fresh `ops.jsonl`. Compaction changes nothing observable about the current state, but truncates structural replay.
 
 ## Replay and determinism
 
@@ -117,7 +117,7 @@ Three levels, and only the first two are part of this format:
    log's `input` and `state` entries. The contract: the same fold plus
    the same inputs produce the same trigger outcomes and the same
    state trajectory. Frames are *approximately* the same — input is
-   sampled (~10 Hz), behaviors are functions of folded time, and
+   sampled (10 Hz), behaviors are functions of folded time, and
    renderers draw. During semantic replay, timers observe the session's recorded transport clock. After a seek, a timer observes the clock as dictated by the closest preceding `clock` entry.
 3. **Bit-exact replay** — the same pixels. **Not part of this format,
    and MUST NOT be promised by implementations of it.** Floats, physics

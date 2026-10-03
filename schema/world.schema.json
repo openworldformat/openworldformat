@@ -2825,13 +2825,6 @@
       "description": "World metadata.",
       "type": "object",
       "properties": {
-        "biome": {
-          "description": "Biome hint for procedural generation.",
-          "type": [
-            "string",
-            "null"
-          ]
-        },
         "compliance": {
           "description": "Compliance metadata for distribution and regulatory classification.",
           "anyOf": [
@@ -2850,32 +2843,9 @@
             "null"
           ]
         },
-        "generation_duration_ms": {
-          "description": "Generation duration in milliseconds.",
-          "type": [
-            "integer",
-            "null"
-          ],
-          "format": "uint64",
-          "minimum": 0
-        },
-        "model": {
-          "description": "LLM model used for generation.",
-          "type": [
-            "string",
-            "null"
-          ]
-        },
         "name": {
           "description": "World name (used as skill name / directory name).",
           "type": "string"
-        },
-        "prompt": {
-          "description": "Original prompt used to generate this world.",
-          "type": [
-            "string",
-            "null"
-          ]
         },
         "source": {
           "description": "Generation source: \"interactive\", \"headless\", \"experiment\", \"mcp\".",
