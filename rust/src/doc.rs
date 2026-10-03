@@ -10,6 +10,8 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fmt;
 
 use crate as wt;
+use crate::behavior::BehaviorDef;
+use crate::identity::{EntityId, EntityRef};
 use wt::{EditOp, WorldEntity};
 
 /// Longest entity name the document accepts.
@@ -172,6 +174,11 @@ impl WorldDoc {
         self.names.get(name).and_then(|id| self.entities.get(id))
     }
 
+    /// The id a name resolves to, if the document has it.
+    pub fn entity_id_by_name(&self, name: &str) -> Option<u64> {
+        self.names.get(name).copied()
+    }
+
     /// Whether an entity id is present.
     pub fn contains(&self, id: u64) -> bool {
         self.entities.contains_key(&id)
@@ -182,9 +189,15 @@ impl WorldDoc {
         self.entities.values()
     }
 
-    /// One more than the largest entity id (1 for an empty world).
+    /// One more than the largest entity id (1 for an empty world),
+    /// never past [`MAX_ENTITY_ID`](crate::MAX_ENTITY_ID): a document
+    /// at the ceiling has nothing left to hand out, and says so by
+    /// sitting on it rather than overflowing past it.
     pub fn next_id(&self) -> u64 {
-        self.entities.keys().next_back().map_or(1, |id| id + 1)
+        self.entities
+            .keys()
+            .next_back()
+            .map_or(1, |id| (id + 1).min(crate::identity::MAX_ENTITY_ID))
     }
 
     /// Entities ordered so every parent comes before its children; roots and
@@ -278,6 +291,10 @@ impl WorldDoc {
 
     /// Apply one op. A `Batch` applies all of its ops or none of them; on
     /// error the document is unchanged.
+    ///
+    /// This is the op-level primitive; name references bind one level
+    /// up, at entry ingestion ([`WorldDoc::apply_entry`]) — the fold's
+    /// unit of commitment.
     pub fn apply(&mut self, op: &EditOp) -> Result<(), ApplyError> {
         match op {
             EditOp::Batch { ops } => {
@@ -299,6 +316,58 @@ impl WorldDoc {
             scratch.apply_in_place(op)?;
         }
         *self = scratch;
+        Ok(())
+    }
+
+    /// Apply one log entry's edits and bind the names it introduced:
+    /// the ingest unit of the fold (spec/world.md, "Identity"). Names
+    /// in entities the entry spawned or modified resolve to ids
+    /// against the fold-so-far *including this entry* — an entry is
+    /// atomic, so same-entry references bind — and a name nothing owns
+    /// refuses the entry, exactly as an op that no longer applies
+    /// would. Delaying resolution to fold time is forbidden: a later
+    /// rename must not retroactively rebind what an entry meant.
+    pub fn apply_entry(&mut self, ops: &[EditOp]) -> Result<(), ApplyError> {
+        let touched = touched_ids(ops);
+        let mut scratch = self.clone();
+        scratch.apply_all(ops)?;
+        scratch.resolve_refs(&touched)?;
+        *self = scratch;
+        Ok(())
+    }
+
+    /// Resolve name references to ids in the given entities, against
+    /// this document as it stands (the fold-so-far).
+    pub fn resolve_refs(&mut self, ids: &[u64]) -> Result<(), ApplyError> {
+        let names: HashMap<String, u64> = self.names.clone();
+        for &id in ids {
+            let Some(entity) = self.entities.get_mut(&id) else {
+                continue;
+            };
+            for behavior in entity.behaviors.iter_mut() {
+                resolve_behavior_refs(behavior, &names)?;
+            }
+        }
+        Ok(())
+    }
+
+    /// Resolve every name reference in the document against the
+    /// document: what loading a base manifest does. Two-phase by
+    /// necessity — a manifest may list a referencing entity before the
+    /// entity it references, so binding waits until all of them are in.
+    pub fn resolve_all_refs(&mut self) -> Result<(), ApplyError> {
+        let ids: Vec<u64> = self.entities.keys().copied().collect();
+        self.resolve_refs(&ids)?;
+        if let Some(avatar) = &mut self.avatar
+            && let Some(EntityRef::Name(name)) = &avatar.model_entity
+        {
+            let names: HashMap<String, u64> = self.names.clone();
+            let id = names
+                .get(name.as_str())
+                .copied()
+                .ok_or_else(|| ApplyError::MissingName(name.clone()))?;
+            avatar.model_entity = Some(EntityRef::Id(EntityId(id)));
+        }
         Ok(())
     }
 
@@ -416,9 +485,64 @@ impl WorldDoc {
     }
 }
 
-/// Check what the format can't hold: empty or over-long names and
-/// non-finite transforms.
+/// The entities an entry's edits touch — the ones whose names bind at
+/// ingestion. Spawns introduce references; modifies replace them.
+fn touched_ids(ops: &[EditOp]) -> Vec<u64> {
+    let mut out = Vec::new();
+    fn walk(ops: &[EditOp], out: &mut Vec<u64>) {
+        for op in ops {
+            match op {
+                EditOp::SpawnEntity { entity } => out.push(entity.id.0),
+                EditOp::ModifyEntity { id, .. } => out.push(id.0),
+                EditOp::Batch { ops } => walk(ops, out),
+                _ => {}
+            }
+        }
+    }
+    walk(ops, &mut out);
+    out
+}
+
+/// Resolve the name references one behavior carries (`Orbit.center`,
+/// `LookAt.target`) against the fold-so-far's names.
+fn resolve_behavior_refs(
+    behavior: &mut BehaviorDef,
+    names: &HashMap<String, u64>,
+) -> Result<(), ApplyError> {
+    match behavior {
+        BehaviorDef::Orbit { center, .. } => {
+            if let Some(EntityRef::Name(name)) = center {
+                let id = names
+                    .get(name.as_str())
+                    .copied()
+                    .ok_or_else(|| ApplyError::MissingName(name.clone()))?;
+                *center = Some(EntityRef::Id(EntityId(id)));
+            }
+        }
+        BehaviorDef::LookAt { target } => {
+            if let EntityRef::Name(name) = target {
+                let id = names
+                    .get(name.as_str())
+                    .copied()
+                    .ok_or_else(|| ApplyError::MissingName(name.clone()))?;
+                *target = EntityRef::Id(EntityId(id));
+            }
+        }
+        _ => {}
+    }
+    Ok(())
+}
+
+/// Check what the format can't hold: empty or over-long names,
+/// non-finite transforms, and ids past the JSON-safe ceiling.
 fn validate_entity(entity: &WorldEntity) -> Result<(), ApplyError> {
+    if entity.id.0 > crate::identity::MAX_ENTITY_ID {
+        return Err(ApplyError::Invalid(format!(
+            "entity {} exceeds the id ceiling {} (2^53-1)",
+            entity.id.0,
+            crate::identity::MAX_ENTITY_ID
+        )));
+    }
     let name = entity.name.as_str();
     if name.trim().is_empty() {
         return Err(ApplyError::Invalid(format!(
@@ -460,6 +584,110 @@ mod tests {
 
     fn spawn(id: u64, name: &str, parent: Option<u64>) -> EditOp {
         EditOp::spawn(entity(id, name, parent))
+    }
+
+    #[test]
+    fn spawn_refuses_ids_past_the_json_safe_ceiling() {
+        let mut doc = WorldDoc::new("w");
+        let mut beyond = entity(crate::identity::MAX_ENTITY_ID + 1, "big", None);
+        beyond.transform.position = [0.0; 3];
+        assert!(matches!(
+            doc.apply(&EditOp::spawn(beyond)),
+            Err(ApplyError::Invalid(_))
+        ));
+        // The ceiling itself is fine.
+        doc.apply(&spawn(crate::identity::MAX_ENTITY_ID, "cap", None))
+            .unwrap();
+        assert!(doc.contains(crate::identity::MAX_ENTITY_ID));
+    }
+
+    #[test]
+    fn names_bind_at_ingestion_not_at_fold_time() {
+        // spec/world.md: names resolve against the fold-so-far, at the
+        // moment the entry that carries them is ingested. A rename
+        // afterwards must not rebind what an earlier entry meant.
+        let mut doc = WorldDoc::new("w");
+        doc.apply(&spawn(1, "anchor", None)).unwrap();
+
+        let mut watcher = entity(2, "watcher", None);
+        watcher.behaviors = vec![crate::behavior::BehaviorDef::LookAt {
+            target: EntityRef::name("anchor"),
+        }];
+        doc.apply_entry(&[EditOp::spawn(watcher)]).unwrap();
+
+        // Now the rename — the behavior already holds the id.
+        doc.apply(&EditOp::modify(
+            EntityId(1),
+            EntityPatch {
+                name: Some(EntityName::new("moved")),
+                ..Default::default()
+            },
+        ))
+        .unwrap();
+
+        let watcher = doc.get(2).unwrap();
+        match &watcher.behaviors[0] {
+            crate::behavior::BehaviorDef::LookAt { target } => {
+                assert_eq!(*target, EntityRef::id(1));
+            }
+            other => panic!("unexpected behavior {other:?}"),
+        }
+        // And the base document resolves too: a manifest's entities bind
+        // against the manifest as a whole.
+        let mut manifest = wt::WorldManifest::new("m");
+        let mut orbiter = entity(4, "orbiter", None);
+        orbiter.behaviors = vec![crate::behavior::BehaviorDef::Orbit {
+            center: Some(EntityRef::name("hub")),
+            center_point: None,
+            radius: 2.0,
+            speed: 10.0,
+            axis: [0.0, 1.0, 0.0],
+            phase: 0.0,
+            tilt: 0.0,
+        }];
+        manifest.entities = vec![entity(3, "hub", None), orbiter];
+        let base = manifest.as_base().unwrap();
+        match &base.get(4).unwrap().behaviors[0] {
+            crate::behavior::BehaviorDef::Orbit { center, .. } => {
+                assert_eq!(*center, Some(EntityRef::id(3)));
+            }
+            other => panic!("unexpected behavior {other:?}"),
+        }
+    }
+
+    #[test]
+    fn a_name_nothing_owns_refuses_the_entry() {
+        let mut doc = WorldDoc::new("w");
+        doc.apply(&spawn(1, "a", None)).unwrap();
+        let mut stray = entity(2, "stray", None);
+        stray.behaviors = vec![crate::behavior::BehaviorDef::LookAt {
+            target: EntityRef::name("ghost"),
+        }];
+        assert!(matches!(
+            doc.apply_entry(&[EditOp::spawn(stray.clone())]),
+            Err(ApplyError::MissingName(name)) if name == "ghost"
+        ));
+        // The entry is atomic: nothing applied, not even the valid parts.
+        assert_eq!(doc.len(), 1);
+    }
+
+    #[test]
+    fn same_entry_references_bind() {
+        // An entry is atomic, so a behavior may reference an entity the
+        // same entry spawns — order within the entry is not causality.
+        let mut doc = WorldDoc::new("w");
+        let mut watcher = entity(2, "watcher", None);
+        watcher.behaviors = vec![crate::behavior::BehaviorDef::LookAt {
+            target: EntityRef::name("anchor"),
+        }];
+        doc.apply_entry(&[spawn(1, "anchor", None), EditOp::spawn(watcher)])
+            .unwrap();
+        match &doc.get(2).unwrap().behaviors[0] {
+            crate::behavior::BehaviorDef::LookAt { target } => {
+                assert_eq!(*target, EntityRef::id(1));
+            }
+            other => panic!("unexpected behavior {other:?}"),
+        }
     }
 
     #[test]

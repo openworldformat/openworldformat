@@ -10,8 +10,11 @@
 
 package org.openworldformat
 
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 
 /**
  * The document at a point in the log — what [foldLog] and [foldPath]
@@ -41,6 +44,12 @@ data class FoldState(
 /**
  * Fold log entries over a manifest: the document at the last entry.
  *
+ * Name-written behavior references bind at ingestion (spec/world.md
+ * "Identity"): the base resolves against itself after the state
+ * initializes, and every entity an entry touches resolves within the
+ * entry's trial — an entry is atomic, so an unresolvable name fails
+ * the entry and the fold stops there.
+ *
  * @throws [WorldFormatException] at the first entry that no longer
  *   applies — the fold stops there, as the specification's readers do.
  */
@@ -54,17 +63,95 @@ fun foldLog(manifest: WorldManifest, entries: List<LogEntry>): FoldState {
         audioEmitters = emptyMap(),
         appliedEdits = 0,
     )
+    // The base resolves first, against the whole base: a saved world's
+    // manifest may still carry name refs an author wrote.
+    for (i in state.entities.indices) {
+        state = resolveNames(state, i)
+    }
     for (entry in entries) {
         val edits = editOps(entry)
         if (edits.isEmpty()) continue  // history folds to nothing
+        val touched = touchedEntityIds(edits)
         var trial = state.copyForTrial()  // all-or-nothing, per entry
         for (edit in edits) {
             trial = applyEdit(trial, edit.name, edit.value)
+        }
+        for (id in touched) {
+            val index = trial.entities.indexOfFirst { it.id == id }
+            if (index >= 0) trial = resolveNames(trial, index)
         }
         state = trial
         state = state.copy(appliedEdits = state.appliedEdits + edits.size)
     }
     return state
+}
+
+// ---------------------------------------------------------------------------
+// Immediate name binding (spec/world.md "Identity")
+// ---------------------------------------------------------------------------
+
+/** The ref field of a behavior that names another entity, if it has
+ *  one: `Orbit.center` and `LookAt.target`. (`modulations[].target`
+ *  names a *property*, not an entity — never touched.) */
+private fun behaviorRefKey(behaviorKind: String): String? = when (behaviorKind) {
+    "Orbit" -> "center"
+    "LookAt" -> "target"
+    else -> null
+}
+
+/**
+ * Resolve one entity's name-written behavior refs to ids, against the
+ * fold-so-far held in [state] — value semantics, an updated copy back.
+ * Saved worlds always contain ids; this is the ingestion half.
+ *
+ * @throws [WorldFormatException] when a ref names no entity.
+ */
+internal fun resolveNames(state: FoldState, index: Int): FoldState {
+    val entity = state.entities.getOrNull(index) ?: return state
+    val behaviors = entity.fields["behaviors"]?.arr ?: return state
+    val idByName = HashMap<String, Int>(state.entities.size)
+    for (e in state.entities) idByName[e.name] = e.id
+    var changed = false
+    val resolved = behaviors.map { behavior ->
+        val o = behavior.obj
+        if (o == null || o.size != 1) return@map behavior
+        val (kind, params) = o.entries.first()
+        val refKey = behaviorRefKey(kind) ?: return@map behavior
+        val paramsObj = params.obj ?: return@map behavior
+        val name = paramsObj[refKey]?.str ?: return@map behavior
+        val id = idByName[name]
+            ?: throw WorldFormatException.invalid("no entity named '$name'")
+        changed = true
+        buildJsonObject {
+            put(kind, buildJsonObject {
+                paramsObj.forEach { (k, v) -> put(k, v) }
+                put(refKey, id)
+            })
+        }
+    }
+    if (!changed) return state
+    val fields = entity.fields.toMutableMap()
+    fields["behaviors"] = JsonArray(resolved)
+    val entities = state.entities.toMutableList()
+    entities[index] = entity.copy(fields = JsonObject(fields))
+    return state.copy(entities = entities)
+}
+
+/** The entity ids an entry's edit ops touch (spawn or modify,
+ *  recursing batches) — the entities whose refs bind at ingestion. */
+private fun touchedEntityIds(edits: List<ClassifiedOp.Edit>): List<Int> {
+    val ids = mutableListOf<Int>()
+    fun visit(edit: ClassifiedOp.Edit) {
+        when (edit.name) {
+            "SpawnEntity" -> edit.value.obj?.get("entity")?.obj?.get("id")?.int?.let(ids::add)
+            "ModifyEntity" -> edit.value.obj?.get("id")?.int?.let(ids::add)
+            "Batch" -> edit.value.obj?.get("ops")?.arr?.forEach { op ->
+                (classifyOp(op) as? ClassifiedOp.Edit)?.let(::visit)
+            }
+        }
+    }
+    edits.forEach(::visit)
+    return ids
 }
 
 // ---------------------------------------------------------------------------
@@ -88,6 +175,14 @@ internal fun applyEdit(state: FoldState, edit: String, value: JsonElement): Fold
             } catch (e: WorldFormatException) {
                 null
             } ?: throw WorldFormatException.invalid("SpawnEntity needs an entity with id and name")
+            // The id ceiling (2^53 − 1), the same line the other
+            // references hold. This common surface types ids as Int —
+            // JS-safe, so nothing above the ceiling can get here —
+            // the check is symmetry, not reachability.
+            if (entity.id.toLong() > MAX_ENTITY_ID) {
+                throw WorldFormatException.invalid(
+                    "entity ${entity.id} exceeds the id ceiling $MAX_ENTITY_ID (2^53-1)")
+            }
             val byId = idIndex(state.entities)
             val nameSet = names(state.entities)
             if (byId.containsKey(entity.id)) {

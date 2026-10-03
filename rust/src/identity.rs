@@ -7,9 +7,35 @@
 
 use serde::{Deserialize, Serialize};
 
+/// The ceiling on entity ids: 2^53 − 1, the largest integer every JSON
+/// number implementation round-trips exactly. Rust could hold `u64`,
+/// but a world that spends ids past this line crashes the references
+/// that read it — so every allocator enforces the same ceiling
+/// (spec/versioning.md's "don't lie to a reader", as arithmetic).
+pub const MAX_ENTITY_ID: u64 = 9007199254740991;
+
+/// Cap an id's schema at the JSON-safe ceiling and drop the 64-bit
+/// `format` hint: the wire contract is 53-bit, and advertising `uint64`
+/// would invite exactly the overflow the ceiling exists to prevent.
+#[cfg(feature = "schema")]
+pub(crate) fn cap_json_safe(schema: &mut schemars::Schema) {
+    if let Some(object) = schema.as_object_mut() {
+        object.remove("format");
+        object.insert(
+            "maximum".to_string(),
+            serde_json::Value::from(MAX_ENTITY_ID),
+        );
+    }
+}
+
 /// Stable, monotonically increasing entity identifier.
+///
+/// Bounded by [`MAX_ENTITY_ID`] (2^53 − 1) on the wire: the format's
+/// contract with JSON-safe integers, so a world written by a 64-bit
+/// allocator never overflows the references that read it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+#[cfg_attr(feature = "schema", schemars(transform = cap_json_safe))]
 pub struct EntityId(pub u64);
 
 /// Human-readable entity name. Unique within a world but may be renamed.
@@ -64,8 +90,11 @@ impl EntityRef {
 }
 
 /// Unique identifier for a compound creation (group of entities).
+///
+/// Carries the same JSON-safe ceiling as [`EntityId`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+#[cfg_attr(feature = "schema", schemars(transform = cap_json_safe))]
 pub struct CreationId(pub u64);
 
 #[cfg(test)]

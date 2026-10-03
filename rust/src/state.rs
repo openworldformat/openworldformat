@@ -120,3 +120,90 @@ pub fn fold_state(state_doc: &StateDoc, entries: &[OpLogEntry]) -> StateFold {
     }
     StateFold { values, undeclared }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::session::StateRecord;
+
+    fn entry(state: &[(&str, Value)]) -> OpLogEntry {
+        OpLogEntry {
+            revision: 1,
+            author: crate::author::Author {
+                peer: None,
+                name: "t".into(),
+            },
+            ops: vec![SessionOp::State(StateRecord {
+                state: state
+                    .iter()
+                    .map(|(k, v)| (k.to_string(), v.clone()))
+                    .collect(),
+            })],
+            timestamp_ms: 0,
+            id: None,
+            parent: None,
+        }
+    }
+
+    /// spec/state.md: if a declared field exactly matches a dotted key,
+    /// the declared field ALWAYS takes precedence over map sub-keys.
+    /// Declaring both `inventory` (a map) and `inventory.rope` (an int)
+    /// is the whole game.
+    #[test]
+    fn a_declared_field_beats_the_map_subkey_it_resembles() {
+        let state_doc = StateDoc {
+            format_version: 1,
+            fields: BTreeMap::from([
+                (
+                    "inventory".to_string(),
+                    StateField {
+                        kind: "map".into(),
+                        initial: Some(serde_json::json!({})),
+                    },
+                ),
+                (
+                    "inventory.rope".to_string(),
+                    StateField {
+                        kind: "int".into(),
+                        initial: Some(serde_json::json!(0)),
+                    },
+                ),
+            ]),
+        };
+        let folded = fold_state(
+            &state_doc,
+            &[entry(&[("inventory.rope", serde_json::json!(5))])],
+        );
+        assert_eq!(folded.values["inventory.rope"], serde_json::json!(5));
+        // The map kept its initial emptiness: not a sub-key hit.
+        assert_eq!(folded.values["inventory"], serde_json::json!({}));
+        assert!(folded.undeclared.is_empty());
+        // And a null on the declared field resets it, rather than
+        // deleting an inventory entry.
+        let folded = fold_state(&state_doc, &[entry(&[("inventory.rope", Value::Null)])]);
+        assert_eq!(folded.values["inventory.rope"], serde_json::json!(0));
+    }
+
+    #[test]
+    fn map_subkeys_still_work_without_a_shadowing_declaration() {
+        let state_doc = StateDoc {
+            format_version: 1,
+            fields: BTreeMap::from([(
+                "inventory".to_string(),
+                StateField {
+                    kind: "map".into(),
+                    initial: Some(serde_json::json!({})),
+                },
+            )]),
+        };
+        let folded = fold_state(
+            &state_doc,
+            &[entry(&[
+                ("inventory.rope", serde_json::json!(1)),
+                ("inventory.torch", serde_json::json!(2)),
+                ("inventory.rope", Value::Null),
+            ])],
+        );
+        assert_eq!(folded.values["inventory"], serde_json::json!({"torch": 2}));
+    }
+}

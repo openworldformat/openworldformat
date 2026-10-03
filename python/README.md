@@ -176,14 +176,23 @@ notebooks.
 
 | Export | What it does |
 |---|---|
-| `parse_manifest(text)` | parse and version-check a world document |
-| `parse_log_line(line)` | parse one `ops.jsonl` line, ops classified |
+| `parse_manifest(text, strict=False)` | parse and version-check a world document (strict also enforces the schema's key sets) |
+| `parse_log_line(line, strict=False)` | parse one `ops.jsonl` line, ops classified |
 | `classify_op(op)` | recognize an op by shape — edits first |
+| `op_kind_shape_ok(kind)` | the shape collision rule: edits PascalCase, history lowercase |
 | `edit_ops(entry)` | an entry's edits, in order |
-| `fold_log(manifest, entries)` | the document at the last entry (the linear fold) |
+| `canonical_json(value)` | the canonical form for hashing — sorted, whitespace-free |
+| `compute_entry_id(entry)` | an entry's content id, `sha256:<hex>` |
+| `fold_log(manifest, entries)` | the document at the last entry (the linear fold; by-name references bind to ids here, at ingestion) |
 | `build_history(entries)` | a log's ids, parents, children and tips |
 | `fold_path(manifest, entries, tip=None)` | the document at any tip (a branch) |
 | `fold_state(state_doc, entries)` | the state document's values at the last entry |
+| `compute_inverse(op, state)` | the inverse of one edit against the state it's about to change — undo is appending it |
+| `merge_branch(state, entries)` | a branch's entries rewritten onto a main fold, colliding ids reallocated |
+| `snapshot_filename(entry_id, revision)` | where a snapshot goes: by entry id, else by revision |
+| `compact_package(package_json, head_revision)` | the package.json of a compaction |
+| `compact(world_dir, head_revision=None)` | fold a package to its head and rewrite it as the new base |
+| `ext_provenance(manifest)` | the provenance extension's five lineage fields, or None |
 
 `openworldformat.physics` mirrors the npm package's
 `openworldformat/physics`: `collect_physics`, `simulate_physics`,

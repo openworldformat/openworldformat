@@ -4,10 +4,60 @@
 
 package org.openworldformat
 
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.put
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.Json
+
+/** The five keys `meta["ext-provenance"]` defines
+ *  (spec/extensions/provenance.md). */
+val EXT_PROVENANCE_FIELDS: List<String> = listOf(
+    "prompt",
+    "model",
+    "generation_duration_ms",
+    "biome",
+    "semantic_category",
+)
+
+/**
+ * LLM lineage metadata (`meta["ext-provenance"]`): the core schema is
+ * governed independently of any single producer, so the fields that
+ * track how a world was generated live in the extension's namespace.
+ * Spec: spec/extensions/provenance.md.
+ */
+data class ExtProvenance(
+    val prompt: String?,
+    val model: String?,
+    val generationDurationMs: Double?,
+    val biome: String?,
+    val semanticCategory: String?,
+) {
+    companion object {
+        /** Read an `ext-provenance` object; null when absent or not an
+         *  object — must-ignore, like every extension field. */
+        operator fun invoke(json: JsonElement?): ExtProvenance? {
+            val o = json?.obj ?: return null
+            return ExtProvenance(
+                prompt = o["prompt"]?.str,
+                model = o["model"]?.str,
+                generationDurationMs = o["generation_duration_ms"]?.dbl,
+                biome = o["biome"]?.str,
+                semanticCategory = o["semantic_category"]?.str,
+            )
+        }
+    }
+
+    /** Back to JSON, writing only the keys that are set. */
+    fun toJson(): JsonObject = buildJsonObject {
+        prompt?.let { put("prompt", it) }
+        model?.let { put("model", it) }
+        generationDurationMs?.let { put("generation_duration_ms", it) }
+        biome?.let { put("biome", it) }
+        semanticCategory?.let { put("semantic_category", it) }
+    }
+}
 
 /** World metadata (`meta`). */
 data class WorldMeta(
@@ -27,6 +77,10 @@ data class WorldMeta(
             )
         }
     }
+
+    /** The world's LLM lineage, when `meta["ext-provenance"]` is present. */
+    val extProvenance: ExtProvenance?
+        get() = ExtProvenance(fields["ext-provenance"])
 }
 
 /** Environment settings (`environment`): background, fog, ambient light. */
@@ -53,6 +107,18 @@ data class EnvironmentDef(
             )
         }
     }
+
+    /** Back to a JSON object — known keys when present, then whatever
+     *  rode along. (Compaction and inverse ops need the fold's own
+     *  environment back as JSON.) */
+    fun toJson(): JsonObject = buildJsonObject {
+        backgroundColor?.let { put("background_color", JsonArray(it.map(::JsonPrimitive))) }
+        fogColor?.let { put("fog_color", JsonArray(it.map(::JsonPrimitive))) }
+        fogDensity?.let { put("fog_density", it) }
+        ambientColor?.let { put("ambient_color", JsonArray(it.map(::JsonPrimitive))) }
+        ambientIntensity?.let { put("ambient_intensity", it) }
+        fields.forEach { (k, v) -> put(k, v) }
+    }
 }
 
 /** The camera (`camera`): where renders start. */
@@ -74,6 +140,15 @@ data class CameraDef(
                 fields = JsonObject(o.filterKeys { it !in known }),
             )
         }
+    }
+
+    /** Back to a JSON object — known keys when present, then whatever
+     *  rode along. */
+    fun toJson(): JsonObject = buildJsonObject {
+        position?.let { put("position", JsonArray(it.map(::JsonPrimitive))) }
+        lookAt?.let { put("look_at", JsonArray(it.map(::JsonPrimitive))) }
+        fovDegrees?.let { put("fov_degrees", it) }
+        fields.forEach { (k, v) -> put(k, v) }
     }
 }
 
@@ -165,11 +240,24 @@ data class WorldManifest(
 /**
  * Parse and sanity-check a world document.
  *
+ * Strict mode ([strict]) checks keys against the schema's vocabulary:
+ * top-level, `meta` and entity keys limited to what the format names
+ * plus *registered* `ext-*` fields — the legacy producer fields
+ * (`prompt`, `model`, `generation_duration_ms`, `biome`,
+ * `semantic_category`) are refused with a pointer at
+ * `meta["ext-provenance"]`. Non-strict behavior is exactly the
+ * default: must-ignore for everything unrecognized.
+ *
  * @throws [WorldFormatException] when the text isn't JSON, has no
  *   schema version, names a version newer than this reader (the
- *   versioning policy's hard line), or has no entities array.
+ *   versioning policy's hard line), has no entities array, or
+ *   (strict) holds a key outside the vocabulary.
  */
-fun parseManifest(json: String): WorldManifest = WorldManifest(OWF_JSON.parseToJsonElement(json))
+fun parseManifest(json: String, strict: Boolean = false): WorldManifest {
+    val element = OWF_JSON.parseToJsonElement(json)
+    if (strict) validateManifestStrict(element)
+    return WorldManifest(element)
+}
 
 /** [buildJsonObject] — kept here so the companion reads cleanly. */
 private fun buildJsonObject(builder: kotlinx.serialization.json.JsonObjectBuilder.() -> Unit): JsonObject =

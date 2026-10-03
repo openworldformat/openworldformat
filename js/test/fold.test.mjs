@@ -6,7 +6,9 @@ import path from "node:path";
 
 import {
   SUPPORTED_SCHEMA_VERSION,
+  MAX_ENTITY_ID,
   classifyOp,
+  opKindShapeOk,
   parseManifest,
   parseLogLine,
   editOps,
@@ -253,4 +255,95 @@ test("a torn line loses at most itself", () => {
   assert.equal(torn, 0); // the example's log is whole
   // And a genuinely torn last line:
   assert.throws(() => parseLogLine(lines[0].slice(0, 20)));
+});
+
+test("the shape collision rule: edits PascalCase, history kinds lowercase", () => {
+  const edits = [
+    "SpawnEntity", "DeleteEntity", "ModifyEntity", "SetEnvironment",
+    "SetCamera", "SetAmbience", "SpawnAudioEmitter", "RemoveAudioEmitter", "Batch",
+  ];
+  const history = ["tool", "input", "state", "clock", "merge"];
+  for (const kind of edits) {
+    assert.match(kind, /^[A-Z]/, `${kind} must be PascalCase`);
+    assert.ok(opKindShapeOk(kind), `${kind} must pass the guard`);
+  }
+  for (const kind of history) {
+    assert.match(kind, /^[a-z]/, `${kind} must be lowercase`);
+    assert.ok(opKindShapeOk(kind), `${kind} must pass the guard`);
+  }
+  // Wrong-cased names pass neither guard, and no shape recognizes them.
+  assert.equal(opKindShapeOk("spawnentity"), false);
+  assert.equal(opKindShapeOk("Tool"), false);
+  assert.equal(classifyOp({ spawnentity: {} }).kind, "unknown");
+});
+
+test("an id past the ceiling refuses", () => {
+  const base = parseManifest(manifestText);
+  const entries = [
+    parseLogLine(
+      JSON.stringify({
+        revision: 1,
+        author: { name: "t" },
+        ops: [{ SpawnEntity: { entity: { id: MAX_ENTITY_ID + 1, name: "too big" } } }],
+        timestamp_ms: 0,
+      }),
+    ),
+  ];
+  assert.throws(() => foldLog(base, entries), /exceeds the id ceiling/);
+  // The ceiling itself is fine — it's the largest exact integer.
+  const at = parseLogLine(
+    JSON.stringify({
+      revision: 1,
+      author: { name: "t" },
+      ops: [{ SpawnEntity: { entity: { id: MAX_ENTITY_ID, name: "at the ceiling" } } }],
+      timestamp_ms: 0,
+    }),
+  );
+  assert.ok(foldLog(base, [at]).entities.some((e) => e.id === MAX_ENTITY_ID));
+});
+
+test("a declared field always wins over a map sub-key (spec/state.md)", () => {
+  const stateDoc = {
+    format_version: 1,
+    fields: {
+      inventory: { type: "map", initial: {} },
+      "inventory.rope": { type: "int", initial: 0 },
+    },
+  };
+  const ops = [{ state: { "inventory.rope": 5 } }].map((op, i) =>
+    parseLogLine(JSON.stringify({ revision: 1, author: { name: "t" }, ops: [op], timestamp_ms: i })));
+  const folded = foldState(stateDoc, ops);
+  // The exact declared field took the value…
+  assert.equal(folded.values["inventory.rope"], 5);
+  // …and the map stayed untouched: no sub-key interpretation.
+  assert.deepEqual(folded.values.inventory, {});
+});
+
+test("a modify patch: null removes a field, an empty patch changes nothing", () => {
+  const base = parseManifest(manifestText);
+  const sunBefore = structuredClone(base.entities.find((e) => e.name === "sun"));
+  const entries = [
+    parseLogLine(
+      JSON.stringify({
+        revision: 1,
+        author: { name: "t" },
+        ops: [{ ModifyEntity: { id: 2, patch: { light: null } } }],
+        timestamp_ms: 0,
+      }),
+    ),
+    parseLogLine(
+      JSON.stringify({
+        revision: 2,
+        author: { name: "t" },
+        ops: [{ ModifyEntity: { id: 2, patch: {} } }],
+        timestamp_ms: 1,
+      }),
+    ),
+  ];
+  const state = foldLog(base, entries);
+  const sun = state.entities.find((e) => e.id === 2);
+  assert.equal(sun.light, undefined); // null cleared it
+  assert.equal(sun.name, sunBefore.name); // and the empty patch changed nothing
+  assert.deepEqual(sun.transform, sunBefore.transform);
+  assert.deepEqual(sun.shape ?? null, sunBefore.shape ?? null);
 });

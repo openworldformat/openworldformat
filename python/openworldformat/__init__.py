@@ -10,7 +10,10 @@ This is the format's research surface: benchmarks, dataset tooling and
 notebooks want ``pip install openworldformat`` and a fold, not a
 renderer. It shares no code or toolchain with the JS reference, which
 makes it a cross-check on the fold contract as much as a consumer of
-it.
+it. Around the fold sit the pieces the spec asks of every reference:
+canonical entry identity, immediate name binding, the computed inverse
+(undo is appending it), branch merges with id remapping, package
+compaction, a strict reader, and the provenance accessor.
 
 Spec: https://openworldformat.org  ·  schema version 3
 """
@@ -18,22 +21,36 @@ Spec: https://openworldformat.org  ·  schema version 3
 from __future__ import annotations
 
 import copy
+import hashlib
 import json
 import re
+from pathlib import Path
 from typing import Any
 
 __all__ = [
     "SUPPORTED_SCHEMA_VERSION",
     "SUPPORTED_FORMAT_VERSION",
+    "MAX_ENTITY_ID",
+    "REGISTERED_EXTENSIONS",
+    "EXT_PROVENANCE_FIELDS",
     "WorldFormatError",
     "parse_manifest",
     "classify_op",
+    "op_kind_shape_ok",
     "parse_log_line",
     "edit_ops",
+    "canonical_json",
+    "compute_entry_id",
     "fold_state",
     "build_history",
     "fold_path",
     "fold_log",
+    "compute_inverse",
+    "merge_branch",
+    "snapshot_filename",
+    "compact_package",
+    "compact",
+    "ext_provenance",
 ]
 
 
@@ -47,6 +64,22 @@ SUPPORTED_SCHEMA_VERSION = 3
 #: The package format version this fold reads.
 SUPPORTED_FORMAT_VERSION = 1
 
+#: The entity id ceiling: 2^53 − 1, the largest integer every JSON
+#: number implementation reads exactly. Ids above it are refused at the
+#: door, not silently rounded by whichever reader has the weakest
+#: number type (spec/world.md "Identity").
+MAX_ENTITY_ID = 9007199254740991
+
+#: The extensions the registry knows (spec/extensions/registry.json) —
+#: the names strict mode accepts wherever an ``ext-*`` key can appear.
+REGISTERED_EXTENSIONS = (
+    "ext-physics",
+    "ext-strict-determinism",
+    "ext-visibility",
+    "ext-cinematography",
+    "ext-provenance",
+)
+
 EDIT_KEYS = frozenset({
     "SpawnEntity",
     "DeleteEntity",
@@ -58,6 +91,35 @@ EDIT_KEYS = frozenset({
     "RemoveAudioEmitter",
     "Batch",
 })
+
+#: The history kinds — lowercase, per the collision rule.
+HISTORY_KEYS = frozenset({"tool", "input", "state", "clock", "merge"})
+
+#: The keys strict mode allows at the manifest's top level: the
+#: schema's own, plus any registered extension.
+_MANIFEST_KEYS = frozenset({
+    "version", "meta", "entities", "environment", "camera", "avatar",
+    "tours", "soundtrack", "creations", "next_entity_id",
+})
+
+#: The keys strict mode allows inside ``meta``.
+_META_KEYS = frozenset({
+    "name", "description", "time_of_day", "tags", "source",
+    "variation_group", "variation", "style_ref", "compliance",
+})
+
+#: The keys strict mode allows on an entity.
+_ENTITY_KEYS = frozenset({
+    "id", "name", "parent", "transform", "chunk", "shape", "material",
+    "light", "audio", "behaviors", "modulations", "triggers",
+    "mesh_asset", "instance_of", "creation_id",
+})
+
+#: Behavior fields that reference another entity, by behavior kind:
+#: ``Orbit`` circles one, ``LookAt`` watches one. ``modulations[]``
+#: has a ``target`` too, but it names a *property* of the modulated
+#: entity, never an entity — never touched by name binding.
+_BEHAVIOR_REF_KEYS = {"Orbit": "center", "LookAt": "target"}
 
 _EXT_KEY = re.compile(r"ext-[a-z0-9-]+")
 
@@ -77,13 +139,42 @@ def _coalesce(v: Any, default: Any) -> Any:
 # ---------------------------------------------------------------------------
 
 
-def parse_manifest(text: str) -> dict:
+def _check_keys(where: str, holder: dict, allowed: frozenset,
+                moved: frozenset = frozenset()) -> None:
+    """Strict mode's key check: every key must be in the schema's set or
+    a registered extension's — the fields that moved out of the core get
+    an error pointing at the extension they moved to instead."""
+    for key in holder:
+        if key in allowed or key in REGISTERED_EXTENSIONS:
+            continue
+        if key in moved:
+            raise WorldFormatError(
+                f"{where} key '{key}' moved to the ext-provenance extension — "
+                'write it in meta["ext-provenance"] '
+                "(spec/extensions/provenance.md)"
+            )
+        if _EXT_KEY.fullmatch(key):
+            raise WorldFormatError(
+                f"{where} key '{key}' isn't in the extension registry "
+                "(spec/extensions/registry.json)"
+            )
+        raise WorldFormatError(f"{where} key '{key}' isn't in the schema")
+
+
+def parse_manifest(text: str, strict: bool = False) -> dict:
     """Parse and sanity-check a world document.
 
     :param text: the manifest's JSON text
+    :param strict: also enforce the schema's key sets — top level,
+        ``meta``, and every entity limited to the schema's keys plus
+        registered extensions, the provenance fields pointed at their
+        extension, unregistered ``ext-*`` named for what they are. The
+        default stays tolerant: must-ignore is the reader's side of the
+        contract, and history must never break a fold.
     :return: the manifest
     :raises ValueError: when the text isn't JSON
-    :raises WorldFormatError: when the schema version isn't supported
+    :raises WorldFormatError: when the schema version isn't supported,
+        or (strict) when a key is outside the schema
     """
     manifest = json.loads(text)
     if not isinstance(manifest, dict) or not _is_num(manifest.get("version")):
@@ -96,6 +187,14 @@ def parse_manifest(text: str) -> dict:
         )
     if not isinstance(manifest.get("entities"), list):
         raise WorldFormatError("manifest has no entities array")
+    if strict:
+        _check_keys("manifest", manifest, _MANIFEST_KEYS)
+        meta = manifest.get("meta")
+        if isinstance(meta, dict):
+            _check_keys("meta", meta, _META_KEYS, moved=EXT_PROVENANCE_FIELDS)
+        for n, entity in enumerate(manifest["entities"]):
+            if isinstance(entity, dict):
+                _check_keys(f"entity {entity.get('id', n)}", entity, _ENTITY_KEYS)
     return manifest
 
 
@@ -131,15 +230,35 @@ def classify_op(op: Any) -> dict:
     return {"kind": "unknown"}
 
 
-def parse_log_line(line: str) -> dict:
+def op_kind_shape_ok(kind: str) -> bool:
+    """The shape collision rule as a predicate (spec/session.md
+    "Compatibility"): edits MUST be PascalCase and history kinds MUST be
+    lowercase, so the two namespaces can never collide — a lowercase
+    kind a reader doesn't know folds to nothing, and nothing lowercase
+    can ever be mistaken for an edit by shape. Extension names sit
+    outside the predicate: they are a registry concern, not a casing
+    concern.
+
+    :param kind: an op kind name
+    :return: True when the kind is a cased edit kind, or one of the
+        lowercase history kinds
+    """
+    return (kind in EDIT_KEYS and kind[:1].isupper()) or kind in HISTORY_KEYS
+
+
+def parse_log_line(line: str, strict: bool = False) -> dict:
     """Parse one log line into an entry with classified ops. Unreadable lines
     are the writer's crash, not the reader's — the caller decides whether
     to skip (the spec says skip the last one, count the rest).
 
     :param line: one line of ops.jsonl
+    :param strict: also refuse ops that classify as unknown, and
+        extension ops the registry doesn't name. The default keeps the
+        tolerant read: an unknown op folds to nothing, and must.
     :return: the entry, with ``classified`` added
     :raises ValueError: when the line isn't JSON
-    :raises WorldFormatError: when the entry has no revision or ops array
+    :raises WorldFormatError: when the entry has no revision or ops
+        array, or (strict) when an op is unrecognized or unregistered
     """
     entry = json.loads(line)
     if (
@@ -148,7 +267,20 @@ def parse_log_line(line: str) -> dict:
         or not isinstance(entry.get("ops"), list)
     ):
         raise WorldFormatError("log entry needs a revision and an ops array")
-    entry["classified"] = [classify_op(op) for op in entry["ops"]]
+    classified = [classify_op(op) for op in entry["ops"]]
+    if strict:
+        for op, c in zip(entry["ops"], classified):
+            if c["kind"] == "unknown":
+                raise WorldFormatError(
+                    "op shape not recognized (strict mode): "
+                    + json.dumps(op)[:100]
+                )
+            if c["kind"] == "extension" and c["name"] not in REGISTERED_EXTENSIONS:
+                raise WorldFormatError(
+                    f"extension '{c['name']}' isn't in the extension registry "
+                    "(spec/extensions/registry.json)"
+                )
+    entry["classified"] = classified
     return entry
 
 
@@ -225,6 +357,45 @@ def fold_state(state_doc: dict | None, entries: list) -> dict:
 # ---------------------------------------------------------------------------
 # Branching histories
 # ---------------------------------------------------------------------------
+
+
+def canonical_json(value: Any) -> str:
+    """The canonical JSON form for hashing (spec/session.md "Entry
+    identity, forks and branches"): no whitespace, keys sorted
+    recursively, arrays in order. Identical entries therefore hash
+    identically across forks — and across languages, for integer-valued
+    JSON. Float formatting is each language's own (``1.0`` may print as
+    ``1`` elsewhere, and neither is wrong), so cross-language hash
+    equality is only promised for documents whose numbers are integers.
+
+    :param value: any JSON value
+    :return: its canonical text
+    """
+    return json.dumps(
+        value, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+    )
+
+
+def compute_entry_id(entry: dict) -> str:
+    """An entry's content id: the entry deep-copied, its own ``id``
+    dropped (an entry is content, not a self-addressing brick — the id
+    is the *of* the hash, never part of it), canonicalized and
+    SHA-256'd. Two peers appending the same entry to forked logs
+    compute the same id, which is the property that keeps identical
+    ids identical across branches.
+
+    :param entry: a log entry
+    :return: ``sha256:<hex>``
+    """
+    body = copy.deepcopy(entry)
+    body.pop("id", None)
+    # ``classified`` is this reader's annotation of the ops, not
+    # content: :func:`parse_log_line` adds it, and the hash must not
+    # see it, or the same line hashed before and after parsing would
+    # name two entries.
+    body.pop("classified", None)
+    digest = hashlib.sha256(canonical_json(body).encode("utf-8")).hexdigest()
+    return f"sha256:{digest}"
 
 
 def _with_identity(entries: list) -> tuple:
@@ -307,6 +478,61 @@ def _invalid(message: str) -> WorldFormatError:
     return WorldFormatError(f"invalid: {message}")
 
 
+def _resolve_names(state: dict, entity: dict) -> None:
+    """Bind one entity's by-name behavior references to ids, in place
+    (spec/world.md "Identity"): cross-entity references may be written
+    by name — what authors and models produce — and MUST resolve to id
+    at ingestion against the fold-so-far. Delaying resolution until
+    fold time is strictly forbidden: it breaks log determinism the
+    moment an entity is renamed. An id (or ``Orbit``'s point-valued
+    ``center_point``) passes through untouched; ``modulations[]``
+    targets name properties, not entities, and are never touched.
+
+    :raises WorldFormatError: when a named entity isn't in the fold
+    """
+    behaviors = entity.get("behaviors")
+    if not isinstance(behaviors, list):
+        return
+    for behavior in behaviors:
+        if not isinstance(behavior, dict) or len(behavior) != 1:
+            continue
+        kind, cfg = next(iter(behavior.items()))
+        field = _BEHAVIOR_REF_KEYS.get(kind)
+        if field is None or not isinstance(cfg, dict):
+            continue
+        name = cfg.get(field)
+        if not isinstance(name, str):
+            continue  # already an id — saved worlds always contain ids
+        id_ = state["name_to_id"].get(name)
+        if id_ is None:
+            raise _invalid(f"no entity named '{name}'")
+        cfg[field] = id_
+
+
+def _touched_ids(edits: list) -> list:
+    """The entity ids an entry's edits touch — spawned or modified,
+    batches recursed — the entities whose by-name references bind at
+    ingestion. Deletions need no binding: what they touched is gone."""
+    ids: list = []
+    for c in edits:
+        edit, value = c["edit"], c["value"]
+        if edit == "SpawnEntity":
+            entity = value.get("entity") if isinstance(value, dict) else None
+            if isinstance(entity, dict) and _is_num(entity.get("id")):
+                ids.append(entity["id"])
+        elif edit == "ModifyEntity":
+            if isinstance(value, dict):
+                ids.append(value.get("id"))
+        elif edit == "Batch":
+            inner = value.get("ops") if isinstance(value, dict) else None
+            if isinstance(inner, list):
+                classified = [classify_op(op) for op in inner]
+                ids.extend(_touched_ids(
+                    [c for c in classified if c["kind"] == "edit"]
+                ))
+    return ids
+
+
 def _apply_edit(state: dict, edit: str, value: dict) -> None:
     """Apply one edit op to a fold state, all-or-nothing. Throws on refusal."""
     if edit == "SpawnEntity":
@@ -317,6 +543,11 @@ def _apply_edit(state: dict, edit: str, value: dict) -> None:
             or not isinstance(entity.get("name"), str)
         ):
             raise _invalid("SpawnEntity needs an entity with id and name")
+        if entity["id"] > MAX_ENTITY_ID:
+            raise _invalid(
+                f"entity {entity['id']} exceeds the id ceiling "
+                f"{MAX_ENTITY_ID} (2^53-1)"
+            )
         if entity["id"] in state["by_id"]:
             raise _invalid(f"entity {entity['id']} already exists")
         if entity["name"] in state["names"]:
@@ -324,9 +555,13 @@ def _apply_edit(state: dict, edit: str, value: dict) -> None:
         parent = entity.get("parent")
         if parent is not None and parent not in state["by_id"]:
             raise _invalid(f"entity {entity['id']}'s parent {parent} isn't in the document")
+        # The fold owns its copy: name binding (and any later edit) writes
+        # the document's entity, never the entry the writer still holds.
+        entity = copy.deepcopy(entity)
         state["entities"].append(entity)
         state["by_id"][entity["id"]] = entity
         state["names"].add(entity["name"])
+        state["name_to_id"][entity["name"]] = entity["id"]
     elif edit == "DeleteEntity":
         id_ = value.get("id")
         entity = state["by_id"].get(id_)
@@ -347,6 +582,7 @@ def _apply_edit(state: dict, edit: str, value: dict) -> None:
             e = state["by_id"].pop(d, None)
             if e is not None:
                 state["names"].discard(e["name"])
+                state["name_to_id"].pop(e["name"], None)
     elif edit == "ModifyEntity":
         entity = state["by_id"].get(value.get("id"))
         if entity is None:
@@ -360,8 +596,10 @@ def _apply_edit(state: dict, edit: str, value: dict) -> None:
                 if patch["name"] in state["names"]:
                     raise _invalid(f"an entity named '{patch['name']}' already exists")
                 state["names"].discard(entity["name"])
+                state["name_to_id"].pop(entity["name"], None)
                 entity["name"] = patch["name"]
                 state["names"].add(patch["name"])
+                state["name_to_id"][patch["name"]] = entity["id"]
         if "parent" in patch:
             if patch["parent"] is not None and patch["parent"] not in state["by_id"]:
                 raise _invalid(f"parent {patch['parent']} isn't in the document")
@@ -437,6 +675,7 @@ def _fresh_trial(state: dict) -> dict:
             },
             "by_id": {e["id"]: e for e in entities},
             "names": {e["name"] for e in entities},
+            "name_to_id": {e["name"]: e["id"] for e in entities},
         },
     }
 
@@ -451,18 +690,25 @@ def _commit_trial(state: dict, trial: dict) -> None:
     state["audio_emitters"] = t["audio_emitters"]
     state["by_id"] = t["by_id"]
     state["names"] = t["names"]
+    state["name_to_id"] = t["name_to_id"]
 
 
 def fold_log(manifest: dict, entries: list) -> dict:
     """Fold log entries over a manifest: the document at the last entry.
 
+    By-name references bind here, at ingestion: the base's entities
+    resolve against the complete base, each entry's against the
+    fold-so-far including the entry's own edits (spec/world.md
+    "Identity" — saved worlds always contain ids).
+
     :param manifest: a parsed manifest (the base, at base_revision)
     :param entries: parsed log entries, in order
     :return: ``{"name", "entities", "environment", "camera", "ambience",
         "audio_emitters", "applied_edits"}`` — plus the internal
-        ``by_id``/``names`` maps the fold maintains
-    :raises WorldFormatError: at the first entry that no longer applies —
-        the fold stops there, exactly as the specification's readers do.
+        ``by_id``/``names``/``name_to_id`` maps the fold maintains
+    :raises WorldFormatError: at the first entry that no longer applies
+        — or whose names don't bind — the fold stops there, exactly as
+        the specification's readers do.
     """
     meta = manifest.get("meta")
     name = meta.get("name") if isinstance(meta, dict) else None
@@ -477,6 +723,12 @@ def fold_log(manifest: dict, entries: list) -> dict:
     }
     state["by_id"] = {e["id"]: e for e in state["entities"]}
     state["names"] = {e["name"] for e in state["entities"]}
+    state["name_to_id"] = {e["name"]: e["id"] for e in state["entities"]}
+
+    # A manifest written by name binds now, against the complete base —
+    # an entity may reference a neighbor declared after it.
+    for entity in state["entities"]:
+        _resolve_names(state, entity)
 
     for entry in entries:
         edits = edit_ops(entry)
@@ -485,6 +737,429 @@ def fold_log(manifest: dict, entries: list) -> dict:
         trial = _fresh_trial(state)
         for c in edits:
             _apply_edit(trial["state"], c["edit"], c["value"])
+        # Names bind inside the entry's trial, before the commit: an
+        # entry is atomic, and an unresolvable name fails it whole.
+        for id_ in _touched_ids(edits):
+            entity = trial["state"]["by_id"].get(id_)
+            if entity is not None:
+                _resolve_names(trial["state"], entity)
         _commit_trial(state, trial)
         state["applied_edits"] += len(edits)
     return state
+
+
+# ---------------------------------------------------------------------------
+# Undo and merge
+# ---------------------------------------------------------------------------
+
+#: The camera a world with no camera has — the schema's own defaults,
+#: restored when SetCamera's inverse has nothing older to restore.
+_DEFAULT_CAMERA = {
+    "position": [5, 5, 5],
+    "look_at": [0, 0, 0],
+    "fov_degrees": 45,
+}
+
+
+def _subtree_parent_first(state: dict, id_) -> list:
+    """The entity and its descendants, every parent before its children —
+    the order a Batch of SpawnEntity ops needs to re-plant a deleted
+    tree, since a spawn's parent must already stand. Document order
+    isn't that order: a re-parent can hang an entity below a younger
+    sibling."""
+    doomed = {id_}
+    grew = True
+    while grew:
+        grew = False
+        for e in state["entities"]:
+            p = e.get("parent")
+            if p is not None and p in doomed and e["id"] not in doomed:
+                doomed.add(e["id"])
+                grew = True
+    remaining = [e for e in state["entities"] if e["id"] in doomed]
+    ordered = []
+    placed = set()
+    while remaining:
+        progress = False
+        for e in list(remaining):
+            p = e.get("parent")
+            if p is None or p not in doomed or p in placed:
+                ordered.append(e)
+                placed.add(e["id"])
+                remaining.remove(e)
+                progress = True
+        if not progress:
+            # Only a malformed base reaches here: a parent cycle no
+            # edit path can build but a hand-written manifest might.
+            raise _invalid(f"entity {id_}'s subtree has a parent cycle")
+    return ordered
+
+
+def compute_inverse(op: dict, state: dict) -> dict:
+    """The inverse of one edit op against the state it's about to change
+    (spec/session.md: every edit has a computable inverse, and undo is
+    appending it — the log never rewinds). Call with the fold from
+    *before* the op applied; append the result after it, and the next
+    fold stands where this one did.
+
+    :param op: the raw op dict (``{"SpawnEntity": {...}}``)
+    :param state: the fold state the op is about to apply to (as
+        :func:`fold_log` returns)
+    :return: the inverse op dict
+    :raises WorldFormatError: for a non-edit op (only edits invert), an
+        unknown edit, or an edit naming an entity the state doesn't
+        have — it would never apply
+    """
+    c = classify_op(op)
+    if c["kind"] != "edit":
+        raise _invalid(f"no inverse for a '{c['kind']}' op — only edits have one")
+    edit, value = c["edit"], c["value"]
+    if edit == "SpawnEntity":
+        entity = value.get("entity") if isinstance(value, dict) else None
+        if not isinstance(entity, dict) or not _is_num(entity.get("id")):
+            raise _invalid("SpawnEntity needs an entity with id and name")
+        return {"DeleteEntity": {"id": entity["id"]}}
+    if edit == "DeleteEntity":
+        id_ = value.get("id") if isinstance(value, dict) else None
+        if id_ not in state["by_id"]:
+            raise _invalid(f"no entity {id_}")
+        return {"Batch": {"ops": [
+            {"SpawnEntity": {"entity": copy.deepcopy(e)}}
+            for e in _subtree_parent_first(state, id_)
+        ]}}
+    if edit == "ModifyEntity":
+        id_ = value.get("id") if isinstance(value, dict) else None
+        entity = state["by_id"].get(id_)
+        if entity is None:
+            raise _invalid(f"no entity {id_}")
+        patch = _coalesce(value.get("patch"), {})
+        # Every patched key set to what it holds now; None for a field
+        # the entity lacks, which is exactly the patch that clears it
+        # back off. Name and parent included.
+        return {"ModifyEntity": {"id": entity["id"], "patch": {
+            field: copy.deepcopy(entity.get(field)) for field in patch
+        }}}
+    if edit == "SetEnvironment":
+        env = _coalesce(state.get("environment"), {})
+        return {"SetEnvironment": {"env": copy.deepcopy(env)}}
+    if edit == "SetCamera":
+        camera = _coalesce(state.get("camera"), _DEFAULT_CAMERA)
+        return {"SetCamera": {"camera": copy.deepcopy(camera)}}
+    if edit == "SetAmbience":
+        ambience = _coalesce(state.get("ambience"), [])
+        return {"SetAmbience": {"ambience": copy.deepcopy(ambience)}}
+    if edit == "SpawnAudioEmitter":
+        if not isinstance(value, dict) or not isinstance(value.get("name"), str):
+            raise _invalid("SpawnAudioEmitter needs a name")
+        return {"RemoveAudioEmitter": {"name": value["name"]}}
+    if edit == "RemoveAudioEmitter":
+        name = value.get("name") if isinstance(value, dict) else None
+        if name not in state.get("audio_emitters", {}):
+            raise _invalid(f"no audio emitter named '{name}'")
+        return {"SpawnAudioEmitter": {
+            "name": name,
+            "audio": copy.deepcopy(state["audio_emitters"][name]),
+        }}
+    if edit == "Batch":
+        ops = _coalesce(value.get("ops"), []) if isinstance(value, dict) else []
+        # Each inner inverse against the state its op was about to
+        # change: fold forward over a trial, undoing as you go, then
+        # reverse — the last undone first.
+        trial = _fresh_trial(state)
+        inverses = []
+        for inner in ops:
+            ic = classify_op(inner)
+            if ic["kind"] != "edit":
+                continue  # history inside a batch has nothing to undo
+            inverses.append(compute_inverse(inner, trial["state"]))
+            _apply_edit(trial["state"], ic["edit"], ic["value"])
+        inverses.reverse()
+        return {"Batch": {"ops": inverses}}
+    raise _invalid(f"unknown edit {edit}")
+
+
+def _spawned_ids(ops: list) -> list:
+    """Every id these ops' SpawnEntity ops spawn, batches recursed — the
+    ids a merge has to check against the trunk's own."""
+    ids: list = []
+    for op in ops:
+        c = classify_op(op)
+        if c["kind"] != "edit":
+            continue
+        edit, value = c["edit"], c["value"]
+        if edit == "SpawnEntity":
+            entity = value.get("entity") if isinstance(value, dict) else None
+            if isinstance(entity, dict) and _is_num(entity.get("id")):
+                ids.append(entity["id"])
+        elif edit == "Batch":
+            inner = value.get("ops") if isinstance(value, dict) else None
+            if isinstance(inner, list):
+                ids.extend(_spawned_ids(inner))
+    return ids
+
+
+def _merge_rewrite_op(op: dict, remapped: dict) -> dict:
+    """One op rewritten through a merge's id remapping — a new, deep
+    copied op. Numeric references (spawned ids, parents, behavior
+    centers and targets) follow their entities to fresh ids; by-name
+    references don't (they bind at ingestion, after the merge); history
+    ops pass through untouched, because they fold to nothing and their
+    contents are nobody's to rewrite."""
+    rewritten = copy.deepcopy(op)
+    if not remapped:
+        return rewritten
+    c = classify_op(rewritten)
+    if c["kind"] != "edit":
+        return rewritten
+    edit, value = c["edit"], c["value"]
+    if not isinstance(value, dict):
+        return rewritten
+
+    def remap(ref):
+        if isinstance(ref, int) and not isinstance(ref, bool) and ref in remapped:
+            return remapped[ref]
+        return ref
+
+    def remap_behavior_refs(holder: dict) -> None:
+        behaviors = holder.get("behaviors")
+        if not isinstance(behaviors, list):
+            return
+        for behavior in behaviors:
+            if not isinstance(behavior, dict) or len(behavior) != 1:
+                continue
+            kind, cfg = next(iter(behavior.items()))
+            field = _BEHAVIOR_REF_KEYS.get(kind)
+            if field is None or not isinstance(cfg, dict):
+                continue
+            ref = cfg.get(field)
+            if isinstance(ref, int) and not isinstance(ref, bool) and ref in remapped:
+                cfg[field] = remapped[ref]
+
+    if edit == "SpawnEntity":
+        entity = value.get("entity")
+        if isinstance(entity, dict):
+            if "id" in entity:
+                entity["id"] = remap(entity["id"])
+            if entity.get("parent") is not None:
+                entity["parent"] = remap(entity["parent"])
+            remap_behavior_refs(entity)
+    elif edit == "ModifyEntity":
+        if "id" in value:
+            value["id"] = remap(value["id"])
+        patch = value.get("patch")
+        if isinstance(patch, dict):
+            if patch.get("parent") is not None:
+                patch["parent"] = remap(patch["parent"])
+            remap_behavior_refs(patch)
+    elif edit == "DeleteEntity":
+        if "id" in value:
+            value["id"] = remap(value["id"])
+    elif edit == "Batch":
+        inner = value.get("ops")
+        if isinstance(inner, list):
+            value["ops"] = [_merge_rewrite_op(o, remapped) for o in inner]
+    return rewritten
+
+
+def merge_branch(state: dict, entries: list) -> dict:
+    """Merge a branch's entries onto a main branch's fold, rewriting id
+    collisions (spec/session.md "Entry identity, forks and branches"):
+    when the branch introduces entities with ids concurrently allocated
+    on main, the merge authority MUST reallocate the colliding ids and
+    rewrite every reference to them inside the merged batch. Fresh ids
+    come from above the trunk's highest, skipping what either side
+    already spawned, never past the ceiling. Name collisions are out
+    of scope — two entities can't share a name, and which of the two
+    keeps it is a human's call, not a merge's: the caller pre-renames.
+
+    :param state: the main branch's fold state at its head (as
+        :func:`fold_log` returns)
+    :param entries: the branch's parsed entries, in order
+    :return: ``{"entries": new deep-copied entries with references
+        rewritten and ops reclassified, "remapped": old id -> new id}``
+    :raises WorldFormatError: when the ids run out under the ceiling
+    """
+    main_ids = set(state["by_id"])
+    ops = [op for entry in entries for op in (entry.get("ops") or [])]
+    spawned = _spawned_ids(ops)
+    taken = main_ids | set(spawned)
+    remapped: dict = {}
+    candidate = max(main_ids, default=0) + 1
+    for old in sorted({i for i in spawned if i in main_ids}):
+        while candidate in taken:
+            candidate += 1
+        if candidate > MAX_ENTITY_ID:
+            raise _invalid(
+                f"merge ran out of entity ids under the ceiling {MAX_ENTITY_ID}"
+            )
+        remapped[old] = candidate
+        taken.add(candidate)
+
+    rewritten = []
+    for entry in entries:
+        new_entry = copy.deepcopy(entry)
+        new_ops = [_merge_rewrite_op(op, remapped) for op in new_entry.get("ops") or []]
+        new_entry["ops"] = new_ops
+        new_entry["classified"] = [classify_op(op) for op in new_ops]
+        rewritten.append(new_entry)
+    return {"entries": rewritten, "remapped": remapped}
+
+
+# ---------------------------------------------------------------------------
+# Extensions
+# ---------------------------------------------------------------------------
+
+#: The fields the provenance extension defines
+#: (spec/extensions/provenance.md) — the LLM lineage fields that moved
+#: out of the core meta and into an extension of their own.
+EXT_PROVENANCE_FIELDS = (
+    "prompt",
+    "model",
+    "generation_duration_ms",
+    "biome",
+    "semantic_category",
+)
+
+
+def ext_provenance(manifest: dict) -> dict | None:
+    """The provenance extension's fields, extracted from a manifest's
+    ``meta["ext-provenance"]``: the five the extension defines and
+    nothing else — unknown keys inside an extension are must-ignore,
+    same as everywhere else in the format. None when the manifest
+    carries none.
+
+    A tool circulating worlds MUST warn the user or scrub ``prompt``
+    before publishing (spec/extensions/provenance.md "Security and
+    Privacy") — it often carries the exact text the author typed.
+
+    :param manifest: a parsed manifest
+    :return: the extension's fields as a dict, or None
+    """
+    meta = manifest.get("meta")
+    block = meta.get("ext-provenance") if isinstance(meta, dict) else None
+    if not isinstance(block, dict):
+        return None
+    return {
+        field: copy.deepcopy(block[field])
+        for field in EXT_PROVENANCE_FIELDS
+        if field in block
+    }
+
+
+# ---------------------------------------------------------------------------
+# Packages
+# ---------------------------------------------------------------------------
+
+
+def snapshot_filename(entry_id: str | None, revision: int) -> str:
+    """Where a snapshot goes (spec/session.md "Snapshots"):
+    ``snapshots/entry-<id>.json`` when the log's entries carry ids,
+    ``snapshots/rev-<N>.json`` for a linear log without them — derived,
+    never authoritative, deletable without loss. Characters a
+    filesystem can't be trusted with fold to ``_``, so a content id
+    (``sha256:…``) becomes a plain filename.
+
+    :param entry_id: the entry's id, or None for a linear log
+    :param revision: the document revision the snapshot holds
+    :return: the path, relative to the package root
+    """
+    if entry_id:
+        safe = re.sub(r"[^A-Za-z0-9._-]", "_", entry_id)
+        return f"snapshots/entry-{safe}.json"
+    return f"snapshots/rev-{revision}.json"
+
+
+def compact_package(package_json: dict, head_revision: int) -> dict:
+    """The package.json of a compaction: the same metadata with
+    ``base_revision`` moved to the head the new base holds — the update
+    the spec's compaction procedure demands of the producer. A new
+    dict; the original is left as it was.
+
+    :param package_json: the parsed package.json
+    :param head_revision: the revision the compacted manifest holds
+    :return: the new package.json dict
+    """
+    updated = copy.deepcopy(package_json)
+    updated["base_revision"] = head_revision
+    return updated
+
+
+def compact(world_dir, head_revision: int | None = None) -> Path:
+    """Compact a package (spec/session.md "Snapshots"): fold it to its
+    head — or the given revision — write the folded document as the new
+    ``manifest.json``, move ``package.json``'s ``base_revision`` to the
+    head, archive the log as ``ops.archive.jsonl`` and start a fresh
+    empty ``ops.jsonl``. Compaction changes nothing observable about
+    the current state — folding the package before and after reaches
+    the same world — it truncates structural replay and nothing else.
+    Snapshots and the state document stay as they are.
+
+    :param world_dir: the package directory (``manifest.json`` plus its
+        ``ops.jsonl``)
+    :param head_revision: the revision to fold to; None for the log's
+        own head
+    :return: the package directory, compacted
+    :raises WorldFormatError: as :func:`fold_log` — a compaction is a
+        fold, and it must succeed
+    """
+    world = Path(world_dir)
+    manifest = parse_manifest((world / "manifest.json").read_text())
+    package_path = world / "package.json"
+    package = None
+    if package_path.exists():
+        package = json.loads(package_path.read_text())
+
+    log_path = world / "ops.jsonl"
+    entries = []
+    if log_path.exists():
+        entries = [
+            parse_log_line(line)
+            for line in log_path.read_text().splitlines() if line.strip()
+        ]
+    if head_revision is None:
+        head_revision = max(
+            (e["revision"] for e in entries),
+            default=_coalesce(_coalesce(package, {}).get("base_revision"), 0),
+        )
+    else:
+        entries = [e for e in entries if e["revision"] <= head_revision]
+
+    state = fold_log(manifest, entries)
+
+    # The folded document as the new base: entities inline, the next id
+    # one past the highest (capped at the ceiling), the scene as the
+    # fold left it — environment and camera from the fold (edits move
+    # them), meta, avatar and tours carried from the base, which no
+    # edit op touches.
+    meta = manifest.get("meta")
+    if not isinstance(meta, dict) or not meta:
+        meta = {"name": state["name"]} if state["name"] else {}
+    document = {
+        "version": SUPPORTED_SCHEMA_VERSION,
+        "meta": copy.deepcopy(meta),
+        "entities": copy.deepcopy(state["entities"]),
+        "next_entity_id": min(
+            max((e.get("id", 0) for e in state["entities"]), default=0) + 1,
+            MAX_ENTITY_ID,
+        ),
+    }
+    if state.get("environment") is not None:
+        document["environment"] = copy.deepcopy(state["environment"])
+    if state.get("camera") is not None:
+        document["camera"] = copy.deepcopy(state["camera"])
+    for field in ("avatar", "tours", "soundtrack", "creations"):
+        if field in manifest:
+            document[field] = copy.deepcopy(manifest[field])
+
+    (world / "manifest.json").write_text(json.dumps(document, indent=2) + "\n")
+
+    if package is None:
+        package = {"format_version": SUPPORTED_FORMAT_VERSION}
+    package_path.write_text(
+        json.dumps(compact_package(package, head_revision), indent=2) + "\n"
+    )
+
+    if log_path.exists():
+        log_path.rename(world / "ops.archive.jsonl")
+    log_path.write_text("")
+    return world

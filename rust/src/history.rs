@@ -71,6 +71,93 @@ impl EditOp {
         EditOp::DeleteEntity { id: entity.id }
     }
 
+    /// Compute the inverse of this operation against the document it is
+    /// about to change — **undo is appending the inverse** (the log
+    /// never rewinds), so the inverse must be computed at the time of
+    /// the edit, while the before-state is still in hand.
+    ///
+    /// The rule the spec states and this implements
+    /// (spec/session.md, "The op kinds"):
+    /// - `SpawnEntity` inverses to `DeleteEntity`;
+    /// - `DeleteEntity` inverses to a `Batch` of `SpawnEntity` ops
+    ///   holding a **deep copy of the deleted tree** (subtree,
+    ///   parents before children, so re-spawning applies);
+    /// - `ModifyEntity` inverses to a `ModifyEntity` restoring the old
+    ///   values — a patch that sets back exactly what the forward patch
+    ///   touched;
+    /// - the scene-wide sets inverse to the scene they replace
+    ///   (defaults where none existed);
+    /// - audio emitters swap roles symmetrically;
+    /// - `Batch` inverses to a batch of inverses in reverse order, each
+    ///   taken against the state its op was about to change.
+    pub fn compute_inverse(
+        &self,
+        doc: &crate::doc::WorldDoc,
+    ) -> Result<EditOp, crate::doc::ApplyError> {
+        use crate::doc::ApplyError;
+        match self {
+            EditOp::SpawnEntity { entity } => Ok(EditOp::DeleteEntity { id: entity.id }),
+            EditOp::DeleteEntity { id } => {
+                if !doc.contains(id.0) {
+                    return Err(ApplyError::MissingEntity(id.0));
+                }
+                // The deleted tree, deep-copied, parents first: applying
+                // the batch re-spawns exactly what deleting removed
+                // (descendants go with a delete, so they come back with it).
+                let ops = doc
+                    .subtree_entities_parent_first(id.0)
+                    .into_iter()
+                    .cloned()
+                    .map(EditOp::spawn)
+                    .collect();
+                Ok(EditOp::Batch { ops })
+            }
+            EditOp::ModifyEntity { id, patch } => {
+                let current = doc.get(id.0).ok_or(ApplyError::MissingEntity(id.0))?;
+                Ok(EditOp::modify(*id, inverse_patch(patch, current)))
+            }
+            EditOp::SetEnvironment { .. } => Ok(EditOp::SetEnvironment {
+                env: doc.environment.clone().unwrap_or_default(),
+            }),
+            EditOp::SetCamera { .. } => Ok(EditOp::SetCamera {
+                camera: doc.camera.clone().unwrap_or_default(),
+            }),
+            EditOp::SetAmbience { .. } => Ok(EditOp::SetAmbience {
+                ambience: doc.ambience.clone(),
+            }),
+            EditOp::SpawnAudioEmitter { name, audio } => Ok(EditOp::RemoveAudioEmitter {
+                name: name.clone(),
+                audio: audio.clone(),
+            }),
+            EditOp::RemoveAudioEmitter { name, .. } => {
+                let id = doc
+                    .entity_id_by_name(name)
+                    .ok_or_else(|| ApplyError::MissingName(name.clone()))?;
+                let audio = doc
+                    .get(id)
+                    .and_then(|e| e.audio.clone())
+                    .ok_or_else(|| ApplyError::MissingName(name.clone()))?;
+                Ok(EditOp::SpawnAudioEmitter {
+                    name: name.clone(),
+                    audio,
+                })
+            }
+            EditOp::Batch { ops } => {
+                // Each op's inverse sees the state its op was about to
+                // change: walk forward over a trial, collecting inverses,
+                // then reverse — the undo of a batch replays it backwards.
+                let mut trial = doc.clone();
+                let mut inverses = Vec::with_capacity(ops.len());
+                for op in ops {
+                    inverses.push(op.compute_inverse(&trial)?);
+                    trial.apply(op)?;
+                }
+                inverses.reverse();
+                Ok(EditOp::Batch { ops: inverses })
+            }
+        }
+    }
+
     /// Create a spawn operation for an entity.
     pub fn spawn(entity: WorldEntity) -> EditOp {
         EditOp::SpawnEntity { entity }
@@ -85,6 +172,57 @@ impl EditOp {
     pub fn modify(id: EntityId, patch: EntityPatch) -> EditOp {
         EditOp::ModifyEntity { id, patch }
     }
+}
+
+/// The patch that undoes `patch` against `current`: every slot the
+/// forward patch sets, the inverse sets back to the entity's value —
+/// or clears, where the entity never had the field.
+fn inverse_patch(patch: &EntityPatch, current: &WorldEntity) -> EntityPatch {
+    let mut inverse = EntityPatch::default();
+    if patch.name.is_some() {
+        inverse.name = Some(current.name.clone());
+    }
+    if patch.transform.is_some() {
+        inverse.transform = Some(current.transform.clone());
+    }
+    if patch.parent.is_some() {
+        inverse.parent = Some(current.parent);
+    }
+    if patch.shape.is_some() {
+        inverse.shape = Some(current.shape.clone());
+    }
+    if patch.material.is_some() {
+        inverse.material = Some(current.material.clone());
+    }
+    if patch.light.is_some() {
+        inverse.light = Some(current.light.clone());
+    }
+    if patch.behaviors.is_some() {
+        inverse.behaviors = Some(current.behaviors.clone());
+    }
+    if patch.audio.is_some() {
+        inverse.audio = Some(current.audio.clone());
+    }
+    if patch.mesh_asset.is_some() {
+        inverse.mesh_asset = Some(current.mesh_asset.clone());
+    }
+    if patch.modulations.is_some() {
+        inverse.modulations = Some(current.modulations.clone());
+    }
+    if patch.instance_of.is_some() {
+        inverse.instance_of = Some(current.instance_of.clone());
+    }
+    if patch.triggers.is_some() {
+        inverse.triggers = Some(current.triggers.clone());
+    }
+    // Extension fields set by the forward patch go back to whatever the
+    // entity carried — absent extension fields clear.
+    for key in patch.extra.keys() {
+        inverse
+            .extra
+            .insert(key.clone(), current.extra.get(key).cloned());
+    }
+    inverse
 }
 
 /// Edit history — append-only log of world edits.
@@ -152,7 +290,88 @@ impl EditHistory {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::doc::WorldDoc;
     use crate::entity::WorldEntity;
+
+    #[test]
+    fn undoing_a_delete_restores_the_whole_tree() {
+        // The rule: DeleteEntity inverses to a Batch of SpawnEntity ops
+        // containing a deep copy of the deleted tree — descendants and
+        // all, parents before children.
+        let mut doc = WorldDoc::new("w");
+        doc.apply(&EditOp::spawn(WorldEntity::new(1, "house")))
+            .unwrap();
+        let mut roof = WorldEntity::new(2, "roof");
+        roof.parent = Some(EntityId(1));
+        doc.apply(&EditOp::spawn(roof)).unwrap();
+        let mut chimney = WorldEntity::new(3, "chimney");
+        chimney.parent = Some(EntityId(2));
+        doc.apply(&EditOp::spawn(chimney)).unwrap();
+        doc.apply(&EditOp::spawn(WorldEntity::new(4, "tree")))
+            .unwrap();
+
+        let delete = EditOp::delete(EntityId(1));
+        let inverse = delete.compute_inverse(&doc).unwrap();
+        let EditOp::Batch { ops } = &inverse else {
+            panic!("a delete's inverse is a batch of spawns");
+        };
+        assert_eq!(ops.len(), 3, "the subtree, one spawn each");
+        // Parents before children, so the batch applies.
+        doc.apply(&delete).unwrap();
+        assert_eq!(doc.len(), 1);
+        doc.apply(&inverse).unwrap();
+        assert_eq!(doc.len(), 4);
+        assert_eq!(doc.get(3).unwrap().parent, Some(EntityId(2)));
+        assert_eq!(doc.get_by_name("chimney").unwrap().id, EntityId(3));
+    }
+
+    #[test]
+    fn every_edit_has_a_computable_inverse() {
+        let mut doc = WorldDoc::new("w");
+        doc.apply(&EditOp::spawn(WorldEntity::new(1, "lamp")))
+            .unwrap();
+
+        let spawn = EditOp::spawn(WorldEntity::new(9, "beacon"));
+        let spawn_inverse = spawn.compute_inverse(&doc).unwrap();
+        doc.apply(&spawn).unwrap();
+        doc.apply(&spawn_inverse).unwrap();
+        assert!(doc.get(9).is_none());
+
+        let modify = EditOp::modify(
+            EntityId(1),
+            EntityPatch {
+                name: Some(crate::identity::EntityName::new("torch")),
+                light: Some(None),
+                ..Default::default()
+            },
+        );
+        let modify_inverse = modify.compute_inverse(&doc).unwrap();
+        doc.apply(&modify).unwrap();
+        assert!(doc.get(1).unwrap().light.is_none());
+        doc.apply(&modify_inverse).unwrap();
+        assert_eq!(doc.get_by_name("lamp").unwrap().id, EntityId(1));
+
+        let set_env = EditOp::SetEnvironment {
+            env: crate::world::EnvironmentDef::default(),
+        };
+        let env_inverse = set_env.compute_inverse(&doc).unwrap();
+        doc.apply(&set_env).unwrap();
+        doc.apply(&env_inverse).unwrap();
+
+        // Batches inverse in reverse, each against the state its op changed.
+        let batch = EditOp::Batch {
+            ops: vec![
+                EditOp::spawn(WorldEntity::new(5, "a")),
+                EditOp::spawn(WorldEntity::new(6, "b")),
+            ],
+        };
+        let batch_inverse = batch.compute_inverse(&doc).unwrap();
+        doc.apply(&batch).unwrap();
+        assert_eq!(doc.len(), 3);
+        doc.apply(&batch_inverse).unwrap();
+        assert_eq!(doc.len(), 1);
+        assert!(doc.get(5).is_none() && doc.get(6).is_none());
+    }
 
     #[test]
     fn undo_redo_basic() {

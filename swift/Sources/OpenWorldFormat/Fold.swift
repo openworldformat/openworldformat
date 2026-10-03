@@ -28,6 +28,13 @@ public struct FoldState: Equatable, Sendable {
 
 /// Fold log entries over a manifest: the document at the last entry.
 ///
+/// Behavior refs written by name bind immediately (spec/world.md,
+/// "Identity"): the base's against the complete base, and each entry's
+/// against the fold-so-far plus that entry's own edits — an entry is
+/// atomic, so its names resolve after its edits apply and before it
+/// commits. A name nothing answers fails the entry; the fold stops
+/// there, exactly as any other refusal does.
+///
 /// - Throws: at the first entry that no longer applies —
 ///   `OpenWorldFormatError.invalid`.
 public func foldLog(_ manifest: WorldManifest, _ entries: [LogEntry]) throws -> FoldState {
@@ -41,6 +48,10 @@ public func foldLog(_ manifest: WorldManifest, _ entries: [LogEntry]) throws -> 
         appliedEdits: 0,
         path: nil
     )
+    // Base refs resolve against the complete base.
+    for index in state.entities.indices {
+        try resolveNames(&state, index)
+    }
     for entry in entries {
         let edits = editOps(entry)
         if edits.isEmpty { continue }   // history folds to nothing
@@ -49,10 +60,86 @@ public func foldLog(_ manifest: WorldManifest, _ entries: [LogEntry]) throws -> 
             guard case let .edit(name, value) = edit else { continue }
             try applyEdit(&trial, name, value)
         }
+        // The entry's names bind now, against the state its edits just
+        // made — delaying is what the spec forbids.
+        for id in touchedEntities(edits) {
+            if let index = trial.entities.firstIndex(where: { $0.id == id }) {
+                try resolveNames(&trial, index)
+            }
+        }
         state = trial
         state.appliedEdits += edits.count
     }
     return state
+}
+
+// MARK: - Immediate name binding
+
+/// The entity ids an entry's edit ops touch — spawn or modify, batches
+/// recursed — the entities whose name refs bind when the entry commits.
+func touchedEntities(_ edits: [ClassifiedOp]) -> [Int] {
+    var ids: [Int] = []
+    func walk(_ name: String, _ value: JSONValue) {
+        switch name {
+        case "SpawnEntity":
+            if let id = value["entity"]?["id"]?.int { ids.append(id) }
+        case "ModifyEntity":
+            if let id = value["id"]?.int { ids.append(id) }
+        case "Batch":
+            for op in value["ops"]?.array ?? [] {
+                if case let .edit(n, v) = classifyOp(op) { walk(n, v) }
+            }
+        default:
+            break
+        }
+    }
+    for edit in edits {
+        if case let .edit(name, value) = edit { walk(name, value) }
+    }
+    return ids
+}
+
+/// Resolve one entity's behavior refs written by name to ids, against
+/// the fold-so-far (`state.entities`): `Orbit.center` and
+/// `LookAt.target` when the ref is a string. Refs already numeric stay;
+/// `modulations[].target` is a property name, not an entity ref, and is
+/// never touched.
+func resolveNames(_ state: inout FoldState, _ entityIndex: Int) throws {
+    guard let behaviors = state.entities[entityIndex].fields["behaviors"]?.array else { return }
+    var resolved: [JSONValue] = []
+    var changed = false
+    for behavior in behaviors {
+        guard let b = behavior.object, b.count == 1, let (kind, params) = b.first,
+              var p = params.object
+        else {
+            resolved.append(behavior)
+            continue
+        }
+        let refKey: String
+        switch kind {
+        case "Orbit": refKey = "center"
+        case "LookAt": refKey = "target"
+        default: refKey = ""
+        }
+        if !refKey.isEmpty, let name = p[refKey]?.string {
+            p[refKey] = .number(Double(try entityId(named: name, in: state)))
+            changed = true
+            resolved.append(.object([kind: .object(p)]))
+        } else {
+            resolved.append(behavior)
+        }
+    }
+    if changed {
+        state.entities[entityIndex].fields["behaviors"] = .array(resolved)
+    }
+}
+
+/// The id an entity name answers to, among the state's entities.
+private func entityId(named name: String, in state: FoldState) throws -> Int {
+    guard let entity = state.entities.first(where: { $0.name == name }) else {
+        throw OpenWorldFormatError.invalid("no entity named '\(name)'")
+    }
+    return entity.id
 }
 
 // MARK: - Applying one edit
@@ -70,6 +157,10 @@ func applyEdit(_ state: inout FoldState, _ edit: String, _ value: JSONValue) thr
             entity = try WorldEntity(json: raw)
         } catch {
             throw OpenWorldFormatError.invalid("SpawnEntity needs an entity with id and name")
+        }
+        guard entity.id <= MAX_ENTITY_ID else {
+            throw OpenWorldFormatError.invalid(
+                "entity \(entity.id) exceeds the id ceiling \(MAX_ENTITY_ID) (2^53-1)")
         }
         let byId = Dictionary(uniqueKeysWithValues: state.entities.map { ($0.id, $0) })
         let names = Set(state.entities.map(\.name))

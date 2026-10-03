@@ -23,6 +23,19 @@ val EDIT_KEYS: Set<String> = setOf(
     "Batch",
 )
 
+/** The history kinds — they record, and fold to nothing. */
+val HISTORY_KEYS: Set<String> = setOf("tool", "input", "state", "clock", "merge")
+
+/**
+ * The shape collision rule (spec/session.md "Compatibility"): an op
+ * kind is either a PascalCase edit in [EDIT_KEYS] or a lowercase
+ * history kind in [HISTORY_KEYS] — so a future edit kind can never
+ * collide with a history kind, and a misspelling of either is
+ * recognizable as neither.
+ */
+fun opKindShapeOk(kind: String): Boolean =
+    if (kind.isNotEmpty() && kind[0] in 'A'..'Z') kind in EDIT_KEYS else kind in HISTORY_KEYS
+
 /** One op, recognized by shape. */
 sealed class ClassifiedOp {
     /** A document edit: one of [EDIT_KEYS], carrying its value. */
@@ -100,10 +113,16 @@ fun LogEntry(
 /**
  * Parse one log line into an entry with classified ops.
  *
- * @throws [WorldFormatException] when the line isn't JSON, or the
- *   entry has no numeric revision and ops array.
+ * Strict mode ([strict]) refuses what the tolerant fold carries: an
+ * op of no recognized kind, and an `ext-*` op whose name the registry
+ * (spec/extensions/registry.json) doesn't list. Non-strict behavior
+ * is exactly the default.
+ *
+ * @throws [WorldFormatException] when the line isn't JSON, the entry
+ *   has no numeric revision and ops array, or (strict) holds an
+ *   unknown or unregistered op kind.
  */
-fun parseLogLine(line: String): LogEntry {
+fun parseLogLine(line: String, strict: Boolean = false): LogEntry {
     val o = OWF_JSON.parseToJsonElement(line).obj
         ?: throw WorldFormatException("log entry must be a JSON object")
     val revision = o["revision"]?.int
@@ -111,6 +130,7 @@ fun parseLogLine(line: String): LogEntry {
     if (revision == null || ops == null) {
         throw WorldFormatException("log entry needs a revision and an ops array")
     }
+    if (strict) validateOpsStrict(ops.toList())
     return LogEntry(
         revision = revision,
         author = o["author"],

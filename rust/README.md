@@ -29,6 +29,42 @@ let (doc, path) = fold_path(&base, &entries, Some("e3"))?; // or at any tip
 reference solver, trajectory write/fold, and the conformance outcome
 runner; the `schema` feature generates `world.schema.json`.
 
+## The 0.2 surface (draft 0.2 compliance)
+
+The draft-0.2 tightening, as this crate reads it:
+
+- `manifest.version` is **required** — a world that doesn't say which
+  schema it speaks is refused, not defaulted.
+- Entity ids cap at `MAX_ENTITY_ID` (2^53 − 1): `alloc_entity_id`
+  returns `Result`, and the fold refuses ids past the ceiling, so
+  worlds this crate generates never overflow a JSON-safe reader.
+- The v2 multi-file manifest fields (`layout_file`, `region_files`,
+  `behavior_files`, `audio_files`, `avatar_file`) are gone from the
+  type, as they already were from the schema.
+- LLM lineage lives under `meta["ext-provenance"]`
+  (`ext_provenance::ExtProvenance`) — the `ext-provenance` extension,
+  not core `WorldMeta` fields.
+- **Names bind at ingestion**: `WorldDoc::apply_entry` (which
+  `fold_log` uses) resolves `Orbit.center`/`LookAt.target` name
+  references against the fold-so-far, and `WorldManifest::as_base`
+  resolves a base manifest against itself — never at fold time.
+- `oplog::canonical_json` + `oplog::compute_entry_id`: the canonical
+  serializer (no whitespace, sorted keys) and the `sha256:` entry
+  identity computed over it, identical across the five references for
+  integer-valued JSON.
+- `EditOp::compute_inverse(&doc)`: the undo rule in full — a delete's
+  inverse is a batch of spawns holding a deep copy of the deleted tree.
+- `session::merge_branch`: fork merging that reallocates ids allocated
+  concurrently on the main line and rewrites every reference to them
+  before appending.
+- `package::snapshot_filename` (`snapshots/entry-<id>.json`, falling
+  back to `rev-<N>.json`) and `package::compact_plan` (base_revision →
+  head; the host performs the file moves).
+- `strict::{parse_manifest_strict, decode_line_strict}`: must-ignore's
+  off switch for authoring tools — unknown fields, legacy lineage keys
+  and unregistered extensions are refusals, with the extension
+  registry embedded as `REGISTERED_EXTENSIONS`.
+
 ## Provenance and the plan
 
 Extracted from LocalGPT's `world-types`, `world-sync` and

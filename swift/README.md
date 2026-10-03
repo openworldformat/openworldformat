@@ -19,7 +19,7 @@ too, with the same entity counts pinned in its tests.
 ```swift
 // Package.swift
 dependencies: [
-    .package(url: "https://github.com/openworldformat/openworldformat", from: "0.1.0")
+    .package(url: "https://github.com/openworldformat/openworldformat", from: "0.2.0")
 ],
 targets: [
     .target(name: "YourTarget", dependencies: [
@@ -31,7 +31,7 @@ targets: [
 or Xcode → File → Add Package Dependencies → the same URL, then
 `import OpenWorldFormat`. The manifest lives at the repository root
 (SwiftPM requires it at the checkout root); the sources and tests are
-this directory. Releases are bare semver tags (`v0.1.0` on) — the
+this directory. Releases are bare semver tags (`v0.2.0` on) — the
 `js-v*`/`rust-v*` tags don't parse as versions. Consumers need
 macOS 14 / iOS 17 / visionOS 1 or later.
 

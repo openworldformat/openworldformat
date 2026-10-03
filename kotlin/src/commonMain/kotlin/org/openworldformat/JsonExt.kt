@@ -24,6 +24,27 @@ const val SUPPORTED_SCHEMA_VERSION: Int = 3
 /** The package format version this package reads. */
 const val SUPPORTED_FORMAT_VERSION: Int = 1
 
+/**
+ * The entity id ceiling: 2^53 − 1, the largest integer every JSON
+ * number representation holds exactly (spec/security.md's robustness
+ * bound, made numeric). A world written by a 64-bit allocator never
+ * overflows the references that read it. This common surface holds
+ * ids as [Int] — JS-safe by construction — so an id above the ceiling
+ * can't even be held here; the check in the fold keeps the five
+ * references symmetric.
+ */
+const val MAX_ENTITY_ID: Long = 9007199254740991
+
+/** The extensions the registry names (spec/extensions/registry.json)
+ *  — strict mode reads membership against this set. */
+val REGISTERED_EXTENSIONS: Set<String> = setOf(
+    "ext-physics",
+    "ext-strict-determinism",
+    "ext-visibility",
+    "ext-cinematography",
+    "ext-provenance",
+)
+
 /** A refusal: parse errors say what the document lacks; fold refusals
  *  carry the "invalid: " prefix the other references throw. */
 class WorldFormatException(message: String) : RuntimeException(message) {

@@ -69,3 +69,33 @@ public struct WorldPackage: Sendable {
         foldState(stateDocument, entries)
     }
 }
+
+// MARK: - Snapshots and compaction
+
+/// A snapshot's filename (spec/session.md, "Snapshots"):
+/// `snapshots/entry-<id>.json` for a log whose entries carry ids,
+/// `snapshots/rev-<N>.json` for a linear log without them. Characters
+/// a filename can't hold — anything outside `[A-Za-z0-9._-]` — fold to
+/// `_`. Snapshots are derived, never authoritative; this names them,
+/// it doesn't write them.
+public func snapshotFilename(entryId: String?, revision: Int) -> String {
+    guard let entryId else { return "snapshots/rev-\(revision).json" }
+    let allowed = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789._-"
+    let sanitized = String(entryId.map { allowed.contains($0) ? $0 : "_" })
+    return "snapshots/entry-\(sanitized).json"
+}
+
+/// Compaction's `package.json`: the same object with `base_revision` at
+/// the head the folded manifest now holds (spec/session.md,
+/// "Snapshots").
+///
+/// The routine this drives is the host app's, because it moves files:
+/// fold at head and write that state as the new `manifest.json`, rename
+/// `ops.jsonl` to `ops.archive.jsonl` (or delete it), and start a fresh
+/// empty `ops.jsonl`. This package is string-based — it returns the
+/// updated JSON and moves nothing.
+public func compactPackage(_ packageJson: JSONValue, headRevision: Int) -> JSONValue {
+    var o = packageJson.object ?? [:]
+    o["base_revision"] = .number(Double(headRevision))
+    return .object(o)
+}

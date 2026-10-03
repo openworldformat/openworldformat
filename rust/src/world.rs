@@ -35,6 +35,28 @@ pub enum VersionError {
     TooNew { found: u32, current: u32 },
 }
 
+/// The id space is exhausted: [`MAX_ENTITY_ID`](crate::MAX_ENTITY_ID)
+/// ids spent, none left to give.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IdCeilingError {
+    /// What the allocator tried to hand out.
+    pub next: u64,
+}
+
+impl fmt::Display for IdCeilingError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "entity id ceiling reached: next would be {}, but ids stop at {} \
+             (2^53 - 1, the JSON-safe integers)",
+            self.next,
+            crate::identity::MAX_ENTITY_ID
+        )
+    }
+}
+
+impl std::error::Error for IdCeilingError {}
+
 impl fmt::Display for VersionError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -74,10 +96,11 @@ impl fmt::Display for VersionError {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct WorldManifest {
-    /// Schema version for forward/backward migration.
-    #[serde(default = "default_version")]
+    /// Schema version for forward/backward migration. Required: a
+    /// world that doesn't say which schema it speaks is refused, not
+    /// guessed at (spec/versioning.md — the version gates parsing).
     pub version: u32,
-    /// World metadata (name, description, biome, etc.).
+    /// World metadata (name, description, tags, …).
     pub meta: WorldMeta,
     /// Environment settings (background, ambient light, fog).
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -95,35 +118,30 @@ pub struct WorldManifest {
     /// entity modulations.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub soundtrack: Option<SoundtrackDef>,
-    // ---- Multi-file references (v2) ----
-    /// Path to a separate layout file (blockout regions, spatial graph).
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub layout_file: Option<String>,
-    /// Paths to per-region entity files.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub region_files: Option<Vec<String>>,
-    /// Paths to behavior library files.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub behavior_files: Option<Vec<String>>,
-    /// Paths to audio spec files.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub audio_files: Option<Vec<String>>,
-    /// Path to an avatar definition file.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub avatar_file: Option<String>,
-
     /// Entities (inline for small worlds).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub entities: Vec<WorldEntity>,
     /// Compound creations.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub creations: Vec<CreationDef>,
-    /// Next entity ID to allocate.
+    /// Next entity ID to allocate, bounded by
+    /// [`MAX_ENTITY_ID`](crate::MAX_ENTITY_ID) (2^53 − 1) so ids stay
+    /// JSON-safe in every reader.
     #[serde(default = "default_next_id")]
+    #[cfg_attr(
+        feature = "schema",
+        schemars(transform = crate::identity::cap_json_safe)
+    )]
     pub next_entity_id: u64,
 }
 
 /// World metadata.
+///
+/// The LLM lineage fields (`prompt`, `model`,
+/// `generation_duration_ms`, `biome`, `semantic_category`) moved to
+/// the [`ext-provenance`](crate::ext_provenance) extension — the core
+/// schema is governed independently of any single producer
+/// (spec/extensions/provenance.md).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct WorldMeta {
@@ -132,9 +150,6 @@ pub struct WorldMeta {
     /// Human-readable description.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
-    /// Biome hint for procedural generation.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub biome: Option<String>,
     /// Time of day (0.0-24.0, for lighting presets).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub time_of_day: Option<f32>,
@@ -152,15 +167,6 @@ pub struct WorldMeta {
     /// Variation axis and value (e.g., ("lighting", "sunset")).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub variation: Option<(String, String)>,
-    /// Original prompt used to generate this world.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub prompt: Option<String>,
-    /// LLM model used for generation.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub model: Option<String>,
-    /// Generation duration in milliseconds.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub generation_duration_ms: Option<u64>,
     /// Style name from memory (if applied).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub style_ref: Option<String>,
@@ -168,6 +174,22 @@ pub struct WorldMeta {
     /// Compliance metadata for distribution and regulatory classification.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub compliance: Option<ComplianceMeta>,
+    /// LLM lineage, under the `ext-provenance` extension's namespace —
+    /// the one extension the core types carry, because generation tools
+    /// were already writing these fields and must not silently lose
+    /// them in the move. In the generated core schema the block is
+    /// free-form (`true`): an extension's shape belongs to its registry
+    /// entry, not the core.
+    #[serde(
+        rename = "ext-provenance",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    #[cfg_attr(
+        feature = "schema",
+        schemars(schema_with = "crate::ext_provenance::core_schema")
+    )]
+    pub ext_provenance: Option<crate::ext_provenance::ExtProvenance>,
 }
 
 /// Regulatory and distribution compliance metadata.
@@ -440,26 +462,18 @@ impl WorldManifest {
             meta: WorldMeta {
                 name: name.into(),
                 description: None,
-                biome: None,
                 time_of_day: None,
                 tags: None,
                 source: None,
                 variation_group: None,
                 variation: None,
-                prompt: None,
-                model: None,
-                generation_duration_ms: None,
                 style_ref: None,
                 compliance: Some(ComplianceMeta::default()),
+                ext_provenance: None,
             },
             environment: None,
             camera: None,
             avatar: None,
-            layout_file: None,
-            region_files: None,
-            behavior_files: None,
-            audio_files: None,
-            avatar_file: None,
             tours: Vec::new(),
             soundtrack: None,
             entities: Vec::new(),
@@ -486,10 +500,20 @@ impl WorldManifest {
     }
 
     /// Allocate and return the next entity ID, incrementing the counter.
-    pub fn alloc_entity_id(&mut self) -> crate::identity::EntityId {
+    ///
+    /// Refuses past [`MAX_ENTITY_ID`](crate::MAX_ENTITY_ID) — the
+    /// allocator enforces the JSON-safe ceiling even where the language
+    /// could count higher, so the worlds it generates never crash the
+    /// references that read them.
+    pub fn alloc_entity_id(&mut self) -> Result<crate::identity::EntityId, IdCeilingError> {
+        if self.next_entity_id > crate::identity::MAX_ENTITY_ID {
+            return Err(IdCeilingError {
+                next: self.next_entity_id,
+            });
+        }
         let id = crate::identity::EntityId(self.next_entity_id);
         self.next_entity_id += 1;
-        id
+        Ok(id)
     }
 
     /// Total entity count.
@@ -535,11 +559,88 @@ mod tests {
     #[test]
     fn alloc_entity_id() {
         let mut m = WorldManifest::new("test");
-        let id1 = m.alloc_entity_id();
-        let id2 = m.alloc_entity_id();
+        let id1 = m.alloc_entity_id().unwrap();
+        let id2 = m.alloc_entity_id().unwrap();
         assert_eq!(id1.0, 1);
         assert_eq!(id2.0, 2);
         assert_eq!(m.next_entity_id, 3);
+    }
+
+    #[test]
+    fn alloc_entity_id_stops_at_the_json_safe_ceiling() {
+        let mut m = WorldManifest::new("test");
+        m.next_entity_id = crate::identity::MAX_ENTITY_ID;
+        assert_eq!(
+            m.alloc_entity_id().unwrap().0,
+            crate::identity::MAX_ENTITY_ID
+        );
+        assert_eq!(
+            m.alloc_entity_id(),
+            Err(IdCeilingError {
+                next: crate::identity::MAX_ENTITY_ID + 1
+            })
+        );
+        // The counter never crosses the line, even after refusing.
+        assert_eq!(m.next_entity_id, crate::identity::MAX_ENTITY_ID + 1);
+    }
+
+    #[test]
+    fn version_is_required_not_defaulted() {
+        // A manifest that doesn't say which schema it speaks is refused,
+        // not guessed at (the version gates parsing).
+        let json = r#"{"meta": {"name": "silent"}}"#;
+        assert!(serde_json::from_str::<WorldManifest>(json).is_err());
+    }
+
+    #[test]
+    fn llm_lineage_lives_under_ext_provenance() {
+        let json = r#"{
+            "version": 3,
+            "meta": {
+                "name": "generated",
+                "ext-provenance": {
+                    "prompt": "a lighthouse over a foggy bay",
+                    "model": "claude-fable-5-1",
+                    "generation_duration_ms": 41000,
+                    "biome": "coastal",
+                    "semantic_category": "landmark"
+                }
+            }
+        }"#;
+        let m: WorldManifest = serde_json::from_str(json).unwrap();
+        let provenance = m.meta.ext_provenance.clone().expect("carried");
+        assert_eq!(
+            provenance.prompt.as_deref(),
+            Some("a lighthouse over a foggy bay")
+        );
+        assert_eq!(provenance.biome.as_deref(), Some("coastal"));
+        assert_eq!(provenance.semantic_category.as_deref(), Some("landmark"));
+        // Round trip keeps it under the extension's key, not the core's.
+        let back = serde_json::to_value(&m).unwrap();
+        assert!(back["meta"]["ext-provenance"]["model"].is_string());
+        assert!(back["meta"]["prompt"].is_null());
+    }
+
+    #[test]
+    fn the_v2_multi_file_references_are_gone() {
+        // The ghost fields: nothing wrote them, nothing read them — the
+        // schema dropped them, and the type finally agrees.
+        let json = r#"{"version": 3, "meta": {"name": "w"},
+            "layout_file": "layout.json", "region_files": ["r1.json"],
+            "behavior_files": [], "audio_files": [], "avatar_file": null}"#;
+        let m: WorldManifest = serde_json::from_str(json).unwrap();
+        let back = serde_json::to_value(&m).unwrap();
+        for ghost in [
+            "layout_file",
+            "region_files",
+            "behavior_files",
+            "audio_files",
+            "avatar_file",
+        ] {
+            assert!(back[ghost].is_null(), "{ghost} must not round-trip");
+        }
+        // Strict mode flags them (see strict.rs) — here they are merely
+        // must-ignored, like any unknown field.
     }
 
     #[test]

@@ -68,6 +68,18 @@ func isExtensionKey(_ key: String) -> Bool {
     }
 }
 
+/// The shape collision rule (spec/session.md, "Compatibility"): edit
+/// kinds are PascalCase, history kinds are lowercase — so no future
+/// kind of either side can ever be mistaken for one of the other. A
+/// kind passes by being an edit key written in PascalCase, or one of
+/// the five lowercase history kinds.
+public func opKindShapeOk(_ kind: String) -> Bool {
+    if EDIT_KEYS.contains(kind) {
+        return kind.first?.isUppercase == true
+    }
+    return ["tool", "input", "state", "clock", "merge"].contains(kind)
+}
+
 /// One parsed ops.jsonl line: an entry, its ops classified on parse.
 public struct LogEntry: Equatable, Sendable {
     public var revision: Int
@@ -102,15 +114,37 @@ public struct LogEntry: Equatable, Sendable {
 /// caller decides whether to skip (the spec says skip the last one,
 /// count the rest).
 ///
-/// - Throws: `OpenWorldFormatError.parse` when the line isn't JSON, or
-///   the entry has no numeric revision and ops array.
-public func parseLogLine(_ line: String) throws -> LogEntry {
+/// Strict mode (`strict: true`) refuses what the default carries: an
+/// op no shape rule recognizes, and an extension op whose name the
+/// registry hasn't registered. Must-ignore stays the default.
+///
+/// - Throws: `OpenWorldFormatError.parse` when the line isn't JSON, the
+///   entry has no numeric revision and ops array — or, when strict, an
+///   op is no known kind or names an unregistered extension.
+public func parseLogLine(_ line: String, strict: Bool = false) throws -> LogEntry {
     let json = try JSONValue(parsing: line)
     guard case let .object(o) = json else {
         throw OpenWorldFormatError.parse("log entry must be a JSON object")
     }
     guard let revision = o["revision"]?.int, let ops = o["ops"]?.array else {
         throw OpenWorldFormatError.parse("log entry needs a revision and an ops array")
+    }
+    if strict {
+        for op in ops {
+            switch classifyOp(op) {
+            case .unknown:
+                let named = op.object?.keys.sorted().first.map { " '\($0)'" } ?? ""
+                throw OpenWorldFormatError.parse("strict: unrecognized op\(named)")
+            case .extensionOp(let name, _):
+                guard REGISTERED_EXTENSIONS.contains(name) else {
+                    throw OpenWorldFormatError.parse(
+                        "strict: '\(name)' is not in the extension registry "
+                            + "(spec/extensions/registry.json)")
+                }
+            default:
+                break
+            }
+        }
     }
     let id = o["id"]?.string
     // A parent of the wrong shape is the same as absent: `id`-bearing

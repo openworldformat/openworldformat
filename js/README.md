@@ -72,15 +72,31 @@ unchanged — peer `three`, nothing else.
 
 | Export | What it does |
 |---|---|
-| `parseManifest(json)` | parse and version-check a world document |
-| `parseLogLine(line)` | parse one `ops.jsonl` line, ops classified |
+| `parseManifest(json, opts?)` | parse and version-check a world document (`{strict: true}` for authoring tools) |
+| `parseLogLine(line, opts?)` | parse one `ops.jsonl` line, ops classified (strict refuses unknown shapes) |
 | `classifyOp(op)` | recognize an op by shape — edits first |
+| `opKindShapeOk(kind)` | the shape collision rule: edits PascalCase, history kinds lowercase |
 | `editOps(entry)` | an entry's edits, in order |
 | `foldLog(manifest, entries)` | the document at the last entry (the linear fold) |
 | `buildHistory(entries)` | ids, parents, children and tips of a branching log |
 | `foldPath(manifest, entries, tip?)` | the document at a tip — fork anywhere, fold that path |
 | `foldState(stateDoc, entries)` | the game state at the last entry (declared fields, map subkeys, tolerant of the undeclared) |
+| `canonicalJson(value)` | deterministic serialization — sorted keys, no whitespace — the hash input |
+| `computeEntryId(entry)` | `sha256:<hex>` of the canonical entry, its own `id` excluded |
+| `computeInverse(op, state)` | the inverse of one edit op — undo is appending it |
+| `mergeBranch(state, entries)` | remap a branch's colliding ids onto the main head, rewriting every reference |
+| `snapshotFilename(entryId, revision)` | where a snapshot lives, the entry id sanitized |
+| `compactPackage(packageJson, headRevision)` | the `package.json` half of compaction (`base_revision` to head) |
+| `extProvenance(manifest)` | read `meta["ext-provenance"]` lineage, or null |
 | `SUPPORTED_SCHEMA_VERSION` | the manifest schema this reads (3) |
+| `MAX_ENTITY_ID` | the id ceiling, 2^53 − 1 |
+| `REGISTERED_EXTENSIONS` | the extensions the registry has accepted |
+
+The fold binds by-name behavior references to ids at ingestion (a later
+rename can't re-bind them), refuses ids past `MAX_ENTITY_ID`, and stops
+at the first entry that no longer applies — the rules
+[the spec](https://openworldformat.org) states. Strict mode is for
+authoring tools and validators; runtime consumers keep must-ignore.
 
 ## The physics extension (`openworldformat/physics`)
 

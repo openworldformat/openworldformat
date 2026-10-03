@@ -14,6 +14,12 @@ public let SUPPORTED_SCHEMA_VERSION = 3
 /// The package format version this package reads.
 public let SUPPORTED_FORMAT_VERSION = 1
 
+/// The entity id ceiling: 2^53 − 1, the largest integer every JSON
+/// number holds exactly. `applyEdit`'s SpawnEntity refuses ids above
+/// it, and a merge never hands one out — a world written by a 64-bit
+/// allocator must not overflow the references that read it.
+public let MAX_ENTITY_ID = 9007199254740991
+
 /// A refusal. Parse errors say what the document lacks; `invalid` is
 /// the fold's refusal prefix, the same string the other references
 /// throw ("invalid: no entity 7") — tests across languages match on it.
@@ -71,6 +77,18 @@ public struct EnvironmentDef: Equatable, Sendable {
     init() {
         fields = [:]
     }
+
+    /// The environment back to a JSON object: its typed fields and its
+    /// passthrough, merged — the inverse of `init(json:)`.
+    public var json: JSONValue {
+        var o = fields
+        if let v = backgroundColor { o["background_color"] = .array(v.map(JSONValue.number)) }
+        if let v = fogColor { o["fog_color"] = .array(v.map(JSONValue.number)) }
+        if let v = fogDensity { o["fog_density"] = .number(v) }
+        if let v = ambientColor { o["ambient_color"] = .array(v.map(JSONValue.number)) }
+        if let v = ambientIntensity { o["ambient_intensity"] = .number(v) }
+        return .object(o)
+    }
 }
 
 /// The camera (`camera`): where renders start.
@@ -90,6 +108,16 @@ public struct CameraDef: Equatable, Sendable {
 
     init() {
         fields = [:]
+    }
+
+    /// The camera back to a JSON object: its typed fields and its
+    /// passthrough, merged — the inverse of `init(json:)`.
+    public var json: JSONValue {
+        var o = fields
+        if let v = position { o["position"] = .array(v.map(JSONValue.number)) }
+        if let v = lookAt { o["look_at"] = .array(v.map(JSONValue.number)) }
+        if let v = fovDegrees { o["fov_degrees"] = .number(v) }
+        return .object(o)
     }
 }
 
@@ -203,36 +231,27 @@ public struct WorldManifest: Equatable, Sendable {
             o["meta"] = .object(m)
         }
         o["entities"] = .array(entities.map(\.json))
-        if let environment { o["environment"] = .object(environmentDict(environment)) }
-        if let camera { o["camera"] = .object(cameraDict(camera)) }
+        if let environment { o["environment"] = environment.json }
+        if let camera { o["camera"] = camera.json }
         if !ambience.isEmpty { o["ambience"] = .array(ambience) }
         return .object(o)
-    }
-
-    private func environmentDict(_ e: EnvironmentDef) -> [String: JSONValue] {
-        var o = e.fields
-        if let v = e.backgroundColor { o["background_color"] = .array(v.map(JSONValue.number)) }
-        if let v = e.fogColor { o["fog_color"] = .array(v.map(JSONValue.number)) }
-        if let v = e.fogDensity { o["fog_density"] = .number(v) }
-        if let v = e.ambientColor { o["ambient_color"] = .array(v.map(JSONValue.number)) }
-        if let v = e.ambientIntensity { o["ambient_intensity"] = .number(v) }
-        return o
-    }
-
-    private func cameraDict(_ c: CameraDef) -> [String: JSONValue] {
-        var o = c.fields
-        if let v = c.position { o["position"] = .array(v.map(JSONValue.number)) }
-        if let v = c.lookAt { o["look_at"] = .array(v.map(JSONValue.number)) }
-        if let v = c.fovDegrees { o["fov_degrees"] = .number(v) }
-        return o
     }
 }
 
 /// Parse and sanity-check a world document.
 ///
+/// Strict mode (`strict: true`) is the validator's half of must-ignore:
+/// where the default parse carries a key the schema doesn't name, strict
+/// refuses it — unknown top-level, `meta` and entity keys, and any
+/// `ext-*` name the registry hasn't registered. It is opt-in because
+/// must-ignore stays the format's default (spec/README.md).
+///
 /// - Throws: `OpenWorldFormatError.parse` when the text isn't JSON, has
 ///   no schema version, names a version newer than this reader (the
-///   versioning policy's hard line), or has no entities array.
-public func parseManifest(_ json: String) throws -> WorldManifest {
-    try WorldManifest(json: JSONValue(parsing: json))
+///   versioning policy's hard line), has no entities array — or, when
+///   strict, names a key no rule knows.
+public func parseManifest(_ json: String, strict: Bool = false) throws -> WorldManifest {
+    let value = try JSONValue(parsing: json)
+    if strict { try checkStrictManifest(value) }
+    return try WorldManifest(json: value)
 }

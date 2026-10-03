@@ -21,6 +21,38 @@ use crate::oplog::OpLogEntry;
 /// The session package format's version (`session.json`'s `format_version`).
 pub const SESSION_FORMAT_VERSION: u32 = 1;
 
+/// The edit op kinds, as the shape collision rule spells them:
+/// PascalCase, always — history kinds are lowercase, always, and the
+/// two forms never collide (spec/session.md, "Compatibility").
+pub const EDIT_KEYS: &[&str] = &[
+    "SpawnEntity",
+    "DeleteEntity",
+    "ModifyEntity",
+    "SetEnvironment",
+    "SetCamera",
+    "SetAmbience",
+    "SpawnAudioEmitter",
+    "RemoveAudioEmitter",
+    "Batch",
+];
+
+/// Whether `key` names an edit op kind (a serializer's guard: edits go
+/// out PascalCase, history goes out lowercase, and an op that breaks
+/// the rule is a bug in the writer, not a new kind).
+pub fn is_edit_key(key: &str) -> bool {
+    EDIT_KEYS.contains(&key)
+}
+
+/// The history op kinds, lowercase by the same rule.
+pub const HISTORY_KEYS: &[&str] = &["tool", "input", "state", "clock", "merge"];
+
+/// Whether a kind follows its case rule: edits PascalCase, history
+/// lowercase. New kinds MUST pick a side (spec/session.md).
+pub fn op_kind_shape_ok(kind: &str) -> bool {
+    (is_edit_key(kind) && kind.chars().next().is_some_and(char::is_uppercase))
+        || (HISTORY_KEYS.contains(&kind) && kind.chars().next().is_some_and(char::is_lowercase))
+}
+
 /// One op in a session log entry. Only `Edit` changes the document; the
 /// rest is history that folds to nothing.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -332,14 +364,185 @@ pub fn fold_path(
 
 /// Fold log entries onto a base document: the state at the last entry.
 ///
-/// Each entry's edits apply atomically, as the room applied them; the fold
-/// stops at the first entry that no longer applies.
+/// Each entry's edits apply atomically, as the room applied them, and
+/// the names the entry introduces bind against the fold-so-far at
+/// ingestion (spec/world.md); the fold stops at the first entry that
+/// no longer applies.
 pub fn fold_log(base: &WorldDoc, entries: &[OpLogEntry]) -> Result<WorldDoc, ApplyError> {
     let mut doc = base.clone();
     for entry in entries {
-        doc.apply_all(&entry.edit_ops())?;
+        doc.apply_entry(&entry.edit_ops())?;
     }
     Ok(doc)
+}
+
+/// What [`merge_branch`] did: the entries to append, and the ids it had
+/// to move out of the way.
+#[derive(Debug, Clone)]
+pub struct MergedBranch {
+    /// The branch's entries with colliding ids reallocated and every
+    /// reference to them rewritten — ready to append to the main log
+    /// (with a [`SessionOp::Merge`] record saying where they came from).
+    pub entries: Vec<OpLogEntry>,
+    /// Old id → new id, for the entities the branch spawned under ids
+    /// the main branch had concurrently allocated.
+    pub remapped: std::collections::BTreeMap<u64, u64>,
+}
+
+/// Merge a branch's entries into a main line: scan the incoming branch
+/// for entity ids allocated concurrently on the main branch, reallocate
+/// them, and rewrite every reference to them inside the incoming batch
+/// before appending (spec/session.md — "the merge authority must handle
+/// ID collisions").
+///
+/// An id the branch *spawns* that the main document already holds
+/// collides; references to ids the branch only *uses* (a modify of an
+/// entity both lines share) are left alone. New ids come from the main
+/// document's `next_id`, stepping past everything either line holds.
+/// Names are ids' problem here, not the merge's: two branches that
+/// spawn the same *name* still collide on apply, and the caller
+/// pre-renames — collision handling is the checklist's line, and this
+/// is where it's drawn.
+pub fn merge_branch(main: &WorldDoc, entries: &[OpLogEntry]) -> Result<MergedBranch, ApplyError> {
+    // Pass 1: what the branch spawns, and which of those ids the main
+    // line already holds.
+    let mut branch_spawns: Vec<u64> = Vec::new();
+    for entry in entries {
+        scan_spawns(&entry.edit_ops(), &mut branch_spawns);
+    }
+    let mut collisions: Vec<u64> = branch_spawns
+        .iter()
+        .copied()
+        .filter(|id| main.contains(*id))
+        .collect();
+    collisions.sort_unstable();
+    collisions.dedup();
+
+    // Pass 2: fresh ids for the collisions, past everything held.
+    let mut taken: std::collections::BTreeSet<u64> = main
+        .entities()
+        .map(|e| e.id.0)
+        .chain(branch_spawns.iter().copied())
+        .collect();
+    let mut next = main.next_id();
+    let mut remapped = std::collections::BTreeMap::new();
+    for old in &collisions {
+        while taken.contains(&next) {
+            next += 1;
+        }
+        if next > crate::identity::MAX_ENTITY_ID {
+            return Err(ApplyError::Invalid(format!(
+                "merge needs a fresh id past {}, but ids stop at {} (2^53-1)",
+                old,
+                crate::identity::MAX_ENTITY_ID
+            )));
+        }
+        taken.insert(next);
+        remapped.insert(*old, next);
+        next += 1;
+    }
+
+    // Pass 3: rewrite every reference to a remapped id.
+    let rewritten = entries
+        .iter()
+        .map(|entry| OpLogEntry {
+            revision: entry.revision,
+            author: entry.author.clone(),
+            ops: entry
+                .ops
+                .iter()
+                .map(|op| rewrite_session_op(op.clone(), &remapped))
+                .collect(),
+            timestamp_ms: entry.timestamp_ms,
+            id: entry.id.clone(),
+            parent: entry.parent.clone(),
+        })
+        .collect();
+    Ok(MergedBranch {
+        entries: rewritten,
+        remapped,
+    })
+}
+
+/// Collect the entity ids a batch of edits spawns.
+fn scan_spawns(ops: &[crate::history::EditOp], out: &mut Vec<u64>) {
+    for op in ops {
+        match op {
+            EditOp::SpawnEntity { entity } => out.push(entity.id.0),
+            EditOp::Batch { ops } => scan_spawns(ops, out),
+            _ => {}
+        }
+    }
+}
+
+/// Rewrite one session op's references through the remap. History kinds
+/// ride along untouched.
+fn rewrite_session_op(op: SessionOp, remapped: &std::collections::BTreeMap<u64, u64>) -> SessionOp {
+    match op {
+        SessionOp::Edit(edit) => SessionOp::Edit(Box::new(rewrite_edit(*edit, remapped))),
+        other => other,
+    }
+}
+
+/// Rewrite one edit's entity references through the remap.
+fn rewrite_edit(op: EditOp, remapped: &std::collections::BTreeMap<u64, u64>) -> EditOp {
+    let map_id = |id: &mut crate::identity::EntityId| {
+        if let Some(&to) = remapped.get(&id.0) {
+            *id = crate::identity::EntityId(to);
+        }
+    };
+    let map_ref = |class_ref: &mut crate::identity::EntityRef| {
+        if let crate::identity::EntityRef::Id(id) = class_ref {
+            map_id(id);
+        }
+    };
+    match op {
+        EditOp::SpawnEntity { mut entity } => {
+            map_id(&mut entity.id);
+            if let Some(parent) = &mut entity.parent {
+                map_id(parent);
+            }
+            for behavior in entity.behaviors.iter_mut() {
+                match behavior {
+                    crate::behavior::BehaviorDef::Orbit {
+                        center: Some(class_ref),
+                        ..
+                    } => map_ref(class_ref),
+                    crate::behavior::BehaviorDef::LookAt { target } => map_ref(target),
+                    _ => {}
+                }
+            }
+            EditOp::spawn(entity)
+        }
+        EditOp::DeleteEntity { mut id } => {
+            map_id(&mut id);
+            EditOp::delete(id)
+        }
+        EditOp::ModifyEntity { mut id, mut patch } => {
+            map_id(&mut id);
+            if let Some(Some(parent)) = &mut patch.parent {
+                map_id(parent);
+            }
+            for behavior in patch.behaviors.iter_mut().flatten() {
+                match behavior {
+                    crate::behavior::BehaviorDef::Orbit {
+                        center: Some(class_ref),
+                        ..
+                    } => map_ref(class_ref),
+                    crate::behavior::BehaviorDef::LookAt { target } => map_ref(target),
+                    _ => {}
+                }
+            }
+            EditOp::modify(id, patch)
+        }
+        EditOp::Batch { ops } => EditOp::Batch {
+            ops: ops
+                .into_iter()
+                .map(|op| rewrite_edit(op, remapped))
+                .collect(),
+        },
+        other => other,
+    }
 }
 
 #[cfg(test)]
@@ -516,6 +719,132 @@ mod tests {
         let (doc, path) = fold_path(&base, &entries, None).unwrap();
         assert_eq!(doc.len(), 2);
         assert_eq!(path, vec!["line-0", "line-1"]);
+    }
+
+    #[test]
+    fn merging_reallocates_colliding_ids_and_rewrites_references() {
+        // The main line holds id 5; the branch forked before 5 existed
+        // and allocated its own 5 (plus a child and a behavior ref to
+        // it). The merge authority moves the branch's 5 out of the way
+        // and rewrites everything that pointed at it.
+        let mut main = WorldDoc::new("main");
+        main.apply(&wt::EditOp::spawn(entity(1, "keep"))).unwrap();
+        main.apply(&wt::EditOp::spawn(entity(5, "moat"))).unwrap();
+
+        let mut branch_child = entity(6, "drawbridge");
+        branch_child.parent = Some(wt::EntityId(5));
+        branch_child.behaviors = vec![crate::behavior::BehaviorDef::LookAt {
+            target: crate::identity::EntityRef::id(5),
+        }];
+        let branch = vec![
+            OpLogEntry {
+                revision: 3,
+                author: Author {
+                    peer: None,
+                    name: "branch".into(),
+                },
+                ops: vec![SessionOp::Edit(Box::new(wt::EditOp::spawn(entity(
+                    5, "wall",
+                ))))],
+                timestamp_ms: 3,
+                id: Some("b1".into()),
+                parent: None,
+            },
+            OpLogEntry {
+                revision: 4,
+                author: Author {
+                    peer: None,
+                    name: "branch".into(),
+                },
+                ops: vec![SessionOp::Edit(Box::new(wt::EditOp::spawn(branch_child)))],
+                timestamp_ms: 4,
+                id: Some("b2".into()),
+                parent: Some("b1".into()),
+            },
+        ];
+
+        let merged = merge_branch(&main, &branch).unwrap();
+        // 5 collided; 6 did not (the main line never allocated it), so
+        // the fresh id steps past everything either line holds: 7.
+        assert_eq!(merged.remapped.get(&5), Some(&7));
+        assert!(!merged.remapped.contains_key(&6));
+
+        // The rewritten branch applies to the main document, and every
+        // reference to the moved id moved with it.
+        let doc = fold_log(&main, &merged.entries).unwrap();
+        assert!(doc.get(5).is_some(), "the main line's 5 is untouched");
+        let wall = doc.get_by_name("wall").unwrap();
+        assert_eq!(wall.id.0, 7, "the branch's wall lives at the fresh id");
+        let bridge = doc.get_by_name("drawbridge").unwrap();
+        assert_eq!(bridge.parent, Some(wt::EntityId(7)));
+        match &bridge.behaviors[0] {
+            crate::behavior::BehaviorDef::LookAt { target } => {
+                assert_eq!(*target, crate::identity::EntityRef::id(7));
+            }
+            other => panic!("unexpected behavior {other:?}"),
+        }
+    }
+
+    #[test]
+    fn merging_leaves_shared_references_alone() {
+        // The branch modifies an entity both lines hold: a reference,
+        // not a spawn — the merge must not touch it.
+        let mut main = WorldDoc::new("main");
+        main.apply(&wt::EditOp::spawn(entity(1, "keep"))).unwrap();
+        let entry = OpLogEntry {
+            revision: 2,
+            author: Author {
+                peer: None,
+                name: "branch".into(),
+            },
+            ops: vec![SessionOp::Edit(Box::new(wt::EditOp::modify(
+                wt::EntityId(1),
+                wt::EntityPatch {
+                    name: Some(crate::identity::EntityName::new("kept")),
+                    ..Default::default()
+                },
+            )))],
+            timestamp_ms: 2,
+            id: Some("b1".into()),
+            parent: None,
+        };
+        let merged = merge_branch(&main, &[entry]).unwrap();
+        assert!(merged.remapped.is_empty());
+        let doc = fold_log(&main, &merged.entries).unwrap();
+        assert_eq!(doc.get(1).unwrap().name.as_str(), "kept");
+    }
+
+    #[test]
+    fn edits_stay_pascal_case_and_history_lowercase() {
+        // The shape collision rule, as the serializer's guard: every
+        // edit kind starts uppercase, every history kind lowercase.
+        for key in EDIT_KEYS {
+            assert!(op_kind_shape_ok(key), "{key} must be PascalCase");
+        }
+        for key in HISTORY_KEYS {
+            assert!(op_kind_shape_ok(key), "{key} must be lowercase");
+        }
+        assert!(!op_kind_shape_ok("spawnentity"));
+        assert!(!op_kind_shape_ok("Tool"));
+        // And the wire agrees: an edit serializes exactly as it always did.
+        let op = SessionOp::Edit(Box::new(EditOp::spawn(entity(1, "lighthouse"))));
+        assert!(
+            serde_json::to_string(&op)
+                .unwrap()
+                .starts_with("{\"SpawnEntity\"")
+        );
+        let record = SessionOp::Tool(ToolRecord {
+            tool: "t".into(),
+            args: serde_json::json!({}),
+            result_hash: None,
+            phase: None,
+            timestamp_ms: None,
+        });
+        assert!(
+            serde_json::to_string(&record)
+                .unwrap()
+                .starts_with("{\"tool\"")
+        );
     }
 
     #[test]
