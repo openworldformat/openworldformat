@@ -59,7 +59,8 @@ formats — it composes them.
 
 Writers SHOULD refresh `log_sha256` and `head_revision` whenever the log
 appends, and SHOULD snapshot periodically (e.g., every 1,000 revisions or
-5MB of log growth). Keyframes for seeking: read at revision N = nearest base-or-snapshot ≤ N, then fold forward).
+5MB of log growth). Keyframes for seeking: read at revision N = nearest
+base-or-snapshot ≤ N, then fold forward.
 
 Readers MUST be tolerant: a torn last log line loses at most itself and
 is skipped (and countable); the fold stops at the first entry that no

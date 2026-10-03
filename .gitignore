@@ -12,3 +12,4 @@ website/.wrangler/
 .DS_Store
 .build/
 .swiftbuild/
+.swiftpm/
