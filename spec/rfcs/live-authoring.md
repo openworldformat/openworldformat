@@ -188,11 +188,16 @@ What git does **not** do, and stays the format's:
   field (and reallocates ids allocated concurrently, as
   `merge_branch` does); this RFC names the need, not the driver.
 
-Decided (review, before acceptance): inside git, git versions asset
-bytes — references may use logical names, and hash-named copies are for
-packages without git and for exports, which rewrite references to them
-so a zip of one revision still verifies. Copying assets by hash inside a
-repository would only duplicate git's own object store.
+Decided (review, before acceptance): portability first, git as an
+extension. Content-addressed asset copies are the baseline everywhere —
+a `.world` is a self-contained, portable database on devices with no git
+— and under git they cost almost nothing: they are immutable and
+content-addressed, so identical bytes are one git blob per version, and
+only genuinely new versions add to the object store, which any history
+would. A git repository MAY let references use logical names for
+readable diffs, with exports to the transport form rewriting them to
+hash-named copies; that is the repository's choice, not the format's
+default.
 
 Also decided: an authority that sees `manifest.json` change to bytes
 `package.json` names treats it as a checkout and reopens — a `git
@@ -255,8 +260,8 @@ they live under `.live/`, which is never zipped or versioned.
 - **New normative surface:** ingestion rules (binding, merge, strict),
   `ModifyWorld`, the total-fold conformance rule, the authority's write
   order.
-- **Two history models** for a while (log DAG and git) until §4's open
-  choice is settled.
+- **Two history models** for a while (the log's DAG and git's), one
+  optional over the other rather than one replacing the other.
 - **Coarser history** for whole-batch commits than for per-call tools —
   intent survives only as the message and the op list.
 

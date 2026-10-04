@@ -109,21 +109,25 @@ Assets live under `assets/`. A world references them by path, relative
 to `assets/`, and a mesh reference also carries the file's SHA-256 — a
 missing or changed file is detected, not silently drawn.
 
-A referenced asset's bytes MUST NOT change: history at an earlier
-revision has to find the bytes it used. How a package keeps that promise
-depends on what carries its history:
+**Content addressing is the baseline.** A referenced asset's bytes MUST
+NOT change: history at an earlier revision has to find the bytes it used,
+and the package must stay a self-contained, portable database on devices
+with no git (mobile included). So the authority stores every asset an op
+references as an immutable copy named by its hash,
+`assets/<sha256>.<ext>`, and the committed reference points at the copy.
+An author may write and rewrite a working file of any name; referencing
+it again stores a new version, and the old one stays. A file named by a
+hash that no longer holds those bytes is corrupt.
 
-- **Without git**, the authority stores every asset an op references as
-  an immutable copy named by its hash, `assets/<sha256>.<ext>`, and the
-  committed reference points at the copy. An author may write and rewrite
-  a working file of any name; referencing it again stores a new version,
-  and the old one stays. A file named by a hash that no longer holds those
-  bytes is corrupt.
-- **In a git repository** (see *Git*), git versions the bytes: references
-  MAY use logical names (`assets/brick.png`), and changing an asset is
-  changing the file and committing it. An export from a repository to the
-  transport form (a zip of one revision) SHOULD rewrite references to
-  hash-named copies, so the package verifies without git.
+A package that is a git repository MAY let references use logical names
+(`assets/brick.png`), with git versioning the bytes — readable asset
+diffs in exchange for needing the repository. That is the repository's
+choice, not the format's default. An export to the transport form (a zip
+of one revision) SHOULD rewrite references to hash-named copies, so the
+package verifies without git. And under git the copies cost almost
+nothing: they are immutable and content-addressed, so identical bytes
+are one git blob, and only genuinely new versions add to the object
+store — which any history would.
 
 Meshes are glTF (`.glb`); textures are PNG; audio formats are determined by
 the Player profile (e.g., OGG, WAV, MP3). The package never invents leaf
@@ -131,8 +135,10 @@ formats — it composes them.
 
 ## Git
 
-A package MAY be a git repository. When it is, git carries the history
-the format describes, and an authority:
+A package MAY be a git repository — an optional layer for desktop
+workflows, never a dependency: a `.world` is fully self-contained
+without it (see *Assets*). When it is, git carries the history the
+format describes, and an authority:
 
 - makes every committed batch a git commit, authored by the batch's
   author, with the entry's `message` as the subject;
