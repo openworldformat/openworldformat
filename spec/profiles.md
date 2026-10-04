@@ -35,19 +35,22 @@ told about its typo; a viewer reading the world later never has to be.
 ## Extensions
 
 Extensions are namespaced (`ext-physics`, `ext-avatars`, …) and carry
-their own version. The registry (this repository's governance process,
-see [`CONTRIBUTING.md`](../CONTRIBUTING.md)) accepts a namespaced
-extension only with:
+their own version. The registry —
+[`spec/extensions/registry.json`](extensions/registry.json), governed by
+[`CONTRIBUTING.md`](../CONTRIBUTING.md) — has two levels:
 
-1. a specification page under `spec/extensions/<name>.md`,
-2. a reference implementation, and
-3. conformance cases.
+- **Proposed** — a specification page under `spec/extensions/<name>.md`.
+  The name is reserved; the shape is open for experiment.
+- **Experimental** — the page, a reference implementation, and
+  conformance cases (a metadata-only extension substitutes a round-trip
+  test in a reference for cases). An extension leaves experimental when
+  two implementers sign off and a producer ships a package using it.
 
-The registry is [`spec/extensions/registry.json`](extensions/registry.json).
-Its first entry is [`ext-physics`](extensions/physics.md) 0.1 —
-experimental, tracking the glTF drafts, one implementer so far. Until
-an extension is registered, its fields are reserved for experiment, and
-producers MUST NOT ship them in packages marked `format_version: 1`.
+Strict Mode admits an `ext-*` key when the registry names the extension
+at either level; an `ext-*` key the registry does not name is a typo,
+not an experiment. And until an extension is in the registry at all, its
+fields are reserved for private experiment — producers MUST NOT ship
+them in packages.
 
 Extensions align with adjacent standards rather than competing with
 them: physics extensions SHOULD track the glTF physics drafts

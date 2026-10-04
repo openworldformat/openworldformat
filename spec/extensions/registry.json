@@ -1,5 +1,5 @@
 {
-  "comment": "The extension registry: namespaced extensions with a spec page, a reference implementation and conformance cases (CONTRIBUTING.md). An extension is experimental until two implementers sign off and a producer ships it.",
+  "comment": "The extension registry. An extension enters as `proposed` with a specification page under spec/extensions/; it becomes `experimental` with a reference implementation and conformance cases (a metadata-only extension substitutes a round-trip test in a reference for cases); it leaves experimental when two implementers sign off and a producer ships a package using it (CONTRIBUTING.md).",
   "extensions": {
     "ext-physics": {
       "version": "0.1.0",
@@ -25,27 +25,27 @@
     },
     "ext-strict-determinism": {
       "version": "0.1.0",
-      "status": "experimental",
+      "status": "proposed",
       "spec": "spec/extensions/strict-determinism.md",
       "notes": "Ensures bit-exact simulation reproducibility across engines using fixed-point math and pinned floating-point rules."
     },
     "ext-visibility": {
       "version": "0.1.0",
-      "status": "experimental",
+      "status": "proposed",
       "spec": "spec/extensions/visibility.md",
       "notes": "Allows authors to conditionally hide entities (e.g. traps, GM secrets) from specific profiles until revealed."
     },
     "ext-cinematography": {
       "version": "0.1.0",
-      "status": "experimental",
+      "status": "proposed",
       "spec": "spec/extensions/cinematography.md",
       "notes": "Provides spline-based camera paths, explicit keyframed animation tracks, and depth-of-field focus targets."
     },
     "ext-provenance": {
       "version": "0.1.0",
-      "status": "experimental",
+      "status": "proposed",
       "spec": "spec/extensions/provenance.md",
-      "notes": "Carries LLM lineage metadata such as prompt, model, and generation duration."
+      "notes": "Carries LLM lineage metadata such as prompt, model, and generation duration. The Rust reference round-trips the block from its core types; promotion to experimental wants that round-trip as a conformance case."
     }
   }
 }

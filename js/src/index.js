@@ -36,11 +36,11 @@ export const BASE_SNAPSHOT = "snapshots/base.json";
 export const MAX_ENTITY_ID = 9007199254740991;
 
 /**
- * The extensions the registry (spec/extensions/registry.json) has
- * accepted: namespaced, each with a spec page, a reference
- * implementation and conformance cases. Strict mode admits `ext-*` keys
- * on these names and no others; the runtime folds any `ext-*` it knows
- * or not — must-ignore (spec/profiles.md).
+ * The extensions the registry (spec/extensions/registry.json) names, at
+ * either level: `proposed` (a spec page) or `experimental` (the page, a
+ * reference implementation, conformance cases). Strict mode admits
+ * `ext-*` keys on these names and no others; the runtime folds any
+ * `ext-*` it knows or not — must-ignore (spec/profiles.md).
  */
 export const REGISTERED_EXTENSIONS = [
   "ext-physics",
