@@ -381,7 +381,10 @@ pub fn fold_path(
 pub fn fold_log(base: &WorldDoc, entries: &[OpLogEntry]) -> Result<WorldDoc, ApplyError> {
     let mut doc = base.clone();
     for entry in entries {
-        doc.apply_entry(&entry.edit_ops())?;
+        // The fold owns `doc` and returns `Err` without it, so the
+        // per-entry transactional copy protects nothing and would make
+        // folding quadratic in the log's length.
+        doc.apply_entry_in_place(&entry.edit_ops())?;
     }
     Ok(doc)
 }
