@@ -159,7 +159,7 @@ kinds) parses unchanged, and an edit serializes today exactly as it
 always did.
 
 ### Folding and Invalid Operations
-During a fold, an operation may "no longer apply" to the current state. Such operations are skipped without failing the fold. The error taxonomy includes:
+During a fold, an operation may "no longer apply" to the current state. The fold stops at the first such entry and names the reason — the same refusal class an authority returns at intake, so a log that replays cleanly folds cleanly and one that cannot never folds halfway in silence. An entry is atomic: if any of its edits no longer applies, none of them commits. The error taxonomy includes:
 - **Entity not found**: Attempting to modify or delete an entity that does not exist.
 - **Invalid patch**: A `ModifyEntity` patch that does not match the schema or attempts an invalid field transition.
 - **Already exists**: Attempting to spawn an entity with an ID that is currently in use.
