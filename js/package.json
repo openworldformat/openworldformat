@@ -1,6 +1,6 @@
 {
   "name": "openworldformat",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "The Open World Format reference package: parse and fold a .world in pure JS, plus the reference three.js renderer.",
   "type": "module",
   "main": "src/index.js",

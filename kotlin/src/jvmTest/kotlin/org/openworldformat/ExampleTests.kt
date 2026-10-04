@@ -16,7 +16,8 @@ class DropTests {
     @Test
     fun theDropTestPackageFoldsOneEditEverythingElseIsHistory() {
         val pkg = loadDrop()
-        assertEquals(6, pkg.manifest.entities.size)
+        assertEquals(6, pkg.base.entities.size)
+        assertEquals(7, pkg.manifest.entities.size, "the head is the fold to main")
         val state = pkg.folded()
         assertEquals(1, state.appliedEdits)
         assertTrue(state.entities.any { it.name == "ball_late" })
@@ -38,7 +39,7 @@ class SpeedrunForkTests {
 
     @Test
     fun aChallengeChainIsAHistoryTwoRunsForkOneCourse() {
-        val manifest = pkg.manifest
+        val manifest = pkg.base
         val entries = pkg.entries
 
         val history = buildHistory(entries)

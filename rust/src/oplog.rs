@@ -40,6 +40,11 @@ pub struct OpLogEntry {
     /// the base, for the first). A branch is a second child of one parent.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub parent: Option<String>,
+    /// What the author says the batch is for — a commit message. History
+    /// for people and for the git commit a batch becomes; it folds to
+    /// nothing.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub message: Option<String>,
 }
 
 /// One log line (no trailing newline).
@@ -117,6 +122,7 @@ mod tests {
             timestamp_ms: 1_700_000_000_000,
             id: None,
             parent: None,
+            message: None,
         };
         let line = encode_line(&entry).unwrap();
         assert!(!line.contains('\n'));
@@ -166,6 +172,7 @@ mod tests {
             )))],
             id: Some("anything at all".into()),
             parent: Some("e6".into()),
+            message: None,
         };
         // The typed entity carries its default transform, so this
         // fixture has a digest of its own — the cross-language golden

@@ -142,6 +142,7 @@ mod tests {
             timestamp_ms: 0,
             id: None,
             parent: None,
+            message: None,
         }
     }
 

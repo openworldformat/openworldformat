@@ -9,12 +9,6 @@
 import Foundation
 
 /// The camera a world with no `camera` renders from.
-let cameraDefaults = JSONValue.object([
-    "position": .array([.number(5), .number(5), .number(5)]),
-    "look_at": .array([.number(0), .number(0), .number(0)]),
-    "fov_degrees": .number(45),
-])
-
 /// The inverse of one edit op, computed against the state the edit is
 /// about to apply to.
 ///
@@ -70,13 +64,32 @@ public func computeInverse(_ op: JSONValue, _ state: FoldState) throws -> JSONVa
             "patch": .object(inversePatch),
         ])])
 
+    // A scene setting that didn't exist comes back as absent, not as a
+    // default one: ModifyWorld clears it.
     case "SetEnvironment":
-        let env = state.environment?.json ?? .object([:])
-        return .object(["SetEnvironment": .object(["env": env])])
+        guard let env = state.environment else {
+            return .object(["ModifyWorld": .object(["patch": .object(["environment": .null])])])
+        }
+        return .object(["SetEnvironment": .object(["env": env.json])])
 
     case "SetCamera":
-        let camera = state.camera?.json ?? cameraDefaults
-        return .object(["SetCamera": .object(["camera": camera])])
+        guard let camera = state.camera else {
+            return .object(["ModifyWorld": .object(["patch": .object(["camera": .null])])])
+        }
+        return .object(["SetCamera": .object(["camera": camera.json])])
+
+    case "ModifyWorld":
+        let patch = value["patch"]?.object ?? [:]
+        let now = try toManifest(state).json.object ?? [:]
+        var inverse: [String: JSONValue] = [:]
+        for field in patch.keys where WORLD_PATCH_KEYS.contains(field) {
+            if ["tours", "creations", "ambience"].contains(field) {
+                inverse[field] = now[field] ?? .array([])
+            } else {
+                inverse[field] = now[field] ?? .null
+            }
+        }
+        return .object(["ModifyWorld": .object(["patch": .object(inverse)])])
 
     case "SetAmbience":
         return .object(["SetAmbience": .object(["ambience": .array(state.ambience)])])

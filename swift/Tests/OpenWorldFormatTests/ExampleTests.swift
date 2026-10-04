@@ -11,7 +11,8 @@ final class DropTests: XCTestCase {
 
     func testTheDropTestPackageFoldsOneEditEverythingElseIsHistory() throws {
         let package = try WorldPackage(directory: drop)
-        XCTAssertEqual(package.manifest.entities.count, 6)
+        XCTAssertEqual(package.base.entities.count, 6)
+        XCTAssertEqual(package.manifest.entities.count, 7, "the head is the fold to main")
         let state = try package.folded()
         XCTAssertEqual(state.appliedEdits, 1)
         XCTAssertTrue(state.entities.contains { $0.name == "ball_late" })
@@ -32,7 +33,7 @@ final class SpeedrunForkTests: XCTestCase {
 
     func testAChallengeChainIsAHistoryTwoRunsForkOneCourse() throws {
         let package = try WorldPackage(directory: forkDir)
-        let forkManifest = package.manifest
+        let forkManifest = package.base
         let forkEntries = package.entries
 
         let history = try buildHistory(forkEntries)

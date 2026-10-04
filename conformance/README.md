@@ -34,6 +34,19 @@ The reference solver runs them in CI (`npm test` in `js/`).
 Each world is a complete `manifest.json` — also valid base worlds for
 session tests. License: Apache-2.0, from the LocalGPT conformance suite.
 
+## Rules every reference runs
+
+Beyond rendering, two rules hold for the documents themselves
+([spec/session.md](../spec/session.md), [spec/package.md](../spec/package.md)):
+
+- **The fold is total.** Every world here, and every example package's
+  base and head, folds with an empty log back to itself — up to names
+  bound to ids, entity order, absent-versus-`null`, numbers by value,
+  and `next_entity_id` at its effective value.
+- **Head-first.** Every example package's `manifest.json` is the fold of
+  its log over `snapshots/base.json` to `main`, `package.json` names its
+  bytes in `world_sha256`, and it is in canonical text.
+
 ## Adding a case
 
 Spec changes that alter what a renderer draws require new or changed

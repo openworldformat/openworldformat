@@ -10,7 +10,7 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class InverseTests {
-    private val base = parseManifest(readResource("examples/hello-world/manifest.json"))
+    private val base = parseManifest(readResource("examples/hello-world/snapshots/base.json"))
 
     @Test
     fun aSpawnInversesToDelete() {
@@ -84,7 +84,7 @@ class InverseTests {
     }
 
     @Test
-    fun settingsInverseToTheirPreviousValueOrTheEmptyForm() {
+    fun settingsInverseToTheirPreviousValueOrClear() {
         // Environment: the fold holds one (the example's) — the inverse
         // restores it; cleared, it inverses to the empty object.
         val state = foldLog(base, emptyList())
@@ -93,25 +93,22 @@ class InverseTests {
             state.environment?.toJson(),
             env.obj!!["SetEnvironment"]!!.obj!!["env"],
         )
+        // A setting that didn't exist comes back as absent: ModifyWorld clears it.
         val cleared = foldLog(base, listOf(entryOf("""[{"SetEnvironment": {"env": null}}]""")))
         assertEquals(
-            json("{}"),
-            computeInverse(json("""{"SetEnvironment": {"env": {}}}"""), cleared).obj!!["SetEnvironment"]!!.obj!!["env"],
+            json("""{"ModifyWorld": {"patch": {"environment": null}}}"""),
+            computeInverse(json("""{"SetEnvironment": {"env": {}}}"""), cleared),
         )
 
         // Camera: previous, or the format defaults.
         val cam = computeInverse(json("""{"SetCamera": {"camera": {"fov_degrees": 70}}}"""), state)
         assertEquals(state.camera?.toJson(), cam.obj!!["SetCamera"]!!.obj!!["camera"])
-        val defaultCam = computeInverse(
-            json("""{"SetCamera": {"camera": {}}}"""),
-            foldLog(base, listOf(entryOf("""[{"SetCamera": {"camera": null}}]"""))),
-        ).obj!!["SetCamera"]!!.obj!!["camera"]!!
-        assertEquals(json("""[5, 5, 5]"""), defaultCam.obj!!["position"])
-        assertEquals(json("""[0, 0, 0]"""), defaultCam.obj!!["look_at"])
-        assertEquals(json("45"), defaultCam.obj!!["fov_degrees"])
         assertEquals(
-            json("""{"position": [5, 5, 5], "look_at": [0, 0, 0], "fov_degrees": 45}"""),
-            defaultCam,
+            json("""{"ModifyWorld": {"patch": {"camera": null}}}"""),
+            computeInverse(
+                json("""{"SetCamera": {"camera": {}}}"""),
+                foldLog(base, listOf(entryOf("""[{"SetCamera": {"camera": null}}]"""))),
+            ),
         )
 
         // Ambience: previous, or the empty list.

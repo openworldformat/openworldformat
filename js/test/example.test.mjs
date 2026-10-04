@@ -9,7 +9,7 @@ import { simulatePhysics, foldTrajectories } from "../src/physics.js";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const dir = path.join(root, "examples/the-drop-test");
-const manifestText = readFileSync(path.join(dir, "manifest.json"), "utf8");
+const manifestText = readFileSync(path.join(dir, "snapshots/base.json"), "utf8");
 const logText = readFileSync(path.join(dir, "ops.jsonl"), "utf8");
 const entries = logText.split("\n").filter((l) => l.trim() !== "").map(parseLogLine);
 
@@ -58,7 +58,7 @@ test("semantic replay: re-simulating the fold reproduces the recorded run", () =
 // ------------------------------------------------------- speedrun-fork
 
 const forkDir = path.join(root, "examples/speedrun-fork");
-const forkManifest = parseManifest(readFileSync(path.join(forkDir, "manifest.json"), "utf8"));
+const forkManifest = parseManifest(readFileSync(path.join(forkDir, "snapshots/base.json"), "utf8"));
 const forkEntries = readFileSync(path.join(forkDir, "ops.jsonl"), "utf8")
   .split("\n").filter((l) => l.trim() !== "").map(parseLogLine);
 

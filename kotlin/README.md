@@ -42,7 +42,7 @@ for (entity in state.entities) {
 
 // Branches: the same log, a different tip.
 val history = pkg.history()       // tips, children
-val variant = foldPath(pkg.manifest, pkg.entries, tip = "e5")
+val variant = foldPath(pkg.base, pkg.entries, tip = "e5")
 
 // Save-game state: typed fields, folded over the declaration.
 val values = pkg.stateValues().values   // ["score.tour" to 1]
@@ -51,10 +51,17 @@ val values = pkg.stateValues().values   // ["score.tour" to 1]
 Piece by piece, if a package is more than folders for you:
 
 ```kotlin
-val manifest = parseManifest(manifestText)
+val base = parseManifest(baseText)       // snapshots/base.json
 val entries = logText.split('\n').filter { it.isNotBlank() }.map(::parseLogLine)
-val world = foldLog(manifest, entries)   // the world at head
+val world = foldLog(base, entries)       // the world at head
+val same = toManifest(world)             // a whole manifest again
 ```
+
+`pkg.manifest` is the world now — a head-first package's
+`manifest.json`, all a viewer needs; `pkg.base` is `snapshots/base.json`,
+what the log folds from. The fold is total (`toManifest`), `ModifyWorld`
+applies and inverts, `compactWorldPackage` moves the base up to the head,
+and an entry's `message` is part of its identity (spec draft 0.3).
 
 On Android, content-URI sources go through the app's own copy layer,
 then the same `loadWorldPackage(File)`.

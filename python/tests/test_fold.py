@@ -18,7 +18,7 @@ from openworldformat import (
 
 ROOT = Path(__file__).resolve().parents[2]
 HELLO = ROOT / "examples" / "hello-world"
-manifest_text = (HELLO / "manifest.json").read_text()
+manifest_text = (HELLO / "snapshots" / "base.json").read_text()
 log_text = (HELLO / "ops.jsonl").read_text()
 entries = [parse_log_line(line) for line in log_text.splitlines() if line.strip()]
 
@@ -151,7 +151,7 @@ class FoldTest(unittest.TestCase):
 
     def test_a_forked_history_folds_per_tip_same_prefix_different_worlds(self):
         forked = ROOT / "examples" / "forked-exploration"
-        manifest = parse_manifest((forked / "manifest.json").read_text())
+        manifest = parse_manifest((forked / "snapshots" / "base.json").read_text())
         entries_ = [
             parse_log_line(line)
             for line in (forked / "ops.jsonl").read_text().splitlines() if line.strip()

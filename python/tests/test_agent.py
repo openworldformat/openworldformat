@@ -13,7 +13,7 @@ HELLO = ROOT / "examples" / "hello-world"
 
 class TemplateAgentTest(unittest.TestCase):
     def setUp(self):
-        self.manifest = parse_manifest((HELLO / "manifest.json").read_text())
+        self.manifest = parse_manifest((HELLO / "snapshots" / "base.json").read_text())
         self.state_doc = json.loads((HELLO / "state.json").read_text())
 
     def test_the_template_solves_a_task_it_understands(self):

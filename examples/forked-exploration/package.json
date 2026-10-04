@@ -1,5 +1,5 @@
 {
-  "format_version": 1,
+  "format_version": 2,
   "name": "castle-exploration",
   "profiles": [
     "viewer",
@@ -13,5 +13,6 @@
   },
   "forked_from": null,
   "seed": null,
-  "updated_ms": 1790000000500
+  "updated_ms": 1790000000500,
+  "world_sha256": "b6ee3b5744f9e8dbe8a4ff4b77265459dd0617ade113855fd66c5ea74312c256"
 }

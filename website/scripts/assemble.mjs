@@ -24,7 +24,7 @@ for (const world of worlds) {
 }
 await cp(path.join(repo, 'conformance/assets/textures'), path.join(root, 'static/conformance/assets/textures'), { recursive: true });
 
-// The example package's manifest, folded nowhere — the Viewer-profile demo.
+// The example package's manifest — its head, which a viewer reads as is.
 await cp(
   path.join(repo, 'examples/hello-world/manifest.json'),
   path.join(root, 'static/conformance/hello-world.json'),

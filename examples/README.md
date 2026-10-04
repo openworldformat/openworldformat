@@ -10,6 +10,9 @@ Each directory is a complete `.world` package (or will be — see each one's
 | `the-drop-test/` | the first package using the `ext-physics` extension: declared bodies, a collision trigger scoring through a state op, and the recorded run — a trajectory op any device can scrub without a solver, plus the outcome the contact produced |
 | `speedrun-fork/` | the first package whose log writes branches: one course, two recorded runs (sampled input plus a timer state op each) — a challenge chain where each run is a tip, named by a ref, and `foldPath` folds the course plus either run |
 
-Zip `hello-world/` and you have the transport form; a viewer reads
-`manifest.json` alone (Viewer profile), a session implementation folds
-`ops.jsonl` over it.
+Every package is head-first (package format 2): `manifest.json` is the
+world at the tip of `main`, in canonical text, and `snapshots/base.json`
+is the state `ops.jsonl` folds from. Zip `hello-world/` and you have the
+transport form; a viewer reads `manifest.json` alone (Viewer profile), a
+session implementation folds `ops.jsonl` over the base — and reaches
+`manifest.json` again, which every reference's tests check.

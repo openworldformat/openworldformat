@@ -121,6 +121,7 @@ jobs:
         run: |
           npx -y ajv-cli@5 validate -s schema/world.schema.json \
             -d "conformance/*.json" -d "examples/*/manifest.json" \
+            -d "examples/*/snapshots/base.json" \
             --spec=draft2020 --strict=false
           npx -y ajv-cli@5 validate -s schema/state.schema.json \
             -d "examples/*/state.json" \

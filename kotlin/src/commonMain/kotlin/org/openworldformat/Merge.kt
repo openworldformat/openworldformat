@@ -76,6 +76,7 @@ fun mergeBranch(state: FoldState, entries: List<LogEntry>): MergeBranchResult {
             ops = entry.ops.map { rewriteMergeOp(it, remap) },
             id = entry.id,
             parent = entry.parent,
+            message = entry.message,
         )
     }
     return MergeBranchResult(rewritten, remap)

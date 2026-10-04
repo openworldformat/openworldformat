@@ -6,8 +6,11 @@ worlds — the scene, the history that built it, and what happened in it.**
 A `.world` is a folder (a zip is its transport form) that holds a world
 document, a typed state document, an append-only session log, and
 content-addressed assets. State at any revision is a pure fold of the log
-over the base. That one invariant gives you rendering, editing,
-multiplayer, undo, save games, replays and mods as reads over one history.
+over the base, and `manifest.json` is that fold at the head, written
+down. That one invariant gives you rendering, editing, multiplayer, undo,
+save games, replays and mods as reads over one history — and lets an
+agent change a world from outside the app that shows it, through ops one
+authority checks and commits.
 
 It is the layer **above** glTF, not a competitor to it: meshes stay glTF
 leaves, referenced by content hash. glTF owns transport; `.world` owns
@@ -16,7 +19,8 @@ sessions.
 
 ## Status
 
-Draft 0.2, describing schema version 3. The schema, the conformance
+Draft 0.3, describing schema version 3 and package format 2
+(head-first). The schema, the conformance
 worlds and a reference fold implementation are in this repository and
 tested in CI; two renderers (Bevy, three.js) already draw the conformance
 suite in the format's origin project. Expect churn until 1.0; the
@@ -44,12 +48,21 @@ npm install openworldformat
 ```
 
 ```js
-import { parseManifest, parseLog, foldLog } from "openworldformat";
+import { parseManifest, parseLogLine, foldLog, toManifest, ingest } from "openworldformat";
 
-const manifest = parseManifest(await fs.readFile("examples/hello-world/manifest.json", "utf8"));
+// The world now: manifest.json is the head. A viewer stops here.
+const world = parseManifest(await fs.readFile("examples/hello-world/manifest.json", "utf8"));
+
+// Its history: the log folds over the base back to the same world.
+const base = parseManifest(await fs.readFile("examples/hello-world/snapshots/base.json", "utf8"));
 const entries = (await fs.readFile("examples/hello-world/ops.jsonl", "utf8"))
-  .split("\n").filter(Boolean).map(parseLog);
-const world = foldLog(manifest, entries); // the world at head revision
+  .split("\n").filter(Boolean).map(parseLogLine);
+const head = toManifest(foldLog(base, entries)); // the same world as `world`
+
+// Authoring: a batch by name, partial patches merged, refused whole on any error.
+const done = ingest(foldLog(world, []), [
+  { ModifyEntity: { id: "lantern", patch: { transform: { position: [-12, 0.5, 3] } } } },
+]);
 ```
 
 The same fold, for benchmarks and notebooks: `pip install

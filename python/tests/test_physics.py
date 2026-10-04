@@ -34,7 +34,7 @@ class FoldTest(unittest.TestCase):
         # Not a plain string key with non-object value, not an edit.
         self.assertEqual(classify_op({"ext-physics": "nope"})["kind"], "unknown")
 
-        manifest = parse_manifest((ROOT / "examples" / "hello-world" / "manifest.json").read_text())
+        manifest = parse_manifest((ROOT / "examples" / "hello-world" / "snapshots" / "base.json").read_text())
         before = len(fold_log(manifest, [])["entities"])
         state = fold_log(manifest, [
             entry_of([{"ext-physics": {"t_s": [0.0, 0.1], "bodies": {"ball": [[0, 5, 0], [0, 4.95, 0]]}}}]),

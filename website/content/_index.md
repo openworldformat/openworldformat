@@ -40,17 +40,27 @@ npm install openworldformat
 ```
 
 ```js
-import { parseManifest, parseLogLine, foldLog } from "openworldformat";
+import { parseManifest, parseLogLine, foldLog, toManifest } from "openworldformat";
 
-const manifest = parseManifest(await fs.readFile("world/manifest.json", "utf8"));
+// manifest.json is the world now — a viewer needs nothing else.
+const world = parseManifest(await fs.readFile("world/manifest.json", "utf8"));
+
+// The history folds over snapshots/base.json back to the same world.
+const base = parseManifest(await fs.readFile("world/snapshots/base.json", "utf8"));
 const entries = (await fs.readFile("world/ops.jsonl", "utf8"))
   .split("\n").filter(Boolean).map(parseLogLine);
-const state = foldLog(manifest, entries); // the world at head revision
+const head = toManifest(foldLog(base, entries)); // the same world
 ```
+
+Agents change a world from outside the app that shows it: they send
+batches of edit ops to the package's one authority, which binds names,
+merges partial patches, reads strictly and commits all or nothing
+([the session log](spec/session/), "Authoring").
 
 ## Status
 
-Draft 0.1, describing manifest schema version 3. The schema, the
+Draft 0.3, describing manifest schema version 3 and package format 2
+(head-first). The schema, the
 conformance suite and a reference fold implementation are in the
 [repository](https://github.com/openworldformat/openworldformat), tested
 in CI. Expect churn until 1.0; the

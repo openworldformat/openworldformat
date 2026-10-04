@@ -1,0 +1,42 @@
+{
+  "version": 3,
+  "meta": {
+    "name": "speedrun-fork",
+    "description": "A challenge chain: one course, two recorded runs, one fork each — the first package whose log writes branches. Each run is a tip (sampled input plus a timer state op); foldPath folds the course plus either run, and the challenge chain is the history itself.",
+    "tags": ["example", "branching", "replay"]
+  },
+  "environment": {
+    "background_color": [0.07, 0.09, 0.13, 1.0],
+    "ambient_intensity": 260.0
+  },
+  "camera": { "position": [0.0, 6.0, 16.0], "look_at": [0.0, 1.0, -2.0], "fov_degrees": 55.0 },
+  "avatar": { "height": 1.8, "movement_speed": 6.0, "spawn_position": [0.0, 0.1, 6.0], "spawn_look_at": [0.0, 1.5, -2.0] },
+  "entities": [
+    { "id": 1, "name": "ground",
+      "shape": { "Plane": { "x": 30.0, "z": 30.0 } },
+      "material": { "color": [0.22, 0.24, 0.28, 1.0], "roughness": 0.95 } },
+    { "id": 2, "name": "sun", "transform": { "position": [5.0, 18.0, 6.0] },
+      "light": { "light_type": "directional", "color": [1.0, 0.97, 0.9, 1.0], "intensity": 12000.0, "direction": [-0.3, -1.0, -0.4] } },
+    { "id": 10, "name": "start_pad", "transform": { "position": [0.0, 0.05, 6.0] },
+      "shape": { "Cylinder": { "radius": 1.2, "height": 0.1 } },
+      "material": { "color": [0.3, 0.7, 0.4, 1.0] } },
+    { "id": 11, "name": "platform_one", "transform": { "position": [0.0, 0.9, 1.0] },
+      "shape": { "Cuboid": { "x": 2.4, "y": 0.3, "z": 2.4 } },
+      "material": { "color": [0.45, 0.5, 0.58, 1.0] } },
+    { "id": 12, "name": "platform_two", "transform": { "position": [2.5, 1.8, -2.0] },
+      "shape": { "Cuboid": { "x": 2.0, "y": 0.3, "z": 2.0 } },
+      "material": { "color": [0.45, 0.5, 0.58, 1.0] } },
+    { "id": 13, "name": "platform_three", "transform": { "position": [-1.5, 2.7, -4.5] },
+      "shape": { "Cuboid": { "x": 2.0, "y": 0.3, "z": 2.0 } },
+      "material": { "color": [0.45, 0.5, 0.58, 1.0] } },
+    { "id": 14, "name": "goal", "transform": { "position": [-1.5, 3.4, -7.0] },
+      "shape": { "Cylinder": { "radius": 1.0, "height": 0.1 } },
+      "material": { "color": [0.9, 0.75, 0.2, 1.0], "emissive": [1.2, 0.9, 0.2, 1.0] },
+      "triggers": [
+        { "on": { "event": "area_enter", "volume": { "shape": "sphere", "radius": 1.6 } },
+          "action": { "action": "host", "name": "stop_timer", "args": { "run": "default" } }, "once": true },
+        { "on": { "event": "area_enter", "volume": { "shape": "sphere", "radius": 1.6 } },
+          "action": { "action": "show_text", "text": "Goal!" }, "once": true } ] }
+  ],
+  "next_entity_id": 15
+}

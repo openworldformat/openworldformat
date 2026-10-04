@@ -23,3 +23,12 @@ Additionally, `meta.prompt` (or its equivalent in `ext-provenance`) carries what
 ## 3. Authenticity and Identity
 
 The session log tracks operations via the `author` field, but this is an unauthenticated free-form object. While the package integrity hashes (`log_sha256`) prove the file hasn't been altered since the hash was generated, they do not prove *who* wrote it. Implementations MUST NOT rely on the `author` field for security or authorization decisions unless an external cryptographic layer (e.g., signed commits, multiplayer server authority) validates the identity.
+
+## 4. Live Authoring Surfaces
+
+An authority that serves a local API for authors ([the package](package.md), "The live folder") opens a door into the user's machine:
+
+- **Bind to loopback only** and **require the token** from `.live/endpoint.json` on every call. A web page in the user's browser can send requests to `localhost`; the token, readable only by processes that can read the package folder, is what keeps a page from editing the world.
+- **`.live/` is never transported**: exports, zips and git exclude it. An endpoint file that travels hands its token to whoever receives the package.
+- **Ingestion is a loader too.** Asset paths in a batch are checked as the package's are (no absolute paths, nothing that leaves `assets/`), with a size bound, before anything is stored.
+- **An author is not authenticated by its name.** A batch's `author` is what the sender says, as everywhere in the log (section 3).

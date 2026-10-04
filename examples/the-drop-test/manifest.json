@@ -1,42 +1,183 @@
 {
-  "version": 3,
+  "camera": {
+    "fov_degrees": 50,
+    "look_at": [1, 1, 0],
+    "position": [7, 4, 11]
+  },
+  "entities": [
+    {
+      "ext-physics": {
+        "body": "static"
+      },
+      "id": 1,
+      "material": {
+        "color": [0.28, 0.3, 0.34, 1],
+        "roughness": 0.95
+      },
+      "name": "ground",
+      "shape": {
+        "Plane": {
+          "x": 40,
+          "z": 40
+        }
+      }
+    },
+    {
+      "id": 2,
+      "light": {
+        "color": [1, 0.96, 0.88, 1],
+        "direction": [-0.4, -1, -0.3],
+        "intensity": 12000,
+        "light_type": "directional"
+      },
+      "name": "sun",
+      "transform": {
+        "position": [8, 16, 5]
+      }
+    },
+    {
+      "ext-physics": {
+        "body": "static"
+      },
+      "id": 3,
+      "material": {
+        "color": [0.5, 0.55, 0.62, 1],
+        "roughness": 0.5
+      },
+      "name": "switch_pad",
+      "shape": {
+        "Cuboid": {
+          "x": 2,
+          "y": 0.6,
+          "z": 2
+        }
+      },
+      "transform": {
+        "position": [0, 0.3, 0]
+      },
+      "triggers": [
+        {
+          "action": {
+            "action": "host",
+            "args": {
+              "amount": 10,
+              "field": "score.switch"
+            },
+            "name": "add_score"
+          },
+          "on": {
+            "event": "collision"
+          },
+          "once": true
+        }
+      ]
+    },
+    {
+      "ext-physics": {
+        "body": "dynamic",
+        "collider": "shape",
+        "friction": 0.4,
+        "mass": 2,
+        "restitution": 0.45
+      },
+      "id": 4,
+      "material": {
+        "color": [0.9, 0.55, 0.15, 1],
+        "roughness": 0.4
+      },
+      "name": "ball",
+      "shape": {
+        "Sphere": {
+          "radius": 0.3
+        }
+      },
+      "transform": {
+        "position": [0, 4, 0]
+      }
+    },
+    {
+      "ext-physics": {
+        "body": "dynamic",
+        "collider": "shape",
+        "friction": 0.05,
+        "mass": 0.5,
+        "restitution": 0.8
+      },
+      "id": 5,
+      "material": {
+        "color": [0.2, 0.75, 0.5, 1],
+        "roughness": 0.3
+      },
+      "name": "bouncy",
+      "shape": {
+        "Sphere": {
+          "radius": 0.25
+        }
+      },
+      "transform": {
+        "position": [3, 2.5, 0]
+      }
+    },
+    {
+      "ext-physics": {
+        "body": "dynamic",
+        "collider": "shape",
+        "friction": 0.6,
+        "gravity_scale": 0.35,
+        "linear_damping": 1.2,
+        "mass": 0.1,
+        "restitution": 0.1
+      },
+      "id": 6,
+      "material": {
+        "color": [0.85, 0.85, 0.9, 1],
+        "roughness": 0.8
+      },
+      "name": "feather",
+      "shape": {
+        "Sphere": {
+          "radius": 0.2
+        }
+      },
+      "transform": {
+        "position": [-3, 4, 0]
+      }
+    },
+    {
+      "ext-physics": {
+        "body": "dynamic",
+        "collider": "shape",
+        "friction": 0.3,
+        "mass": 3,
+        "restitution": 0.6
+      },
+      "id": 7,
+      "material": {
+        "color": [0.6, 0.3, 0.8, 1]
+      },
+      "name": "ball_late",
+      "shape": {
+        "Sphere": {
+          "radius": 0.35
+        }
+      },
+      "transform": {
+        "position": [6, 5, 0]
+      }
+    }
+  ],
+  "environment": {
+    "ambient_intensity": 220,
+    "background_color": [0.09, 0.11, 0.16, 1],
+    "ext-physics": {
+      "gravity": [0, -9.81, 0]
+    }
+  },
   "meta": {
-    "name": "the-drop-test",
     "description": "The first package shipped using the ext-physics extension: three balls dropped with different restitution and gravity scale, a switch pad that scores on contact, and a fourth ball spawned mid-session. The log records the run the reference solver simulated — a trajectory op any device can scrub without a solver.",
+    "name": "the-drop-test",
     "tags": ["example", "physics"]
   },
-  "environment": {
-    "background_color": [0.09, 0.11, 0.16, 1.0],
-    "ambient_intensity": 220.0,
-    "ext-physics": { "gravity": [0.0, -9.81, 0.0] }
-  },
-  "camera": { "position": [7.0, 4.0, 11.0], "look_at": [1.0, 1.0, 0.0], "fov_degrees": 50.0 },
-  "entities": [
-    { "id": 1, "name": "ground",
-      "shape": { "Plane": { "x": 40.0, "z": 40.0 } },
-      "material": { "color": [0.28, 0.3, 0.34, 1.0], "roughness": 0.95 },
-      "ext-physics": { "body": "static" } },
-    { "id": 2, "name": "sun", "transform": { "position": [8.0, 16.0, 5.0] },
-      "light": { "light_type": "directional", "color": [1.0, 0.96, 0.88, 1.0], "intensity": 12000.0, "direction": [-0.4, -1.0, -0.3] } },
-    { "id": 3, "name": "switch_pad", "transform": { "position": [0.0, 0.3, 0.0] },
-      "shape": { "Cuboid": { "x": 2.0, "y": 0.6, "z": 2.0 } },
-      "material": { "color": [0.5, 0.55, 0.62, 1.0], "roughness": 0.5 },
-      "ext-physics": { "body": "static" },
-      "triggers": [
-        { "on": { "event": "collision" },
-          "action": { "action": "host", "name": "add_score", "args": { "field": "score.switch", "amount": 10 } }, "once": true } ] },
-    { "id": 4, "name": "ball", "transform": { "position": [0.0, 4.0, 0.0] },
-      "shape": { "Sphere": { "radius": 0.3 } },
-      "material": { "color": [0.9, 0.55, 0.15, 1.0], "roughness": 0.4 },
-      "ext-physics": { "body": "dynamic", "mass": 2.0, "collider": "shape", "restitution": 0.45, "friction": 0.4 } },
-    { "id": 5, "name": "bouncy", "transform": { "position": [3.0, 2.5, 0.0] },
-      "shape": { "Sphere": { "radius": 0.25 } },
-      "material": { "color": [0.2, 0.75, 0.5, 1.0], "roughness": 0.3 },
-      "ext-physics": { "body": "dynamic", "mass": 0.5, "collider": "shape", "restitution": 0.8, "friction": 0.05 } },
-    { "id": 6, "name": "feather", "transform": { "position": [-3.0, 4.0, 0.0] },
-      "shape": { "Sphere": { "radius": 0.2 } },
-      "material": { "color": [0.85, 0.85, 0.9, 1.0], "roughness": 0.8 },
-      "ext-physics": { "body": "dynamic", "mass": 0.1, "collider": "shape", "restitution": 0.1, "friction": 0.6, "gravity_scale": 0.35, "linear_damping": 1.2 } }
-  ],
-  "next_entity_id": 7
+  "next_entity_id": 8,
+  "version": 3
 }

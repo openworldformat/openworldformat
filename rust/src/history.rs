@@ -44,12 +44,18 @@ pub enum EditOp {
     SpawnAudioEmitter { name: String, audio: AudioDef },
     /// Remove an audio emitter by name.
     RemoveAudioEmitter { name: String, audio: AudioDef },
+    /// Change the world's scene-wide fields (meta, environment, camera,
+    /// avatar, tours, soundtrack, ambience, creations): absent leaves a
+    /// field alone, `null` clears it, a value sets it.
+    ModifyWorld {
+        patch: Box<crate::world_patch::WorldPatch>,
+    },
     /// A batch of atomic operations (all-or-nothing).
     Batch { ops: Vec<EditOp> },
 }
 
 /// A single ambient audio layer.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct AmbienceLayerDef {
     /// Layer name (e.g., "wind", "rain").
@@ -116,11 +122,30 @@ impl EditOp {
                 let current = doc.get(id.0).ok_or(ApplyError::MissingEntity(id.0))?;
                 Ok(EditOp::modify(*id, inverse_patch(patch, current)))
             }
-            EditOp::SetEnvironment { .. } => Ok(EditOp::SetEnvironment {
-                env: doc.environment.clone().unwrap_or_default(),
+            // A scene setting that didn't exist comes back as absent,
+            // not as a default one.
+            EditOp::SetEnvironment { .. } => Ok(match &doc.environment {
+                Some(env) => EditOp::SetEnvironment { env: env.clone() },
+                None => EditOp::ModifyWorld {
+                    patch: Box::new(crate::world_patch::WorldPatch {
+                        environment: Some(None),
+                        ..Default::default()
+                    }),
+                },
             }),
-            EditOp::SetCamera { .. } => Ok(EditOp::SetCamera {
-                camera: doc.camera.clone().unwrap_or_default(),
+            EditOp::SetCamera { .. } => Ok(match &doc.camera {
+                Some(camera) => EditOp::SetCamera {
+                    camera: camera.clone(),
+                },
+                None => EditOp::ModifyWorld {
+                    patch: Box::new(crate::world_patch::WorldPatch {
+                        camera: Some(None),
+                        ..Default::default()
+                    }),
+                },
+            }),
+            EditOp::ModifyWorld { patch } => Ok(EditOp::ModifyWorld {
+                patch: Box::new(inverse_world_patch(patch, doc)),
             }),
             EditOp::SetAmbience { .. } => Ok(EditOp::SetAmbience {
                 ambience: doc.ambience.clone(),
@@ -223,6 +248,25 @@ fn inverse_patch(patch: &EntityPatch, current: &WorldEntity) -> EntityPatch {
             .insert(key.clone(), current.extra.get(key).cloned());
     }
     inverse
+}
+
+/// The world patch that undoes `patch`: every field it touches set back
+/// to the document's value (cleared where the document had none).
+fn inverse_world_patch(
+    patch: &crate::world_patch::WorldPatch,
+    doc: &crate::doc::WorldDoc,
+) -> crate::world_patch::WorldPatch {
+    use crate::world_patch::WorldPatch;
+    WorldPatch {
+        meta: patch.meta.as_ref().map(|_| doc.meta()),
+        environment: patch.environment.as_ref().map(|_| doc.environment.clone()),
+        camera: patch.camera.as_ref().map(|_| doc.camera.clone()),
+        avatar: patch.avatar.as_ref().map(|_| doc.avatar.clone()),
+        tours: patch.tours.as_ref().map(|_| doc.tours.clone()),
+        soundtrack: patch.soundtrack.as_ref().map(|_| doc.soundtrack.clone()),
+        ambience: patch.ambience.as_ref().map(|_| doc.ambience.clone()),
+        creations: patch.creations.as_ref().map(|_| doc.creations.clone()),
+    }
 }
 
 /// Edit history — append-only log of world edits.

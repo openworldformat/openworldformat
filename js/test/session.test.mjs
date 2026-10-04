@@ -168,10 +168,15 @@ test("computeInverse: every kind, and the refusals", () => {
     { ModifyEntity: { id: 9, patch: { light: { light_type: "point", intensity: 800 }, shape: null, name: "e", parent: null } } },
   );
 
-  // The scene-wide sets inverse to what they replace — or the defaults.
-  assert.deepEqual(computeInverse({ SetCamera: { camera: { fov_degrees: 60 } } }, state).SetCamera.camera,
-    { position: [5, 5, 5], look_at: [0, 0, 0], fov_degrees: 45 });
-  assert.deepEqual(computeInverse({ SetEnvironment: { env: { fog_density: 0.2 } } }, state).SetEnvironment.env, {});
+  // The scene-wide sets inverse to what they replace — and a setting
+  // that didn't exist comes back as absent, through ModifyWorld.
+  assert.deepEqual(computeInverse({ SetCamera: { camera: { fov_degrees: 60 } } }, state),
+    { ModifyWorld: { patch: { camera: null } } });
+  assert.deepEqual(computeInverse({ SetEnvironment: { env: { fog_density: 0.2 } } }, state),
+    { ModifyWorld: { patch: { environment: null } } });
+  const lit = foldLog({ ...manifest, environment: { ambient_intensity: 1 } }, []);
+  assert.deepEqual(computeInverse({ SetEnvironment: { env: { fog_density: 0.2 } } }, lit),
+    { SetEnvironment: { env: { ambient_intensity: 1 } } });
   assert.deepEqual(computeInverse({ SetAmbience: { ambience: [{ Wind: {} }] } }, state).SetAmbience.ambience, []);
 
   // Audio emitters spawn and remove into each other.

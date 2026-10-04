@@ -40,14 +40,15 @@ class PackageTests {
         // A package with no package.json gets the minimal one.
         val minimal = compactPackage(JsonElementNull, 3).obj!!
         assertEquals(3, minimal["base_revision"]!!.int)
-        assertEquals(1, minimal["format_version"]!!.int)
+        assertEquals(SUPPORTED_FORMAT_VERSION, minimal["format_version"]!!.int)
     }
 
     private lateinit var dir: File
 
     private fun packageFolder(): File {
         dir = kotlin.io.path.createTempDirectory("owf-compact").toFile()
-        File(dir, "manifest.json").writeText(
+        File(dir, "snapshots").mkdirs()
+        File(dir, BASE_SNAPSHOT).writeText(
             """{"version": 3, "meta": {"name": "tiny"}, "entities": [{"id": 1, "name": "a"}]}"""
         )
         File(dir, "ops.jsonl").writeText(
@@ -57,8 +58,15 @@ class PackageTests {
             {"revision":2,"ops":[{"ModifyEntity":{"id":2,"patch":{"name":"b2"}}}]}
             """.trimIndent() + "\n"
         )
+        // Head-first: manifest.json is the fold of the whole log.
+        val head = WorldPackage(
+            manifestText = File(dir, BASE_SNAPSHOT).readText(),
+            logText = File(dir, "ops.jsonl").readText(),
+            baseText = File(dir, BASE_SNAPSHOT).readText(),
+        ).folded()
+        File(dir, "manifest.json").writeText(toManifest(head).toJson().toString())
         File(dir, "package.json").writeText(
-            """{"format_version": 1, "name": "tiny", "base_revision": 0, "head_revision": 2}"""
+            """{"format_version": 2, "name": "tiny", "base_revision": 0, "head_revision": 2}"""
         )
         return dir
     }
@@ -79,11 +87,12 @@ class PackageTests {
 
         val written = compactWorldPackage(dir, headRevision = 2)
 
-        // The new base holds the folded entities, parents inline.
+        // The new base is the head: the folded entities, parents inline.
         assertEquals("tiny", written["meta"]!!.obj!!["name"]!!.str)
         val entities = written["entities"]!!.arr!!.map { WorldEntity(it) }
         assertEquals(listOf(1, 2), entities.map { it.id })
         assertEquals(3, written["next_entity_id"]!!.int)
+        assertEquals(File(dir, "manifest.json").readText(), File(dir, BASE_SNAPSHOT).readText())
 
         // The file moves.
         assertTrue(File(dir, "ops.archive.jsonl").exists(), "the old log archives")

@@ -8,7 +8,11 @@ for in the format's lineage.
 - `manifest.json`'s `version` — the **schema version** of the world
   document (currently 3). It gates parsing.
 - `package.json`'s `format_version` — the **package format** (folder
-  layout, metadata, log entry envelope). Currently 1.
+  layout, metadata, log entry envelope). Currently 2: version 2 is
+  head-first — `manifest.json` became the world now and the base moved to
+  `snapshots/base.json` — which changes what a version-1 reader would
+  draw, so it is a new version rather than an optional field
+  ([the package](package.md)).
 
 ## Rules
 

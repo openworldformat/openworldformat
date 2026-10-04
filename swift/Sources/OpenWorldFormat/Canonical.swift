@@ -110,6 +110,7 @@ func entryObject(_ entry: LogEntry, includeId: Bool) -> JSONValue {
     o["ops"] = .array(entry.ops)
     if includeId, let id = entry.id { o["id"] = .string(id) }
     if let parent = entry.parent { o["parent"] = .string(parent) }
+    if let message = entry.message { o["message"] = .string(message) }
     return .object(o)
 }
 

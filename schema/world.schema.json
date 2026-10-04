@@ -4,6 +4,13 @@
   "description": "Top-level world manifest — everything needed to save/load a world.\n\nConventions every renderer follows (Bevy through `localgpt-world-bevy`,\nthree.js through the web viewer):\n\n- positions are world units, Y up;\n- rotations are XYZ Euler angles in degrees;\n- colours are RGBA in `0..=1`, sRGB-encoded, except `emissive`, which is\n  linear (values above 1 glow);\n- directional light intensity is lux, point and spot lights are lumens,\n  spot angles are radians;\n- asset paths are relative to the world's `assets/` folder.\n\nThe format names no engine: which renderer or engine version drew a\nworld is not part of it.",
   "type": "object",
   "properties": {
+    "ambience": {
+      "description": "The ambient soundscape: layered procedural or sampled sound with\nno position. `SetAmbience` replaces it; it is part of the\ndocument so the fold's state is always a manifest.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/AmbienceLayerDef"
+      }
+    },
     "avatar": {
       "description": "Avatar configuration.",
       "anyOf": [
@@ -117,6 +124,30 @@
             "mask"
           ]
         }
+      ]
+    },
+    "AmbienceLayerDef": {
+      "description": "A single ambient audio layer.",
+      "type": "object",
+      "properties": {
+        "name": {
+          "description": "Layer name (e.g., \"wind\", \"rain\").",
+          "type": "string"
+        },
+        "source": {
+          "description": "The sound source.",
+          "$ref": "#/$defs/AudioSource"
+        },
+        "volume": {
+          "description": "Volume (0.0–1.0).",
+          "type": "number",
+          "format": "float"
+        }
+      },
+      "required": [
+        "name",
+        "source",
+        "volume"
       ]
     },
     "AudioDef": {

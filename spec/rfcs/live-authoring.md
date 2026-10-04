@@ -1,10 +1,14 @@
 # RFC: Live authoring — agents outside, ops in, the world in front
 
-**Status:** proposed. Nothing here is normative yet. A proof of concept
-exists in LocalGPT (branch `poc/live-editing`; see *Evidence*), one
-implementer, so every mechanism below still has to earn its second, per
-[CONTRIBUTING](../../CONTRIBUTING.md). Draft 0.x: this RFC breaks
-compatibility on purpose where noted, and says so.
+**Status:** accepted for draft 0.3. The normative text lives in
+[the package](../package.md) (head-first, canonical text, assets, git,
+the live folder), [the session log](../session.md) (`ModifyWorld`, the
+total fold, authoring, the entry `message`), [profiles](../profiles.md)
+(the Authoring profile) and [security](../security.md) (live authoring
+surfaces); where this note and those pages differ, the pages win. All
+five references implement the fold side and pass the new conformance
+rules; Rust and JS implement authoring. Draft 0.x: this breaks
+compatibility on purpose (package format 2), and says so.
 
 ## The problem
 
@@ -107,7 +111,7 @@ that already holds the batch's earlier ops:
    reply reports it). Ids stay numeric in the committed log.
 2. **Merge.** In `ModifyEntity` patches, object-valued struct fields
    (`transform`, `material`, `light`) merge into the entity's current
-   value as a JSON merge patch (RFC 7386): present keys replace, `null`
+   value as a JSON merge patch (RFC 7396): present keys replace, `null`
    removes, absent keys keep. `SetEnvironment` merges the same way. The
    *committed* op carries the full merged value, so the log needs no new
    semantics to replay. Enum-valued fields (`shape`) still replace.
@@ -184,10 +188,19 @@ What git does **not** do, and stays the format's:
   field (and reallocates ids allocated concurrently, as
   `merge_branch` does); this RFC names the need, not the driver.
 
-Open choice: inside git, the hash-named asset copies duplicate what git
-already versions. Keeping them keeps a single revision verifiable
-outside git (a zip of the working tree); dropping them keeps asset names
-human. One answer is needed before this leaves *proposed*.
+Decided (review, before acceptance): inside git, git versions asset
+bytes — references may use logical names, and hash-named copies are for
+packages without git and for exports, which rewrite references to them
+so a zip of one revision still verifies. Copying assets by hash inside a
+repository would only duplicate git's own object store.
+
+Also decided: an authority that sees `manifest.json` change to bytes
+`package.json` names treats it as a checkout and reopens — a `git
+checkout` or pull under an open app is not a direct write. Only other
+writes are refused, and an authority may make `manifest.json` read-only
+so they fail at once. Before any semantic merge driver, the canonical
+text (members sorted, entities by id, plain arrays inline) keeps
+ordinary textual merges clean in most cases; a driver stays open.
 
 ## 5. Replay from keyframes
 
@@ -274,14 +287,12 @@ Gaps it hit, which this RFC answers: partial patches resetting fields
 
 ## Open questions
 
-- Hash-named asset copies versus git-versioned working names (§4).
-- The semantic merge driver: in the spec, or a reference tool.
-- Whether names may stay in the committed log (no; this RFC binds them),
-  and whether ids should become collision-free strings for branch-heavy
-  work.
+- The semantic merge driver for git: in the spec, or a reference tool —
+  after the canonical text has been tried on real merges.
+- Whether ids should become collision-free strings for branch-heavy work
+  (names bind at ingestion and committed logs carry ids — settled).
 - Redo, and per-author undo outside rooms.
-- What an authority does when the git branch is switched under it
-  (reopen, not restore).
+- The Authoring profile in the Python, Swift and Kotlin references.
 
 ## Implementation status
 
@@ -290,6 +301,16 @@ Gaps it hit, which this RFC answers: partial patches resetting fields
   `crates/gen/src/gen3d/live.rs` (`--live` canvas, HTTP API, replay from
   commits). Built on the 0.1 crate, so `ModifyWorld` is not there yet:
   scene-level fields are simply unchangeable through it.
-- **This repository:** nothing yet. Next: `ModifyWorld` and the
-  total-fold conformance rule in the Rust and JS references (they are
-  worth landing on their own), then head-first examples.
+- **This repository (draft 0.3):**
+  - all five references carry the whole document through the fold, apply
+    and invert `ModifyWorld`, clear on the inverse of a first
+    `SetEnvironment`/`SetCamera`, read head-first packages, and carry the
+    entry `message` in its identity (one golden id, five references);
+  - conformance: every conformance world and every example's base and
+    head survive an empty fold; every example's `manifest.json` is the
+    fold to `main` and is named by `world_sha256`;
+  - Rust (`authoring::ingest`, `manifest_text`) and JS (`ingest`,
+    `manifestText`) implement authoring and the canonical text, and write
+    the same bytes;
+  - the examples are head-first, in canonical text; the schema gained the
+    manifest's `ambience`.

@@ -26,16 +26,16 @@ pip install openworldformat
 
 ```python
 from pathlib import Path
-from openworldformat import parse_manifest, parse_log_line, fold_log
+from openworldformat import read_package, fold_log, to_manifest
 
-manifest = parse_manifest(Path("world/manifest.json").read_text())
-entries = [parse_log_line(line)
-           for line in Path("world/ops.jsonl").read_text().splitlines()
-           if line.strip()]
+# A head-first package: manifest.json is the world now (`head`); the log
+# folds over snapshots/base.json back to it.
+base, entries, head, package = read_package(Path("world"))
 
-state = fold_log(manifest, entries)
+state = fold_log(base, entries)
 state["entities"]       # the world at head revision
 state["applied_edits"]  # how many edits the log held
+to_manifest(state)      # the whole manifest again — the fold is total
 ```
 
 The fold applies the spec's rules: only `edit` ops change the document;
@@ -191,7 +191,9 @@ notebooks.
 | `merge_branch(state, entries)` | a branch's entries rewritten onto a main fold, colliding ids reallocated |
 | `snapshot_filename(entry_id, revision)` | where a snapshot goes: by entry id, else by revision |
 | `compact_package(package_json, head_revision)` | the package.json of a compaction |
-| `compact(world_dir, head_revision=None)` | fold a package to its head and rewrite it as the new base |
+| `read_package(world_dir)` | a head-first package: `(base, entries, head, package_json)` |
+| `to_manifest(state)` | the fold's state as a whole manifest — `to_manifest(fold_log(m, []))` is `m` again |
+| `compact(world_dir, head_revision=None)` | move the base up to the head (or a revision): `snapshots/base.json` rewritten, the entries it holds archived |
 | `ext_provenance(manifest)` | the provenance extension's five lineage fields, or None |
 
 `openworldformat.physics` mirrors the npm package's

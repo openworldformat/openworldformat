@@ -78,6 +78,14 @@ data class WorldMeta(
         }
     }
 
+    /** Back to JSON: the named fields over the passthrough. */
+    fun toJson(): JsonObject = buildJsonObject {
+        fields.forEach { (k, v) -> put(k, v) }
+        name?.let { put("name", JsonPrimitive(it)) }
+        description?.let { put("description", JsonPrimitive(it)) }
+        if (tags.isNotEmpty()) put("tags", JsonArray(tags.map(::JsonPrimitive)))
+    }
+
     /** The world's LLM lineage, when `meta["ext-provenance"]` is present. */
     val extProvenance: ExtProvenance?
         get() = ExtProvenance(fields["ext-provenance"])
@@ -206,6 +214,17 @@ data class WorldManifest(
 ) {
     /** The world's name, per `meta.name` — "" when absent. */
     val name: String get() = meta?.name ?: ""
+
+    /** Back to JSON: the typed fields over everything that rode along. */
+    fun toJson(): JsonObject = buildJsonObject {
+        fields.forEach { (k, v) -> put(k, v) }
+        put("version", JsonPrimitive(version))
+        meta?.let { put("meta", it.toJson()) }
+        environment?.let { put("environment", it.toJson()) }
+        camera?.let { put("camera", it.toJson()) }
+        if (ambience.isNotEmpty()) put("ambience", JsonArray(ambience))
+        put("entities", JsonArray(entities.map { it.toJson() }))
+    }
 
     companion object {
         operator fun invoke(json: JsonElement): WorldManifest {

@@ -13,6 +13,7 @@ package org.openworldformat
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
@@ -33,6 +34,16 @@ data class FoldState(
     val appliedEdits: Int,
     /** The entry ids folded, in order ([foldPath] only). */
     val path: List<String>? = null,
+    /** The manifest schema version the world was read at. */
+    val version: Int = SUPPORTED_SCHEMA_VERSION,
+    /** The world's metadata (its name is [name]). */
+    val meta: WorldMeta? = null,
+    /**
+     * The rest of the manifest — avatar, tours, soundtrack, creations,
+     * next_entity_id and anything this reader doesn't type — so the
+     * fold's state is always a whole manifest ([toManifest]).
+     */
+    val scene: JsonObject = JsonObject(emptyMap()),
 ) {
     /** A value copy safe to mutate speculatively. */
     internal fun copyForTrial(): FoldState = copy(
@@ -62,6 +73,9 @@ fun foldLog(manifest: WorldManifest, entries: List<LogEntry>): FoldState {
         ambience = manifest.ambience,
         audioEmitters = emptyMap(),
         appliedEdits = 0,
+        version = manifest.version,
+        meta = manifest.meta,
+        scene = sceneOf(manifest),
     )
     // The base resolves first, against the whole base: a saved world's
     // manifest may still carry name refs an author wrote.
@@ -155,6 +169,49 @@ private fun touchedEntityIds(edits: List<ClassifiedOp.Edit>): List<Int> {
 }
 
 // ---------------------------------------------------------------------------
+// The whole document
+// ---------------------------------------------------------------------------
+
+/** The manifest's untyped fields, with `next_entity_id` at its
+ *  effective value: ids are never reused, so it is at least one past
+ *  the largest. */
+internal fun sceneOf(manifest: WorldManifest): JsonObject {
+    val past = (manifest.entities.maxOfOrNull { it.id } ?: 0) + 1
+    val declared = manifest.fields["next_entity_id"]?.int ?: 1
+    return JsonObject(manifest.fields + ("next_entity_id" to JsonPrimitive(maxOf(declared, past))))
+}
+
+/**
+ * The fold's state as a manifest — the whole document. The fold is
+ * total (spec/session.md): `toManifest(foldLog(m, []))` is `m` again, up
+ * to name binding, entity order and absent-versus-default fields; a
+ * head-first package's `manifest.json` is `toManifest` of its fold to
+ * `main`.
+ */
+fun toManifest(state: FoldState): WorldManifest {
+    val past = (state.entities.maxOfOrNull { it.id } ?: 0) + 1
+    val floor = state.scene["next_entity_id"]?.int ?: 1
+    val json = buildJsonObject {
+        state.scene.forEach { (k, v) -> put(k, v) }
+        put("version", state.version)
+        put("meta", buildJsonObject {
+            state.meta?.fields?.forEach { (k, v) -> put(k, v) }
+            put("name", state.name)
+            state.meta?.description?.let { put("description", it) }
+            if (state.meta?.tags?.isNotEmpty() == true) {
+                put("tags", JsonArray(state.meta.tags.map(::JsonPrimitive)))
+            }
+        })
+        state.environment?.let { put("environment", it.toJson()) }
+        state.camera?.let { put("camera", it.toJson()) }
+        if (state.ambience.isNotEmpty()) put("ambience", JsonArray(state.ambience))
+        put("entities", JsonArray(state.entities.map { it.toJson() }))
+        put("next_entity_id", maxOf(floor, past))
+    }
+    return WorldManifest(json)
+}
+
+// ---------------------------------------------------------------------------
 // Applying one edit
 // ---------------------------------------------------------------------------
 
@@ -195,7 +252,11 @@ internal fun applyEdit(state: FoldState, edit: String, value: JsonElement): Fold
                 throw WorldFormatException.invalid(
                     "entity ${entity.id}'s parent ${entity.parent} isn't in the document")
             }
-            state.copy(entities = state.entities + entity)
+            val floor = state.scene["next_entity_id"]?.int ?: 1
+            state.copy(
+                entities = state.entities + entity,
+                scene = JsonObject(state.scene + ("next_entity_id" to JsonPrimitive(maxOf(floor, entity.id + 1)))),
+            )
         }
 
         "DeleteEntity" -> {
@@ -308,6 +369,36 @@ internal fun applyEdit(state: FoldState, edit: String, value: JsonElement): Fold
                 throw WorldFormatException.invalid("no audio emitter named '$name'")
             }
             state.copy(audioEmitters = state.audioEmitters - name)
+        }
+
+        "ModifyWorld" -> {
+            // The scene-wide fields, patched like an entity: absent
+            // unchanged, null clears, a value sets (spec/session.md).
+            val patch = value.obj?.get("patch")?.obj ?: JsonObject(emptyMap())
+            var next = state
+            patch["meta"]?.let { meta ->
+                val name = meta.obj?.get("name")?.str
+                if (name == null || name.isBlank()) {
+                    throw WorldFormatException.invalid(
+                        "ModifyWorld.meta must be a meta object with a name; it can't be cleared")
+                }
+                next = next.copy(meta = WorldMeta(meta), name = name)
+            }
+            patch["environment"]?.let { env ->
+                next = next.copy(environment = if (env.isNull) null else EnvironmentDef(env))
+            }
+            patch["camera"]?.let { camera ->
+                next = next.copy(camera = if (camera.isNull) null else CameraDef(camera))
+            }
+            patch["ambience"]?.let { ambience ->
+                next = next.copy(ambience = ambience.arr?.toList() ?: emptyList())
+            }
+            val scene = next.scene.toMutableMap()
+            for (field in listOf("avatar", "soundtrack", "tours", "creations")) {
+                val v = patch[field] ?: continue
+                if (v.isNull || v.arr?.isEmpty() == true) scene.remove(field) else scene[field] = v
+            }
+            next.copy(scene = JsonObject(scene))
         }
 
         "Batch" -> {

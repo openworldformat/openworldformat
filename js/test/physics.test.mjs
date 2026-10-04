@@ -32,7 +32,7 @@ test("extension ops classify and fold to nothing", () => {
   // Not a plain string key with non-object value, not an edit.
   assert.equal(classifyOp({ "ext-physics": "nope" }).kind, "unknown");
 
-  const manifest = parseManifest(read("examples/hello-world/manifest.json"));
+  const manifest = parseManifest(read("examples/hello-world/snapshots/base.json"));
   const before = foldLog(manifest, []).entities.length;
   const state = foldLog(manifest, [
     entry([{ "ext-physics": { t_s: [0.0, 0.1], bodies: { ball: [[0, 5, 0], [0, 4.95, 0]] } } }]),

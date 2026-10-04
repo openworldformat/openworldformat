@@ -96,7 +96,7 @@ extension WorldMeta {
 /// own properties — plus the registered `ext-*` names.
 let strictManifestKeys: Set<String> = [
     "version", "meta", "entities", "environment", "camera", "avatar",
-    "tours", "soundtrack", "creations", "next_entity_id",
+    "ambience", "tours", "soundtrack", "creations", "next_entity_id",
 ]
 
 /// Strict mode's `meta` keys.

@@ -35,7 +35,9 @@ from openworldformat import (
     op_kind_shape_ok,
     parse_log_line,
     parse_manifest,
+    read_package,
     snapshot_filename,
+    to_manifest,
 )
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -424,18 +426,17 @@ class ComputeInverseTest(unittest.TestCase):
             {"SetAmbience": {"ambience": [{"kind": "wind", "intensity": 0.4}]}},
         )
 
-    def test_scene_setters_on_a_bare_world_inverse_to_the_format_defaults(self):
+    def test_scene_setters_on_a_bare_world_inverse_to_absent(self):
+        # A setting that didn't exist comes back as absent, not as a
+        # default one: ModifyWorld clears it (spec/session.md).
         state = fold_log(mini_manifest(), [])
         self.assertEqual(compute_inverse(
             {"SetEnvironment": {"env": {}}}, state),
-            {"SetEnvironment": {"env": {}}},
+            {"ModifyWorld": {"patch": {"environment": None}}},
         )
         self.assertEqual(compute_inverse(
             {"SetCamera": {"camera": {}}}, state),
-            {"SetCamera": {"camera": {
-                "position": [5, 5, 5], "look_at": [0, 0, 0],
-                "fov_degrees": 45,
-            }}},
+            {"ModifyWorld": {"patch": {"camera": None}}},
         )
         self.assertEqual(compute_inverse(
             {"SetAmbience": {"ambience": []}}, state),
@@ -642,101 +643,114 @@ def build_world():
     return manifest, env, raw_entries
 
 
+def write_package(world, manifest, raw_entries, package=None):
+    """A head-first package on disk: the base in snapshots/base.json, the
+    head (the fold of the whole log) as manifest.json."""
+    world.mkdir()
+    (world / "snapshots").mkdir()
+    (world / "snapshots" / "base.json").write_text(json.dumps(manifest))
+    if raw_entries:
+        (world / "ops.jsonl").write_text(
+            "\n".join(json.dumps(e) for e in raw_entries) + "\n"
+        )
+    parsed = [parse_log_line(json.dumps(e)) for e in raw_entries]
+    head = to_manifest(fold_log(parse_manifest(json.dumps(manifest)), parsed))
+    (world / "manifest.json").write_text(json.dumps(head, indent=2) + "\n")
+    if package is not None:
+        (world / "package.json").write_text(json.dumps(package))
+    return head
+
+
 class CompactTest(unittest.TestCase):
-    def test_compaction_changes_nothing_observable_and_truncates_replay(self):
+    def test_compaction_moves_the_base_to_the_head_and_truncates_replay(self):
         manifest, env, raw_entries = build_world()
         with tempfile.TemporaryDirectory() as tmp:
             world = Path(tmp) / "tiny.world"
-            world.mkdir()
-            (world / "manifest.json").write_text(json.dumps(manifest))
-            log_text = "\n".join(json.dumps(e) for e in raw_entries) + "\n"
-            (world / "ops.jsonl").write_text(log_text)
-            (world / "package.json").write_text(json.dumps({
-                "format_version": 1, "name": "tiny",
+            write_package(world, manifest, raw_entries, {
+                "format_version": 2, "name": "tiny",
                 "base_revision": 0, "head_revision": 3,
-            }))
-            parsed = [parse_log_line(json.dumps(e)) for e in raw_entries]
-            before = fold_log(parse_manifest(json.dumps(manifest)), parsed)
+            })
+            log_text = (world / "ops.jsonl").read_text()
+            head_text = (world / "manifest.json").read_text()
 
             result = compact(world)
             self.assertEqual(result, world)
 
+            # The head is untouched; the base is now the head.
+            self.assertEqual((world / "manifest.json").read_text(), head_text)
+            self.assertEqual((world / "snapshots" / "base.json").read_text(), head_text)
             # The log is archived whole, and the fresh one is empty.
             self.assertEqual((world / "ops.archive.jsonl").read_text(), log_text)
             self.assertEqual((world / "ops.jsonl").read_text(), "")
-
-            # base_revision moved to the head; the rest survived.
             package = json.loads((world / "package.json").read_text())
             self.assertEqual(package["base_revision"], 3)
-            self.assertEqual(package["format_version"], 1)
+            self.assertEqual(package["format_version"], 2)
             self.assertEqual(package["name"], "tiny")
 
-            # The new manifest is the folded document: same entities,
-            # same scene, next id past the highest.
-            new_manifest = parse_manifest(
-                (world / "manifest.json").read_text()
-            )
-            self.assertEqual(
-                sorted(new_manifest["entities"], key=lambda e: e["id"]),
-                sorted(before["entities"], key=lambda e: e["id"]),
-            )
-            self.assertEqual(new_manifest["environment"], env)  # the folded one
-            self.assertEqual(new_manifest["camera"], manifest["camera"])
-            self.assertEqual(new_manifest["meta"]["tags"], ["test"])
-            self.assertEqual(new_manifest["next_entity_id"], 32)
-            # And folding it with no log reaches the same world — the
-            # compaction contract, held.
-            after = fold_log(new_manifest, [])
+            # The package still folds to the same world: nothing observable moved.
+            base, entries, head, _ = read_package(world)
+            after = to_manifest(fold_log(base, entries))
+            self.assertEqual(after["environment"], env)
             self.assertEqual(
                 sorted(after["entities"], key=lambda e: e["id"]),
-                sorted(before["entities"], key=lambda e: e["id"]),
+                sorted(head["entities"], key=lambda e: e["id"]),
             )
-            self.assertEqual(after["environment"], env)
+            self.assertEqual(after["meta"]["tags"], ["test"])
 
-    def test_compaction_to_a_revision_folds_only_that_far(self):
+    def test_compaction_to_a_revision_moves_the_base_only_that_far(self):
         manifest, env, raw_entries = build_world()
         with tempfile.TemporaryDirectory() as tmp:
             world = Path(tmp) / "tiny.world"
-            world.mkdir()
-            (world / "manifest.json").write_text(json.dumps(manifest))
-            (world / "ops.jsonl").write_text(
-                "\n".join(json.dumps(e) for e in raw_entries) + "\n"
-            )
+            head = write_package(world, manifest, raw_entries)
             compact(world, head_revision=2)
             package = json.loads((world / "package.json").read_text())
             self.assertEqual(package["base_revision"], 2)
-            new_manifest = parse_manifest(
-                (world / "manifest.json").read_text()
-            )
-            names = {e["name"] for e in new_manifest["entities"]}
+            base = parse_manifest((world / "snapshots" / "base.json").read_text())
+            names = {e["name"] for e in base["entities"]}
             self.assertIn("cabin", names)  # revision 1
-            self.assertNotIn("shed", names)  # revision 3 never folded in
-            self.assertEqual(new_manifest["environment"], env)  # revision 2
+            self.assertNotIn("shed", names)  # revision 3 stays in the log
+            self.assertEqual(base["environment"], env)  # revision 2
+            # The entries after the new base stay, and still fold to the head.
+            _base, entries, _head, _ = read_package(world)
+            self.assertTrue(any(e["revision"] == 3 for e in entries))
+            self.assertEqual(
+                sorted(e["name"] for e in to_manifest(fold_log(base, entries))["entities"]),
+                sorted(e["name"] for e in head["entities"]),
+            )
 
     def test_compaction_creates_a_minimal_package_json_when_absent(self):
         manifest, _env, raw_entries = build_world()
         with tempfile.TemporaryDirectory() as tmp:
             world = Path(tmp) / "tiny.world"
-            world.mkdir()
-            (world / "manifest.json").write_text(json.dumps(manifest))
-            (world / "ops.jsonl").write_text(
-                "\n".join(json.dumps(e) for e in raw_entries) + "\n"
-            )
+            write_package(world, manifest, raw_entries)
             compact(world)
             package = json.loads((world / "package.json").read_text())
-            self.assertEqual(package, {"format_version": 1, "base_revision": 3})
+            self.assertEqual(package, {"format_version": 2, "base_revision": 3})
 
-    def test_compaction_of_a_package_with_no_log_is_a_no_op_fold(self):
+    def test_a_package_with_no_log_is_its_own_base(self):
         manifest, _env, _raw = build_world()
         with tempfile.TemporaryDirectory() as tmp:
             world = Path(tmp) / "tiny.world"
             world.mkdir()
             (world / "manifest.json").write_text(json.dumps(manifest))
+            base, entries, head, package = read_package(world)
+            self.assertEqual(base, head)
+            self.assertEqual(entries, [])
+            self.assertIsNone(package)
             compact(world)
             package = json.loads((world / "package.json").read_text())
-            self.assertEqual(package, {"format_version": 1, "base_revision": 0})
+            self.assertEqual(package, {"format_version": 2, "base_revision": 0})
             self.assertEqual((world / "ops.jsonl").read_text(), "")
             self.assertFalse((world / "ops.archive.jsonl").exists())
+
+    def test_a_log_with_edits_needs_a_base(self):
+        manifest, _env, raw_entries = build_world()
+        with tempfile.TemporaryDirectory() as tmp:
+            world = Path(tmp) / "tiny.world"
+            write_package(world, manifest, raw_entries)
+            (world / "snapshots" / "base.json").unlink()
+            with self.assertRaises(WorldFormatError):
+                read_package(world)
 
 
 class StrictModeTest(unittest.TestCase):

@@ -38,6 +38,7 @@ const MANIFEST_KEYS: &[&str] = &[
     "environment",
     "camera",
     "avatar",
+    "ambience",
     "tours",
     "soundtrack",
     "creations",

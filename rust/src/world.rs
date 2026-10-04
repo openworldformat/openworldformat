@@ -118,6 +118,11 @@ pub struct WorldManifest {
     /// entity modulations.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub soundtrack: Option<SoundtrackDef>,
+    /// The ambient soundscape: layered procedural or sampled sound with
+    /// no position. `SetAmbience` replaces it; it is part of the
+    /// document so the fold's state is always a manifest.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub ambience: Vec<crate::history::AmbienceLayerDef>,
     /// Entities (inline for small worlds).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub entities: Vec<WorldEntity>,
@@ -476,6 +481,7 @@ impl WorldManifest {
             avatar: None,
             tours: Vec::new(),
             soundtrack: None,
+            ambience: Vec::new(),
             entities: Vec::new(),
             creations: Vec::new(),
             next_entity_id: default_next_id(),

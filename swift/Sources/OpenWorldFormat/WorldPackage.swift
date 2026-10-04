@@ -8,7 +8,12 @@ import Foundation
 public struct WorldPackage: Sendable {
     /// The folder this package was loaded from, if any.
     public let directory: URL?
+    /// The world now: `manifest.json`, the state at the tip of `main`.
+    /// A viewer draws this and needs nothing else.
     public let manifest: WorldManifest
+    /// The state the log folds from: `snapshots/base.json`, or the head
+    /// itself when the log holds no edits.
+    public let base: WorldManifest
     /// Parsed log entries, in file order. A torn final line is skipped
     /// — the writer's crash is not the reader's (spec/session.md).
     public let entries: [LogEntry]
@@ -16,8 +21,9 @@ public struct WorldPackage: Sendable {
     /// `package.json` (the transport metadata), if present.
     public let packageJSON: JSONValue?
 
-    /// Load a package folder: `manifest.json` (required), `ops.jsonl`
-    /// (optional), `state.json` and `package.json` (optional).
+    /// Load a head-first package folder: `manifest.json` (required),
+    /// `snapshots/base.json` (required when the log holds edits),
+    /// `ops.jsonl`, `state.json` and `package.json` (optional).
     public init(directory: URL) throws {
         let fm = FileManager.default
         func text(_ name: String) throws -> String? {
@@ -50,13 +56,25 @@ public struct WorldPackage: Sendable {
             self.entries = []
         }
 
+        if let baseText = try text(BASE_SNAPSHOT) {
+            self.base = try parseManifest(baseText)
+        } else if entries.contains(where: { !editOps($0).isEmpty }) {
+            throw OpenWorldFormatError.parse(
+                "the log holds edits but there is no \(BASE_SNAPSHOT) to fold them from")
+        } else {
+            self.base = manifest
+        }
+
         self.stateDocument = try text("state.json").map { try StateDocument(json: JSONValue(parsing: $0)) }
         self.packageJSON = try text("package.json").map { try JSONValue(parsing: $0) }
     }
 
-    /// The world at head revision: the fold of the whole log.
+    /// The world at the tip of `main` (`refs.main`, else the last entry):
+    /// the fold of its path over the base. For a consistent package this
+    /// is `manifest` again — `verify()` checks that it is.
     public func folded() throws -> FoldState {
-        try foldLog(manifest, entries)
+        if entries.isEmpty { return try foldLog(base, []) }
+        return try foldPath(base, entries, tip: packageJSON?["refs"]?["main"]?.string)
     }
 
     /// The history of this package's log (tips, branches).
@@ -90,9 +108,9 @@ public func snapshotFilename(entryId: String?, revision: Int) -> String {
 /// "Snapshots").
 ///
 /// The routine this drives is the host app's, because it moves files:
-/// fold at head and write that state as the new `manifest.json`, rename
-/// `ops.jsonl` to `ops.archive.jsonl` (or delete it), and start a fresh
-/// empty `ops.jsonl`. This package is string-based — it returns the
+/// copy `manifest.json` (already the head) to `snapshots/base.json`,
+/// rename `ops.jsonl` to `ops.archive.jsonl` (or delete it), and start a
+/// fresh empty `ops.jsonl`. This package is string-based — it returns the
 /// updated JSON and moves nothing.
 public func compactPackage(_ packageJson: JSONValue, headRevision: Int) -> JSONValue {
     var o = packageJson.object ?? [:]

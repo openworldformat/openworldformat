@@ -20,8 +20,13 @@ import { createHash } from "node:crypto";
 /** The manifest schema version this fold reads. */
 export const SUPPORTED_SCHEMA_VERSION = 3;
 
-/** The package format version this fold reads. */
-export const SUPPORTED_FORMAT_VERSION = 1;
+/** The package format version this fold reads: 2, head-first —
+ *  `manifest.json` is the world at the tip of `main`, the base lives in
+ *  `snapshots/base.json` (spec/package.md). */
+export const SUPPORTED_FORMAT_VERSION = 2;
+
+/** Where a head-first package keeps the state its log folds from. */
+export const BASE_SNAPSHOT = "snapshots/base.json";
 
 /**
  * The entity id ceiling: 2^53 − 1, the largest integer every IEEE-754
@@ -113,6 +118,8 @@ export const REGISTERED_EXTENSIONS = [
  * @property {any[]} ops
  * @property {string} [id]
  * @property {string|null} [parent]
+ * @property {string} [message] what the author says the batch is for —
+ *   part of the entry's identity, folds to nothing
  * @property {ClassifiedOp[]} [classified]
  */
 
@@ -139,12 +146,27 @@ export const REGISTERED_EXTENSIONS = [
  * @property {EnvironmentDef|null} environment
  * @property {CameraDef|null} camera
  * @property {any[]} ambience
+ * @property {WorldScene} scene the rest of the manifest — so the fold's
+ *   state is always a whole manifest (see toManifest)
  * @property {Map<string, any>} audioEmitters
  * @property {number} appliedEdits
  * @property {Map<number, WorldEntity>} byId
  * @property {Set<string>} names
  * @property {Map<string, number>} nameToId names → ids: the ingestion-time binding index
  * @property {string[]} [path]
+ */
+
+/**
+ * The manifest fields a fold carries besides entities, environment,
+ * camera and ambience. `next_entity_id` only grows: ids are never reused.
+ * @typedef {object} WorldScene
+ * @property {number} version
+ * @property {WorldMeta|undefined} meta
+ * @property {any} [avatar]
+ * @property {any[]} tours
+ * @property {any} [soundtrack]
+ * @property {any[]} creations
+ * @property {number} next_entity_id
  */
 
 /** A declared state field (schema/state.schema.json). */
@@ -230,6 +252,7 @@ const EDIT_KEYS = new Set([
   "SetAmbience",
   "SpawnAudioEmitter",
   "RemoveAudioEmitter",
+  "ModifyWorld",
   "Batch",
 ]);
 
@@ -255,7 +278,7 @@ export function opKindShapeOk(kind) {
 // keys per scope, with registered `ext-*` admitted alongside.
 const MANIFEST_KEYS = new Set([
   "version", "meta", "entities", "environment", "camera", "avatar",
-  "tours", "soundtrack", "creations", "next_entity_id",
+  "ambience", "tours", "soundtrack", "creations", "next_entity_id",
 ]);
 const META_KEYS = new Set([
   "name", "description", "time_of_day", "tags", "source",
@@ -693,6 +716,7 @@ function applyEdit(state, edit, value) {
       state.byId.set(entity.id, entity);
       state.names.add(entity.name);
       state.nameToId.set(entity.name, entity.id);
+      state.scene.next_entity_id = Math.max(state.scene.next_entity_id, entity.id + 1);
       return;
     }
     case "DeleteEntity": {
@@ -792,6 +816,34 @@ function applyEdit(state, edit, value) {
       }
       state.audioEmitters.delete(value.name);
       return;
+    case "ModifyWorld": {
+      // The scene-wide fields, patched like an entity: absent unchanged,
+      // null clears, a value sets (spec/session.md).
+      const patch = value.patch ?? {};
+      if ("meta" in patch) {
+        const meta = patch.meta;
+        if (meta === null || typeof meta !== "object" || typeof meta.name !== "string" ||
+          meta.name.trim() === "") {
+          throw invalid("ModifyWorld.meta must be a meta object with a name; it can't be cleared");
+        }
+        state.scene.meta = meta;
+        state.name = meta.name;
+      }
+      if ("environment" in patch) state.environment = patch.environment ?? null;
+      if ("camera" in patch) state.camera = patch.camera ?? null;
+      if ("ambience" in patch) state.ambience = patch.ambience ?? [];
+      if ("avatar" in patch) {
+        if (patch.avatar === null) delete state.scene.avatar;
+        else state.scene.avatar = patch.avatar;
+      }
+      if ("soundtrack" in patch) {
+        if (patch.soundtrack === null) delete state.scene.soundtrack;
+        else state.scene.soundtrack = patch.soundtrack;
+      }
+      if ("tours" in patch) state.scene.tours = patch.tours ?? [];
+      if ("creations" in patch) state.scene.creations = patch.creations ?? [];
+      return;
+    }
     case "Batch": {
       const ops = value.ops ?? [];
       // All-or-nothing: apply to a deep copy, commit on success.
@@ -823,6 +875,7 @@ function freshTrial(state) {
       environment: structuredClone(state.environment),
       camera: structuredClone(state.camera),
       ambience: structuredClone(state.ambience),
+      scene: structuredClone(state.scene),
       audioEmitters: new Map(structuredClone([...state.audioEmitters.entries()])),
       byId: new Map(entities.map((e) => [e.id, e])),
       names: new Set(entities.map((e) => e.name)),
@@ -835,6 +888,8 @@ function freshTrial(state) {
  * @param {FoldState} state
  * @param {{state: FoldState}} trial */
 function commitTrial(state, trial) {
+  state.name = trial.state.name;
+  state.scene = trial.state.scene;
   state.entities = trial.state.entities;
   state.environment = trial.state.environment;
   state.camera = trial.state.camera;
@@ -903,10 +958,66 @@ function touchedIds(edits) {
   return ids;
 }
 
+/** The manifest's scene-wide fields, as a fold carries them.
+ * @param {WorldManifest} manifest
+ * @returns {WorldScene} */
+function sceneOf(manifest) {
+  const past = manifest.entities.reduce((n, e) => Math.max(n, (e.id ?? 0) + 1), 1);
+  /** @type {WorldScene} */
+  const scene = {
+    version: manifest.version,
+    meta: structuredClone(manifest.meta),
+    tours: structuredClone(manifest.tours ?? []),
+    creations: structuredClone(manifest.creations ?? []),
+    next_entity_id: Math.max(manifest.next_entity_id ?? 1, past),
+  };
+  if (manifest.avatar !== undefined && manifest.avatar !== null) {
+    scene.avatar = structuredClone(manifest.avatar);
+  }
+  if (manifest.soundtrack !== undefined && manifest.soundtrack !== null) {
+    scene.soundtrack = structuredClone(manifest.soundtrack);
+  }
+  return scene;
+}
+
+/**
+ * The fold's state as a manifest — the whole document. The fold is
+ * total (spec/session.md): `toManifest(foldLog(m, []))` is `m` again, up
+ * to name binding, entity order and absent-versus-default fields, and a
+ * head-first package's `manifest.json` is `toManifest` of its fold to
+ * `main`.
+ * @param {FoldState} state
+ * @returns {WorldManifest}
+ */
+export function toManifest(state) {
+  const scene = state.scene;
+  /** @type {WorldManifest} */
+  const manifest = {
+    version: scene.version,
+    meta: { ...structuredClone(scene.meta ?? {}), name: state.name },
+    entities: structuredClone(state.entities),
+  };
+  if (state.environment !== null && state.environment !== undefined) {
+    manifest.environment = structuredClone(state.environment);
+  }
+  if (state.camera !== null && state.camera !== undefined) {
+    manifest.camera = structuredClone(state.camera);
+  }
+  if (scene.avatar !== undefined) manifest.avatar = structuredClone(scene.avatar);
+  if (scene.tours.length > 0) manifest.tours = structuredClone(scene.tours);
+  if (scene.soundtrack !== undefined) manifest.soundtrack = structuredClone(scene.soundtrack);
+  if (state.ambience.length > 0) manifest.ambience = structuredClone(state.ambience);
+  if (scene.creations.length > 0) manifest.creations = structuredClone(scene.creations);
+  const past = state.entities.reduce((n, e) => Math.max(n, e.id + 1), 1);
+  manifest.next_entity_id = Math.max(scene.next_entity_id, past);
+  return manifest;
+}
+
 /**
  * Fold log entries over a manifest: the document at the last entry.
  *
- * @param {WorldManifest} manifest a parsed manifest (the base, at base_revision)
+ * @param {WorldManifest} manifest a parsed manifest (the base, at base_revision —
+ *   in a head-first package, `snapshots/base.json`)
  * @param {LogEntry[]} entries parsed log entries, in order
  * @returns {FoldState}
  * @throws at the first entry that no longer applies — the fold stops there,
@@ -918,7 +1029,8 @@ export function foldLog(manifest, entries) {
     entities: structuredClone(manifest.entities),
     environment: manifest.environment ?? null,
     camera: manifest.camera ?? null,
-    ambience: manifest.ambience ?? [],
+    ambience: structuredClone(manifest.ambience ?? []),
+    scene: sceneOf(manifest),
     audioEmitters: new Map(),
     appliedEdits: 0,
     byId: new Map(),
@@ -1038,18 +1150,31 @@ export function computeInverse(op, state) {
       }
       return { ModifyEntity: { id: c.value.id, patch: inverse } };
     }
+    // A scene setting that didn't exist comes back as absent, not as a
+    // default one: ModifyWorld clears it.
     case "SetEnvironment":
-      return { SetEnvironment: { env: structuredClone(state.environment ?? {}) } };
+      return state.environment === null || state.environment === undefined
+        ? { ModifyWorld: { patch: { environment: null } } }
+        : { SetEnvironment: { env: structuredClone(state.environment) } };
     case "SetCamera":
-      // The format's defaults (spec/world.md's camera): where the camera
-      // starts when the document never set one.
-      return {
-        SetCamera: {
-          camera: structuredClone(
-            state.camera ?? { position: [5, 5, 5], look_at: [0, 0, 0], fov_degrees: 45 },
-          ),
-        },
-      };
+      return state.camera === null || state.camera === undefined
+        ? { ModifyWorld: { patch: { camera: null } } }
+        : { SetCamera: { camera: structuredClone(state.camera) } };
+    case "ModifyWorld": {
+      const patch = c.value.patch ?? {};
+      const now = toManifest(state);
+      /** @type {Record<string, any>} */
+      const inverse = {};
+      for (const field of Object.keys(patch)) {
+        if (!WORLD_PATCH_KEYS.includes(field)) continue; // must-ignore
+        if (field === "tours" || field === "creations" || field === "ambience") {
+          inverse[field] = structuredClone(now[field] ?? []);
+        } else {
+          inverse[field] = now[field] === undefined ? null : structuredClone(now[field]);
+        }
+      }
+      return { ModifyWorld: { patch: inverse } };
+    }
     case "SetAmbience":
       return { SetAmbience: { ambience: structuredClone(state.ambience ?? []) } };
     case "SpawnAudioEmitter":
@@ -1249,8 +1374,8 @@ export function snapshotFilename(entryId, revision) {
  * structural replay. This returns a NEW package.json object with
  * `base_revision` moved to the head revision; `head_revision` and every
  * other field are left as they are. The file routine it drives is the
- * host app's — this package stays string-based: write the folded
- * manifest at head as the new `manifest.json`, rename `ops.jsonl` →
+ * host app's — this package stays string-based: copy `manifest.json`
+ * (already the head) to `snapshots/base.json`, rename `ops.jsonl` →
  * `ops.archive.jsonl` (or delete it), start a fresh empty `ops.jsonl`.
  * @param {Record<string, any>} packageJson the parsed package.json
  * @param {number} headRevision the revision the compacted base holds
@@ -1258,4 +1383,277 @@ export function snapshotFilename(entryId, revision) {
  */
 export function compactPackage(packageJson, headRevision) {
   return { ...structuredClone(packageJson), base_revision: headRevision };
+}
+
+// ---------------------------------------------------------------------------
+// Authoring (spec/session.md "Authoring"): a batch an author sends, made
+// into ops worth committing — or refused whole, with a reason per op.
+// ---------------------------------------------------------------------------
+
+/** The fields ModifyWorld's patch reaches (spec/session.md). */
+export const WORLD_PATCH_KEYS = [
+  "meta", "environment", "camera", "avatar", "tours", "soundtrack", "ambience", "creations",
+];
+
+// Strict ingestion's key sets for the struct fields a patch may carry,
+// from the schema's $defs. Registered `ext-*` keys pass, as everywhere.
+const TRANSFORM_KEYS = new Set(["position", "rotation_degrees", "scale", "visible"]);
+const MATERIAL_KEYS = new Set([
+  "alpha_mode", "base_color_texture", "color", "double_sided", "emissive", "emissive_texture",
+  "metallic", "metallic_roughness_texture", "normal_map_texture", "reflectance", "roughness",
+  "unlit",
+]);
+const LIGHT_KEYS = new Set([
+  "color", "direction", "inner_angle", "intensity", "light_type", "outer_angle", "range", "shadows",
+]);
+const ENVIRONMENT_KEYS = new Set([
+  "ambient_color", "ambient_intensity", "background_color", "fog_color", "fog_density",
+]);
+const CAMERA_KEYS = new Set(["fov_degrees", "look_at", "position"]);
+
+/**
+ * JSON merge patch (RFC 7396): objects merge key by key, `null` removes,
+ * anything else replaces.
+ * @param {any} current
+ * @param {any} change
+ * @returns {any}
+ */
+export function mergePatch(current, change) {
+  const isObject = (/** @type {any} */ v) => v !== null && typeof v === "object" && !Array.isArray(v);
+  if (!isObject(current) || !isObject(change)) return structuredClone(change);
+  const out = structuredClone(current);
+  for (const [key, value] of Object.entries(change)) {
+    if (value === null) delete out[key];
+    else out[key] = key in out ? mergePatch(out[key], value) : structuredClone(value);
+  }
+  return out;
+}
+
+/**
+ * Ingest a batch — `[op, …]` or `{ops: [op, …]}` — against a fold state.
+ * Each op, in order, against a trial holding the batch's earlier ops:
+ * names bind to ids (a string where an entity id goes is a name), a
+ * spawn without an id gets the next one, the struct fields of a patch
+ * (`transform`, `material`, `light`; `SetEnvironment`'s env;
+ * ModifyWorld's object fields) merge into the current value, no key the
+ * format would drop is allowed, and the op must apply. Any failure
+ * refuses the whole batch.
+ *
+ * @param {FoldState} state the world as it stands (unchanged by this call)
+ * @param {any} batch
+ * @returns {{ok: true, ops: any[], spawned: Record<string, number>, state: FoldState}
+ *   | {ok: false, errors: string[]}}
+ */
+export function ingest(state, batch) {
+  const ops = Array.isArray(batch) ? batch : batch?.ops;
+  if (!Array.isArray(ops)) {
+    return { ok: false, errors: ['a batch is [op, …] or {"ops": [op, …]}'] };
+  }
+  if (ops.length === 0) return { ok: false, errors: ["the batch holds no ops"] };
+  const trial = freshTrial(state).state;
+  trial.appliedEdits = state.appliedEdits;
+  /** @type {Record<string, number>} */
+  const spawned = {};
+  /** @type {string[]} */
+  const errors = [];
+  /** @type {any[]} */
+  const committed = [];
+  ops.forEach((raw, i) => {
+    try {
+      const op = structuredClone(raw);
+      bindOp(trial, op, spawned);
+      strictOp(op);
+      const c = classifyOp(op);
+      if (c.kind !== "edit") throw new Error("only edit ops can be sent");
+      // An op is an entry of one: apply, then bind the names it wrote.
+      const step = freshTrial(trial);
+      applyEdit(step.state, c.edit, c.value);
+      for (const id of touchedIds([c])) {
+        const entity = step.state.byId.get(id);
+        if (entity) resolveNames(step.state, entity);
+      }
+      commitTrial(trial, step);
+      committed.push(op);
+    } catch (e) {
+      errors.push(`op ${i}: ${/** @type {Error} */ (e).message}`);
+    }
+  });
+  if (errors.length > 0) return { ok: false, errors };
+  trial.appliedEdits += committed.length;
+  return { ok: true, ops: committed, spawned, state: trial };
+}
+
+/** Names to ids, ids for spawns, merged struct patches — in place.
+ * @param {FoldState} trial @param {any} op @param {Record<string, number>} spawned */
+function bindOp(trial, op, spawned) {
+  if (op === null || typeof op !== "object" || Array.isArray(op)) {
+    throw new Error('an op is an object like {"SpawnEntity": {…}}');
+  }
+  const kinds = Object.keys(op);
+  if (kinds.length !== 1) throw new Error(`an op holds exactly one kind, one of: ${[...EDIT_KEYS].join(", ")}`);
+  const kind = kinds[0];
+  const body = op[kind];
+  /** @param {any} ref @returns {any} */
+  const resolve = (ref) => {
+    if (typeof ref !== "string") return ref;
+    const id = spawned[ref] ?? trial.nameToId.get(ref);
+    if (id === undefined) throw new Error(`no entity is named "${ref}"`);
+    return id;
+  };
+  switch (kind) {
+    case "SpawnEntity": {
+      const entity = body?.entity;
+      if (entity === null || typeof entity !== "object") throw new Error('SpawnEntity needs an "entity" object');
+      if (entity.id === undefined || entity.id === null) {
+        entity.id = Math.max(trial.scene.next_entity_id,
+          ...Object.values(spawned).map((id) => id + 1));
+      } else if (typeof entity.id !== "number") {
+        throw new Error("a new entity's id is a number, or left out to get one");
+      }
+      if ("parent" in entity) entity.parent = resolve(entity.parent);
+      if (typeof entity.name === "string") spawned[entity.name] = entity.id;
+      return;
+    }
+    case "ModifyEntity": {
+      body.id = resolve(body.id);
+      const current = trial.byId.get(body.id);
+      const patch = body.patch;
+      if (patch && typeof patch === "object") {
+        if ("parent" in patch) patch.parent = resolve(patch.parent);
+        if (current) {
+          for (const field of ["transform", "material", "light"]) {
+            if (patch[field] && typeof patch[field] === "object" && current[field] && typeof current[field] === "object") {
+              patch[field] = mergePatch(current[field], patch[field]);
+            }
+          }
+        }
+      }
+      return;
+    }
+    case "DeleteEntity":
+      body.id = resolve(body.id);
+      return;
+    case "SetEnvironment":
+      if (body?.env && typeof body.env === "object" && trial.environment) {
+        body.env = mergePatch(trial.environment, body.env);
+      }
+      return;
+    case "ModifyWorld": {
+      const patch = body?.patch;
+      if (patch && typeof patch === "object") {
+        const now = toManifest(trial);
+        for (const field of ["meta", "environment", "camera", "avatar", "soundtrack"]) {
+          if (patch[field] && typeof patch[field] === "object" && now[field] && typeof now[field] === "object") {
+            patch[field] = mergePatch(now[field], patch[field]);
+          }
+        }
+      }
+      return;
+    }
+    case "Batch":
+      for (const inner of body?.ops ?? []) bindOp(trial, inner, spawned);
+      return;
+    default:
+      if (!EDIT_KEYS.has(kind)) {
+        throw new Error(`"${kind}" isn't an op kind; the format has: ${[...EDIT_KEYS].join(", ")}`);
+      }
+  }
+}
+
+/** Refuse keys the format would drop, with a path to each.
+ * @param {any} op */
+function strictOp(op) {
+  /** @type {string[]} */
+  const unknown = [];
+  /** @param {any} object @param {Set<string>} allowed @param {string} path */
+  const check = (object, allowed, path) => {
+    if (object === null || typeof object !== "object") return;
+    for (const key of Object.keys(object)) {
+      if (allowed.has(key)) continue;
+      if (key.startsWith("ext-") && REGISTERED_EXTENSIONS.includes(key)) continue;
+      unknown.push(`${path}/${key}`);
+    }
+  };
+  /** @param {any} entity @param {string} path @param {boolean} isPatch */
+  const checkEntity = (entity, path, isPatch) => {
+    const keys = new Set(ENTITY_KEYS);
+    if (isPatch) keys.delete("id");
+    check(entity, keys, path);
+    check(entity?.transform, TRANSFORM_KEYS, `${path}/transform`);
+    check(entity?.material, MATERIAL_KEYS, `${path}/material`);
+    check(entity?.light, LIGHT_KEYS, `${path}/light`);
+  };
+  const [kind] = Object.keys(op);
+  const body = op[kind];
+  switch (kind) {
+    case "SpawnEntity":
+      check(body, new Set(["entity"]), `/${kind}`);
+      checkEntity(body.entity, `/${kind}/entity`, false);
+      break;
+    case "ModifyEntity":
+      check(body, new Set(["id", "patch"]), `/${kind}`);
+      checkEntity(body.patch, `/${kind}/patch`, true);
+      break;
+    case "DeleteEntity":
+      check(body, new Set(["id"]), `/${kind}`);
+      break;
+    case "SetEnvironment":
+      check(body?.env, ENVIRONMENT_KEYS, `/${kind}/env`);
+      break;
+    case "SetCamera":
+      check(body?.camera, CAMERA_KEYS, `/${kind}/camera`);
+      break;
+    case "ModifyWorld":
+      check(body?.patch, new Set(WORLD_PATCH_KEYS), `/${kind}/patch`);
+      check(body?.patch?.meta, META_KEYS, `/${kind}/patch/meta`);
+      check(body?.patch?.environment, ENVIRONMENT_KEYS, `/${kind}/patch/environment`);
+      check(body?.patch?.camera, CAMERA_KEYS, `/${kind}/patch/camera`);
+      break;
+    case "Batch":
+      for (const inner of body?.ops ?? []) strictOp(inner);
+      break;
+  }
+  if (unknown.length > 0) {
+    throw new Error(unknown.map((p) => `${p} is not a field of the format`).join("; "));
+  }
+}
+
+// ---------------------------------------------------------------------------
+// The canonical text of a manifest (spec/package.md "Canonical text")
+// ---------------------------------------------------------------------------
+
+/**
+ * A manifest as its canonical text: what an authority writes to
+ * `manifest.json`, so that the same world is always the same bytes —
+ * small diffs, ordinary git merges, a `world_sha256` that means
+ * something. Members sorted by code point, null members left out,
+ * entities in id order, two-space indentation, arrays of plain values
+ * on one line, numbers in their shortest form (integral values without a
+ * fraction), a trailing newline.
+ * @param {WorldManifest} manifest
+ * @returns {string}
+ */
+export function manifestText(manifest) {
+  const world = structuredClone(manifest);
+  if (Array.isArray(world.entities)) world.entities.sort((a, b) => a.id - b.id);
+  return canonicalPretty(world, 0) + "\n";
+}
+
+/** @param {any} value @param {number} depth @returns {string} */
+function canonicalPretty(value, depth) {
+  if (value === null || typeof value !== "object") return JSON.stringify(value);
+  const pad = "  ".repeat(depth);
+  const inner = "  ".repeat(depth + 1);
+  if (Array.isArray(value)) {
+    if (value.length === 0) return "[]";
+    if (value.every((x) => x === null || typeof x !== "object")) {
+      return `[${value.map((x) => JSON.stringify(x)).join(", ")}]`;
+    }
+    return `[\n${value.map((x) => inner + canonicalPretty(x, depth + 1)).join(",\n")}\n${pad}]`;
+  }
+  const keys = Object.keys(value)
+    .filter((k) => value[k] !== null && value[k] !== undefined)
+    .sort(compareByCodePoint);
+  if (keys.length === 0) return "{}";
+  return `{\n${keys.map((k) => `${inner}${JSON.stringify(k)}: ${canonicalPretty(value[k], depth + 1)}`).join(",\n")}\n${pad}}`;
 }

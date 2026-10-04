@@ -72,19 +72,20 @@ final class InverseTests: XCTestCase {
             ])]))
     }
 
-    func testSetEnvironmentRestoresThePreviousEnvOrTheEmptyObject() throws {
+    func testSetEnvironmentRestoresThePreviousEnvOrClears() throws {
         let withEnv = try parseManifest(
             #"{"version": 3, "entities": [{"id": 1, "name": "root"}], "environment": {"fog_density": 0.2}}"#)
         let setEnv = try JSONValue(parsing: #"{"SetEnvironment": {"env": {}}}"#)
         XCTAssertEqual(
             try computeInverse(setEnv, try foldLog(withEnv, [])),
             .object(["SetEnvironment": .object(["env": .object(["fog_density": .number(0.2)])])]))
+        // A setting that didn't exist comes back as absent: ModifyWorld clears it.
         XCTAssertEqual(
             try computeInverse(setEnv, try foldLog(tinyManifest(), [])),
-            .object(["SetEnvironment": .object(["env": .object([:])])]))
+            .object(["ModifyWorld": .object(["patch": .object(["environment": .null])])]))
     }
 
-    func testSetCameraRestoresThePreviousCameraOrTheFormatDefaults() throws {
+    func testSetCameraRestoresThePreviousCameraOrClears() throws {
         let withCamera = try parseManifest(
             #"{"version": 3, "entities": [{"id": 1, "name": "root"}], "camera": {"position": [1, 2, 3], "fov_degrees": 60.0}}"#)
         let setCamera = try JSONValue(parsing: #"{"SetCamera": {"camera": {}}}"#)
@@ -94,14 +95,9 @@ final class InverseTests: XCTestCase {
                 "position": .array([.number(1), .number(2), .number(3)]),
                 "fov_degrees": .number(60),
             ])])]))
-        let defaults = JSONValue.object([
-            "position": .array([.number(5), .number(5), .number(5)]),
-            "look_at": .array([.number(0), .number(0), .number(0)]),
-            "fov_degrees": .number(45),
-        ])
         XCTAssertEqual(
             try computeInverse(setCamera, try foldLog(tinyManifest(), [])),
-            .object(["SetCamera": .object(["camera": defaults])]))
+            .object(["ModifyWorld": .object(["patch": .object(["camera": .null])])]))
     }
 
     func testSetAmbienceRestoresThePreviousAmbienceOrEmpty() throws {

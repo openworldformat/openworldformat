@@ -32,6 +32,11 @@ name resolution until fold time is strictly forbidden because it breaks log dete
 when entities are renamed. Never address entities by array
 position: positions are a serialization detail, ids are the contract.
 
+A world's `next_entity_id` is where the next id comes from. Its
+effective value is the larger of what the manifest declares and one past
+its largest id, and it never goes down: deleting the newest entity does
+not free its id.
+
 ## Entities
 
 An entity is a transform, and any of: a shape, a material, a light,
@@ -80,5 +85,7 @@ shipping the recording.
 ## Scene-wide settings
 
 Environment (background, ambient, fog), camera, avatar (spawn point,
-point of view, speed), and tours (named waypoint sequences) are part of
-the document, not renderer state.
+point of view, speed), tours (named waypoint sequences), the ambient
+soundscape (`ambience`), the soundtrack, creations and the world's
+`meta` are part of the document, not renderer state — and each is
+reachable by an edit (`ModifyWorld`, [the session log](session.md)).

@@ -8,7 +8,8 @@ hand-edited. Where prose and schema disagree, the schema wins and the
 prose gets fixed.
 
 - Manifest schema version: **3**
-- Draft spec: **0.2**
+- Draft spec: **0.3** (the manifest gained an optional `ambience`, so the
+  fold's state is always a whole manifest)
 
 The session log's entry envelope and op kinds ([spec/session.md](../spec/session.md))
 are specified in prose until the state document settles; the `state.json`

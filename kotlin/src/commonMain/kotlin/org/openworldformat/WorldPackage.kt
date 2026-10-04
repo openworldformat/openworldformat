@@ -22,7 +22,11 @@ class WorldPackage(
     stateText: String? = null,
     val packageText: String? = null,
     strict: Boolean = false,
+    /** `snapshots/base.json`, when the package has one. */
+    baseText: String? = null,
 ) {
+    /** The world now: `manifest.json`, the state at the tip of `main`.
+     *  A viewer draws this and needs nothing else. */
     val manifest: WorldManifest = parseManifest(manifestText, strict)
 
     /** Parsed log entries, in file order. */
@@ -44,8 +48,21 @@ class WorldPackage(
 
     val packageJson: JsonElement? = packageText?.let { OWF_JSON.parseToJsonElement(it) }
 
-    /** The world at head revision: the fold of the whole log. */
-    fun folded(): FoldState = foldLog(manifest, entries)
+    /** The state the log folds from: `snapshots/base.json`, or the head
+     *  itself when the log holds no edits. */
+    val base: WorldManifest = when {
+        baseText != null -> parseManifest(baseText, strict)
+        entries.any { editOps(it).isNotEmpty() } -> throw WorldFormatException(
+            "the log holds edits but there is no $BASE_SNAPSHOT to fold them from")
+        else -> manifest
+    }
+
+    /** The world at the tip of `main` (`refs.main`, else the last
+     *  entry): the fold of its path over the base — for a consistent
+     *  package, [manifest] again. */
+    fun folded(): FoldState =
+        if (entries.isEmpty()) foldLog(base, emptyList())
+        else foldPath(base, entries, packageJson?.obj?.get("refs")?.obj?.get("main")?.str)
 
     /** The history of this package's log (tips, branches). */
     fun history(): History = buildHistory(entries)
@@ -79,12 +96,12 @@ fun snapshotFilename(entryId: String?, revision: Int): String {
  * The `package.json` after compaction: every field it held, with
  * `base_revision` set to [headRevision] — the new base is the folded
  * document. A missing or malformed package.json gets the minimal
- * object (format version 1). Spec: spec/session.md "Snapshots".
+ * object (the current format version). Spec: spec/session.md "Snapshots".
  */
 fun compactPackage(packageJson: JsonElement, headRevision: Int): JsonElement {
     val o = packageJson.obj
         ?: return buildJsonObject {
-            put("format_version", 1)
+            put("format_version", SUPPORTED_FORMAT_VERSION)
             put("base_revision", headRevision)
         }
     return buildJsonObject {

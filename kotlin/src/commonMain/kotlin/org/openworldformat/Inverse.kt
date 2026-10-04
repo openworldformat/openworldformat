@@ -16,10 +16,10 @@ import kotlinx.serialization.json.put
 /** The format's default camera — what a SetCamera inverses to when the
  *  fold holds no camera of its own: `{"position":[5,5,5],"look_at":
  *  [0,0,0],"fov_degrees":45}`, integers as every reference writes it. */
-private val FORMAT_DEFAULT_CAMERA: JsonObject = buildJsonObject {
-    put("position", JsonArray(listOf(5L, 5L, 5L).map { JsonPrimitive(it) }))
-    put("look_at", JsonArray(listOf(0L, 0L, 0L).map { JsonPrimitive(it) }))
-    put("fov_degrees", JsonPrimitive(45L))
+/** `{"ModifyWorld": {"patch": {field: null}}}` — the inverse of setting a
+ *  scene field the document didn't have. */
+private fun clearing(field: String): JsonElement = buildJsonObject {
+    put("ModifyWorld", buildJsonObject { put("patch", buildJsonObject { put(field, JsonNull) }) })
 }
 
 /**
@@ -114,16 +114,34 @@ fun computeInverse(op: JsonElement, state: FoldState): JsonElement {
             }
         }
 
-        "SetEnvironment" -> buildJsonObject {
-            put("SetEnvironment", buildJsonObject {
-                put("env", state.environment?.toJson() ?: JsonObject(emptyMap()))
-            })
-        }
+        // A scene setting that didn't exist comes back as absent, not
+        // as a default one: ModifyWorld clears it.
+        "SetEnvironment" -> state.environment?.let { env ->
+            buildJsonObject { put("SetEnvironment", buildJsonObject { put("env", env.toJson()) }) }
+        } ?: clearing("environment")
 
-        "SetCamera" -> buildJsonObject {
-            put("SetCamera", buildJsonObject {
-                put("camera", state.camera?.toJson() ?: FORMAT_DEFAULT_CAMERA)
-            })
+        "SetCamera" -> state.camera?.let { camera ->
+            buildJsonObject { put("SetCamera", buildJsonObject { put("camera", camera.toJson()) }) }
+        } ?: clearing("camera")
+
+        "ModifyWorld" -> {
+            val patch = value.obj?.get("patch")?.obj ?: JsonObject(emptyMap())
+            val now = toManifest(state).toJson()
+            buildJsonObject {
+                put("ModifyWorld", buildJsonObject {
+                    put("patch", buildJsonObject {
+                        for (field in patch.keys) {
+                            if (field !in WORLD_PATCH_KEYS) continue  // must-ignore
+                            val current = now[field]
+                            when {
+                                current != null -> put(field, current)
+                                field in setOf("tours", "creations", "ambience") -> put(field, JsonArray(emptyList()))
+                                else -> put(field, JsonNull)
+                            }
+                        }
+                    })
+                })
+            }
         }
 
         "SetAmbience" -> buildJsonObject {

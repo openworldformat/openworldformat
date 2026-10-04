@@ -12,7 +12,18 @@ import Foundation
 public let SUPPORTED_SCHEMA_VERSION = 3
 
 /// The package format version this package reads.
-public let SUPPORTED_FORMAT_VERSION = 1
+/// The package format this reader reads: 2, head-first — `manifest.json`
+/// is the world at the tip of `main`, the base lives in
+/// `snapshots/base.json` (spec/package.md).
+public let SUPPORTED_FORMAT_VERSION = 2
+
+/// Where a head-first package keeps the state its log folds from.
+public let BASE_SNAPSHOT = "snapshots/base.json"
+
+/// The fields `ModifyWorld`'s patch reaches (spec/session.md).
+public let WORLD_PATCH_KEYS = [
+    "meta", "environment", "camera", "avatar", "tours", "soundtrack", "ambience", "creations",
+]
 
 /// The entity id ceiling: 2^53 − 1, the largest integer every JSON
 /// number holds exactly. `applyEdit`'s SpawnEntity refuses ids above

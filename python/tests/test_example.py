@@ -27,7 +27,7 @@ def read_entries(directory):
 
 
 DROP = ROOT / "examples" / "the-drop-test"
-manifest_text = (DROP / "manifest.json").read_text()
+manifest_text = (DROP / "snapshots" / "base.json").read_text()
 entries = read_entries(DROP)
 
 
@@ -73,7 +73,7 @@ class DropTest(unittest.TestCase):
 class SpeedrunForkTest(unittest.TestCase):
     def test_a_challenge_chain_is_a_history_two_runs_fork_one_course(self):
         fork_dir = ROOT / "examples" / "speedrun-fork"
-        fork_manifest = parse_manifest((fork_dir / "manifest.json").read_text())
+        fork_manifest = parse_manifest((fork_dir / "snapshots" / "base.json").read_text())
         fork_entries = read_entries(fork_dir)
 
         history = build_history(fork_entries)

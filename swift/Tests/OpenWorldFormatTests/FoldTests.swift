@@ -92,7 +92,7 @@ extension ClassifiedOp {
 }
 
 final class FoldTests: XCTestCase {
-    let manifestText = try! read(hello.appendingPathComponent("manifest.json"))
+    let manifestText = try! read(hello.appendingPathComponent("snapshots/base.json"))
     var entries: [LogEntry] { try! readEntries(hello) }
 
     func testTheExampleLogFoldsTheLanternAppearsHistoryFoldsToNothing() throws {
@@ -168,7 +168,7 @@ final class FoldTests: XCTestCase {
 
     func testAForkedHistoryFoldsPerTipSamePrefixDifferentWorlds() throws {
         let forked = root.appendingPathComponent("examples/forked-exploration")
-        let manifest = try parseManifest(try read(forked.appendingPathComponent("manifest.json")))
+        let manifest = try parseManifest(try read(forked.appendingPathComponent("snapshots/base.json")))
         let entries = try readEntries(forked)
 
         let history = try buildHistory(entries)

@@ -12,7 +12,7 @@ import kotlinx.serialization.json.JsonElement
 /** The manifest's own top-level keys (schema/world.schema.json). */
 internal val STRICT_MANIFEST_KEYS: Set<String> = setOf(
     "version", "meta", "entities", "environment", "camera",
-    "avatar", "tours", "soundtrack", "creations", "next_entity_id",
+    "avatar", "ambience", "tours", "soundtrack", "creations", "next_entity_id",
 )
 
 /** The keys `meta` defines. */

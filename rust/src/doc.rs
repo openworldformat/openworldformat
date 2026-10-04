@@ -54,18 +54,29 @@ impl fmt::Display for ApplyError {
 
 impl std::error::Error for ApplyError {}
 
-/// A world as a collaborative session shares it.
+/// A world as a collaborative session shares it: every field a manifest
+/// holds, so the fold's state is always a whole manifest
+/// ([`WorldDoc::to_manifest`] round-trips [`WorldDoc::from_manifest`]).
 #[derive(Debug, Clone, Default)]
 pub struct WorldDoc {
     /// World name (the manifest's `meta.name`).
     pub name: String,
     entities: BTreeMap<u64, WorldEntity>,
     names: HashMap<String, u64>,
+    /// The manifest schema version the world was read at.
+    pub version: u32,
+    /// The rest of `meta` (its `name` is [`WorldDoc::name`]).
+    meta: Option<wt::WorldMeta>,
     pub environment: Option<wt::EnvironmentDef>,
     pub camera: Option<wt::CameraDef>,
     pub avatar: Option<wt::AvatarDef>,
     pub tours: Vec<wt::TourDef>,
+    pub soundtrack: Option<wt::SoundtrackDef>,
     pub ambience: Vec<wt::AmbienceLayerDef>,
+    pub creations: Vec<wt::CreationDef>,
+    /// The lowest id the next spawn may take: ids are never reused, so
+    /// this only grows — deleting the newest entity doesn't free its id.
+    next_floor: u64,
 }
 
 impl WorldDoc {
@@ -73,23 +84,46 @@ impl WorldDoc {
     pub fn new(name: impl Into<String>) -> Self {
         Self {
             name: name.into(),
+            version: crate::world::WORLD_SCHEMA_VERSION,
+            next_floor: 1,
             ..Self::default()
         }
     }
 
     /// A document holding a manifest's inline entities and scene settings.
     ///
-    /// Multi-file worlds must be flattened into `entities` first. An entity
-    /// whose parent isn't in the manifest becomes a root rather than failing
-    /// the whole world.
+    /// An entity whose parent isn't in the manifest becomes a root rather
+    /// than failing the whole world.
     pub fn from_manifest(manifest: &wt::WorldManifest) -> Result<Self, ApplyError> {
         let mut doc = Self::new(manifest.meta.name.clone());
-        doc.environment = manifest.environment.clone();
-        doc.camera = manifest.camera.clone();
-        doc.avatar = manifest.avatar.clone();
-        doc.tours = manifest.tours.clone();
+        doc.set_scene(manifest);
         doc.load_entities(manifest.entities.iter().cloned())?;
         Ok(doc)
+    }
+
+    /// Take every field of `manifest` but its entities.
+    pub fn set_scene(&mut self, manifest: &wt::WorldManifest) {
+        self.name = manifest.meta.name.clone();
+        self.version = manifest.version;
+        self.meta = Some(manifest.meta.clone());
+        self.environment = manifest.environment.clone();
+        self.camera = manifest.camera.clone();
+        self.avatar = manifest.avatar.clone();
+        self.tours = manifest.tours.clone();
+        self.soundtrack = manifest.soundtrack.clone();
+        self.ambience = manifest.ambience.clone();
+        self.creations = manifest.creations.clone();
+        self.next_floor = self.next_floor.max(manifest.next_entity_id);
+    }
+
+    /// The world's metadata, its name included.
+    pub fn meta(&self) -> wt::WorldMeta {
+        let mut meta = self
+            .meta
+            .clone()
+            .unwrap_or_else(|| wt::WorldManifest::new("").meta);
+        meta.name = self.name.clone();
+        meta
     }
 
     /// A document holding exactly `entities` (a scene projection), with the
@@ -143,12 +177,22 @@ impl WorldDoc {
     }
 
     /// The document as a manifest: entities inline, parents before children.
+    ///
+    /// Every field is the document's: a world read with
+    /// [`WorldDoc::from_manifest`] and folded with an empty log comes back
+    /// as it was, up to entity order (spec/session.md, "The fold is
+    /// total").
     pub fn to_manifest(&self) -> wt::WorldManifest {
         let mut manifest = wt::WorldManifest::new(self.name.clone());
+        manifest.version = self.version;
+        manifest.meta = self.meta();
         manifest.environment = self.environment.clone();
         manifest.camera = self.camera.clone();
         manifest.avatar = self.avatar.clone();
         manifest.tours = self.tours.clone();
+        manifest.soundtrack = self.soundtrack.clone();
+        manifest.ambience = self.ambience.clone();
+        manifest.creations = self.creations.clone();
         manifest.entities = self.entities_parent_first().into_iter().cloned().collect();
         manifest.next_entity_id = self.next_id();
         manifest
@@ -197,7 +241,9 @@ impl WorldDoc {
         self.entities
             .keys()
             .next_back()
-            .map_or(1, |id| (id + 1).min(crate::identity::MAX_ENTITY_ID))
+            .map_or(1, |id| id + 1)
+            .max(self.next_floor)
+            .min(crate::identity::MAX_ENTITY_ID)
     }
 
     /// Entities ordered so every parent comes before its children; roots and
@@ -394,6 +440,7 @@ impl WorldDoc {
                 }
                 self.names.insert(entity.name.0.clone(), id);
                 self.entities.insert(id, entity.clone());
+                self.next_floor = self.next_floor.max(id.saturating_add(1));
                 Ok(())
             }
             EditOp::DeleteEntity { id } => {
@@ -472,6 +519,39 @@ impl WorldDoc {
                     .ok_or_else(|| ApplyError::MissingName(name.clone()))?;
                 if let Some(entity) = self.entities.get_mut(&id) {
                     entity.audio = None;
+                }
+                Ok(())
+            }
+            EditOp::ModifyWorld { patch } => {
+                if let Some(meta) = &patch.meta
+                    && meta.name.trim().is_empty()
+                {
+                    return Err(ApplyError::Invalid("a world's name can't be empty".into()));
+                }
+                if let Some(meta) = &patch.meta {
+                    self.name = meta.name.clone();
+                    self.meta = Some(meta.clone());
+                }
+                if let Some(env) = &patch.environment {
+                    self.environment = env.clone();
+                }
+                if let Some(camera) = &patch.camera {
+                    self.camera = camera.clone();
+                }
+                if let Some(avatar) = &patch.avatar {
+                    self.avatar = avatar.clone();
+                }
+                if let Some(tours) = &patch.tours {
+                    self.tours = tours.clone();
+                }
+                if let Some(soundtrack) = &patch.soundtrack {
+                    self.soundtrack = soundtrack.clone();
+                }
+                if let Some(ambience) = &patch.ambience {
+                    self.ambience = ambience.clone();
+                }
+                if let Some(creations) = &patch.creations {
+                    self.creations = creations.clone();
                 }
                 Ok(())
             }

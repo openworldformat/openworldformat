@@ -20,6 +20,7 @@ val EDIT_KEYS: Set<String> = setOf(
     "SetAmbience",
     "SpawnAudioEmitter",
     "RemoveAudioEmitter",
+    "ModifyWorld",
     "Batch",
 )
 
@@ -96,6 +97,9 @@ data class LogEntry(
     val id: String?,
     val parent: String?,
     val classified: List<ClassifiedOp>,
+    /** What the author says the batch is for — a commit message. Part of
+     *  the entry's identity; it folds to nothing. */
+    val message: String? = null,
 )
 
 fun LogEntry(
@@ -105,9 +109,10 @@ fun LogEntry(
     ops: List<JsonElement>,
     id: String? = null,
     parent: String? = null,
+    message: String? = null,
 ): LogEntry = LogEntry(
     revision, author, timestampMs, ops, id, parent,
-    ops.map(::classifyOp),
+    ops.map(::classifyOp), message,
 )
 
 /**
@@ -140,6 +145,7 @@ fun parseLogLine(line: String, strict: Boolean = false): LogEntry {
         // A parent of the wrong shape is the same as absent: id-bearing
         // logs carry parent as a string; anything else falls to the chain.
         parent = o["parent"]?.takeIf { it !is kotlinx.serialization.json.JsonNull }?.str,
+        message = o["message"]?.str,
     )
 }
 

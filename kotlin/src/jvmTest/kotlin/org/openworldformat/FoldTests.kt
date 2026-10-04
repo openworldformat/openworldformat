@@ -187,7 +187,7 @@ class ClassifyTests {
 }
 
 class FoldTests {
-    private val manifestText = readResource("examples/hello-world/manifest.json")
+    private val manifestText = readResource("examples/hello-world/snapshots/base.json")
     private val entries = readEntries("examples/hello-world/ops.jsonl")
 
     @Test
@@ -288,7 +288,7 @@ class FoldTests {
 
     @Test
     fun aForkedHistoryFoldsPerTipSamePrefixDifferentWorlds() {
-        val manifest = parseManifest(readResource("examples/forked-exploration/manifest.json"))
+        val manifest = parseManifest(readResource("examples/forked-exploration/snapshots/base.json"))
         val forkedEntries = readEntries("examples/forked-exploration/ops.jsonl")
 
         val history = buildHistory(forkedEntries)

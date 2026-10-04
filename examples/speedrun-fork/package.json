@@ -1,5 +1,5 @@
 {
-  "format_version": 1,
+  "format_version": 2,
   "name": "speedrun-fork",
   "profiles": [
     "viewer",
@@ -15,5 +15,6 @@
   },
   "forked_from": null,
   "seed": null,
-  "updated_ms": 1790000220000
+  "updated_ms": 1790000220000,
+  "world_sha256": "e735f2b9eec07be0d053e005504d0040f34f7c423197e5d3eac23499690fced8"
 }

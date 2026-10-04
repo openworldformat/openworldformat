@@ -19,7 +19,7 @@ import {
 } from "../src/index.js";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
-const manifestText = readFileSync(path.join(root, "examples/hello-world/manifest.json"), "utf8");
+const manifestText = readFileSync(path.join(root, "examples/hello-world/snapshots/base.json"), "utf8");
 const logText = readFileSync(path.join(root, "examples/hello-world/ops.jsonl"), "utf8");
 const entries = logText
   .split("\n")
@@ -188,7 +188,7 @@ test("state folds over the declaration, tolerating the undeclared", () => {
 
 test("a forked history folds per tip: same prefix, different worlds", () => {
   const forkedDir = path.join(root, "examples/forked-exploration");
-  const manifest = parseManifest(readFileSync(path.join(forkedDir, "manifest.json"), "utf8"));
+  const manifest = parseManifest(readFileSync(path.join(forkedDir, "snapshots/base.json"), "utf8"));
   const entries = readFileSync(path.join(forkedDir, "ops.jsonl"), "utf8")
     .split("\n").filter((l) => l.trim() !== "").map(parseLogLine);
 

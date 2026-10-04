@@ -18,7 +18,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-from . import build_history, fold_log, parse_log_line, parse_manifest
+from . import build_history, fold_log, parse_log_line, read_package
 from .eval import entry_metrics
 
 __all__ = ["summarize", "main"]
@@ -43,8 +43,7 @@ def summarize(world_dir) -> dict:
         span_s, revision, span_ms}``
     """
     world = Path(world_dir)
-    manifest = parse_manifest((world / "manifest.json").read_text())
-    entries = _entries_of(world)
+    manifest, entries, _head, _package = read_package(world)
     state = fold_log(manifest, entries)
     row = entry_metrics(entries, state["applied_edits"])
     row["span_s"] = round(row["span_ms"] / 1000, 3)

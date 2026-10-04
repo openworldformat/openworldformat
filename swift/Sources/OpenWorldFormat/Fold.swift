@@ -19,6 +19,14 @@ public struct FoldState: Equatable, Sendable {
     public var environment: EnvironmentDef?
     public var camera: CameraDef?
     public var ambience: [JSONValue]
+    /// The manifest schema version the world was read at.
+    public var version: Int
+    /// The world's metadata (its name is `name`).
+    public var meta: WorldMeta?
+    /// The rest of the manifest — avatar, tours, soundtrack, creations,
+    /// next_entity_id and any field this reader doesn't type — so the
+    /// fold's state is always a whole manifest (`toManifest`).
+    public var scene: [String: JSONValue]
     public var audioEmitters: [String: JSONValue]
     /// How many edit ops the folded entries carried.
     public var appliedEdits: Int
@@ -44,6 +52,9 @@ public func foldLog(_ manifest: WorldManifest, _ entries: [LogEntry]) throws -> 
         environment: manifest.environment,
         camera: manifest.camera,
         ambience: manifest.ambience,
+        version: manifest.version,
+        meta: manifest.meta,
+        scene: sceneOf(manifest),
         audioEmitters: [:],
         appliedEdits: 0,
         path: nil
@@ -71,6 +82,43 @@ public func foldLog(_ manifest: WorldManifest, _ entries: [LogEntry]) throws -> 
         state.appliedEdits += edits.count
     }
     return state
+}
+
+// MARK: - The whole document
+
+/// The manifest's untyped fields, with `next_entity_id` at its effective
+/// value: ids are never reused, so it is at least one past the largest.
+func sceneOf(_ manifest: WorldManifest) -> [String: JSONValue] {
+    var scene = manifest.fields
+    let past = (manifest.entities.map(\.id).max() ?? 0) + 1
+    let declared = scene["next_entity_id"]?.int ?? 1
+    scene["next_entity_id"] = .number(Double(max(declared, past)))
+    return scene
+}
+
+/// The fold's state as a manifest — the whole document. The fold is
+/// total (spec/session.md): `toManifest(foldLog(m, []))` is `m` again, up
+/// to name binding, entity order and absent-versus-default fields; a
+/// head-first package's `manifest.json` is `toManifest` of its fold to
+/// `main`.
+public func toManifest(_ state: FoldState) throws -> WorldManifest {
+    var o = state.scene
+    o["version"] = .number(Double(state.version))
+    var meta = state.meta ?? WorldMeta(json: .object([:]))
+    meta.name = state.name
+    var m = meta.fields
+    m["name"] = .string(state.name)
+    if let description = meta.description { m["description"] = .string(description) }
+    if !meta.tags.isEmpty { m["tags"] = .array(meta.tags.map(JSONValue.string)) }
+    o["meta"] = .object(m)
+    o["entities"] = .array(state.entities.map(\.json))
+    if let environment = state.environment { o["environment"] = environment.json }
+    if let camera = state.camera { o["camera"] = camera.json }
+    if !state.ambience.isEmpty { o["ambience"] = .array(state.ambience) }
+    let past = (state.entities.map(\.id).max() ?? 0) + 1
+    let floor = state.scene["next_entity_id"]?.int ?? 1
+    o["next_entity_id"] = .number(Double(max(floor, past)))
+    return try WorldManifest(json: .object(o))
 }
 
 // MARK: - Immediate name binding
@@ -174,6 +222,8 @@ func applyEdit(_ state: inout FoldState, _ edit: String, _ value: JSONValue) thr
             throw OpenWorldFormatError.invalid("entity \(entity.id)'s parent \(parent) isn't in the document")
         }
         state.entities.append(entity)
+        let floor = state.scene["next_entity_id"]?.int ?? 1
+        state.scene["next_entity_id"] = .number(Double(max(floor, entity.id + 1)))
 
     case "DeleteEntity":
         guard let id = value["id"]?.int else {
@@ -284,6 +334,37 @@ func applyEdit(_ state: inout FoldState, _ edit: String, _ value: JSONValue) thr
             throw OpenWorldFormatError.invalid("no audio emitter named '\(name)'")
         }
         state.audioEmitters.removeValue(forKey: name)
+
+    case "ModifyWorld":
+        // The scene-wide fields, patched like an entity: absent
+        // unchanged, null clears, a value sets (spec/session.md).
+        let patch = value["patch"]?.object ?? [:]
+        if let meta = patch["meta"] {
+            guard let name = meta["name"]?.string,
+                  !name.trimmingCharacters(in: .whitespaces).isEmpty else {
+                throw OpenWorldFormatError.invalid(
+                    "ModifyWorld.meta must be a meta object with a name; it can't be cleared")
+            }
+            state.meta = WorldMeta(json: meta)
+            state.name = name
+        }
+        if let env = patch["environment"] {
+            state.environment = env == .null ? nil : EnvironmentDef(json: env)
+        }
+        if let camera = patch["camera"] {
+            state.camera = camera == .null ? nil : CameraDef(json: camera)
+        }
+        if let ambience = patch["ambience"] {
+            state.ambience = ambience.array ?? []
+        }
+        for field in ["avatar", "soundtrack", "tours", "creations"] {
+            guard let v = patch[field] else { continue }
+            if v == .null || v.array?.isEmpty == true {
+                state.scene.removeValue(forKey: field)
+            } else {
+                state.scene[field] = v
+            }
+        }
 
     case "Batch":
         let ops = value["ops"]?.array ?? []

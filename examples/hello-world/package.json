@@ -1,5 +1,5 @@
 {
-  "format_version": 1,
+  "format_version": 2,
   "name": "hello-world",
   "profiles": [
     "viewer",
@@ -8,5 +8,6 @@
   "base_revision": 0,
   "head_revision": 1,
   "seed": null,
-  "updated_ms": 1790000002000
+  "updated_ms": 1790000002000,
+  "world_sha256": "1ddacfc5952c3405345a0ced8bb79337bc4dc3baa50634c53c64185a29aa22e0"
 }

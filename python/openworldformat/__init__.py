@@ -30,6 +30,8 @@ from typing import Any
 __all__ = [
     "SUPPORTED_SCHEMA_VERSION",
     "SUPPORTED_FORMAT_VERSION",
+    "BASE_SNAPSHOT",
+    "WORLD_PATCH_KEYS",
     "MAX_ENTITY_ID",
     "REGISTERED_EXTENSIONS",
     "EXT_PROVENANCE_FIELDS",
@@ -45,11 +47,13 @@ __all__ = [
     "build_history",
     "fold_path",
     "fold_log",
+    "to_manifest",
     "compute_inverse",
     "merge_branch",
     "snapshot_filename",
     "compact_package",
     "compact",
+    "read_package",
     "ext_provenance",
 ]
 
@@ -61,8 +65,19 @@ class WorldFormatError(ValueError):
 #: The manifest schema version this fold reads.
 SUPPORTED_SCHEMA_VERSION = 3
 
-#: The package format version this fold reads.
-SUPPORTED_FORMAT_VERSION = 1
+#: The package format version this fold reads: 2, head-first —
+#: ``manifest.json`` is the world at the tip of ``main``, the base lives
+#: in ``snapshots/base.json`` (spec/package.md).
+SUPPORTED_FORMAT_VERSION = 2
+
+#: Where a head-first package keeps the state its log folds from.
+BASE_SNAPSHOT = "snapshots/base.json"
+
+#: The fields ``ModifyWorld``'s patch reaches (spec/session.md).
+WORLD_PATCH_KEYS = (
+    "meta", "environment", "camera", "avatar", "tours", "soundtrack",
+    "ambience", "creations",
+)
 
 #: The entity id ceiling: 2^53 − 1, the largest integer every JSON
 #: number implementation reads exactly. Ids above it are refused at the
@@ -89,6 +104,7 @@ EDIT_KEYS = frozenset({
     "SetAmbience",
     "SpawnAudioEmitter",
     "RemoveAudioEmitter",
+    "ModifyWorld",
     "Batch",
 })
 
@@ -99,7 +115,7 @@ HISTORY_KEYS = frozenset({"tool", "input", "state", "clock", "merge"})
 #: schema's own, plus any registered extension.
 _MANIFEST_KEYS = frozenset({
     "version", "meta", "entities", "environment", "camera", "avatar",
-    "tours", "soundtrack", "creations", "next_entity_id",
+    "ambience", "tours", "soundtrack", "creations", "next_entity_id",
 })
 
 #: The keys strict mode allows inside ``meta``.
@@ -558,6 +574,8 @@ def _apply_edit(state: dict, edit: str, value: dict) -> None:
         # The fold owns its copy: name binding (and any later edit) writes
         # the document's entity, never the entry the writer still holds.
         entity = copy.deepcopy(entity)
+        scene = state["scene"]
+        scene["next_entity_id"] = max(scene["next_entity_id"], entity["id"] + 1)
         state["entities"].append(entity)
         state["by_id"][entity["id"]] = entity
         state["names"].add(entity["name"])
@@ -647,6 +665,36 @@ def _apply_edit(state: dict, edit: str, value: dict) -> None:
         if name not in state["audio_emitters"]:
             raise _invalid(f"no audio emitter named '{name}'")
         del state["audio_emitters"][name]
+    elif edit == "ModifyWorld":
+        # The scene-wide fields, patched like an entity: absent
+        # unchanged, None clears, a value sets (spec/session.md).
+        patch = _coalesce(value.get("patch"), {})
+        scene = state["scene"]
+        if "meta" in patch:
+            meta = patch["meta"]
+            if not isinstance(meta, dict) or not isinstance(meta.get("name"), str) \
+                    or not meta["name"].strip():
+                raise _invalid(
+                    "ModifyWorld.meta must be a meta object with a name; "
+                    "it can't be cleared"
+                )
+            scene["meta"] = meta
+            state["name"] = meta["name"]
+        if "environment" in patch:
+            state["environment"] = patch["environment"]
+        if "camera" in patch:
+            state["camera"] = patch["camera"]
+        if "ambience" in patch:
+            state["ambience"] = _coalesce(patch["ambience"], [])
+        for field in ("avatar", "soundtrack"):
+            if field in patch:
+                if patch[field] is None:
+                    scene.pop(field, None)
+                else:
+                    scene[field] = patch[field]
+        for field in ("tours", "creations"):
+            if field in patch:
+                scene[field] = _coalesce(patch[field], [])
     elif edit == "Batch":
         ops = _coalesce(value.get("ops"), [])
         # All-or-nothing: apply to a deep copy, commit on success.
@@ -666,6 +714,8 @@ def _fresh_trial(state: dict) -> dict:
     entities = copy.deepcopy(state["entities"])
     return {
         "state": {
+            "name": state.get("name", ""),
+            "scene": copy.deepcopy(state["scene"]),
             "entities": entities,
             "environment": copy.deepcopy(state["environment"]),
             "camera": copy.deepcopy(state["camera"]),
@@ -683,6 +733,8 @@ def _fresh_trial(state: dict) -> dict:
 def _commit_trial(state: dict, trial: dict) -> None:
     """Commit a trial's document fields and rebuilt maps onto the fold state."""
     t = trial["state"]
+    state["name"] = t["name"]
+    state["scene"] = t["scene"]
     state["entities"] = t["entities"]
     state["environment"] = t["environment"]
     state["camera"] = t["camera"]
@@ -693,6 +745,59 @@ def _commit_trial(state: dict, trial: dict) -> None:
     state["name_to_id"] = t["name_to_id"]
 
 
+def _scene_of(manifest: dict) -> dict:
+    """The manifest fields a fold carries besides entities, environment,
+    camera and ambience. ``next_entity_id`` only grows: ids are never
+    reused."""
+    entities = _coalesce(manifest.get("entities"), [])
+    past = max((e.get("id", 0) + 1 for e in entities), default=1)
+    scene = {
+        "version": manifest.get("version"),
+        "meta": copy.deepcopy(manifest.get("meta")),
+        "tours": copy.deepcopy(_coalesce(manifest.get("tours"), [])),
+        "creations": copy.deepcopy(_coalesce(manifest.get("creations"), [])),
+        "next_entity_id": max(_coalesce(manifest.get("next_entity_id"), 1), past),
+    }
+    for field in ("avatar", "soundtrack"):
+        if manifest.get(field) is not None:
+            scene[field] = copy.deepcopy(manifest[field])
+    return scene
+
+
+def to_manifest(state: dict) -> dict:
+    """The fold's state as a manifest — the whole document. The fold is
+    total (spec/session.md): ``to_manifest(fold_log(m, []))`` is ``m``
+    again, up to name binding, entity order and absent-versus-default
+    fields; a head-first package's ``manifest.json`` is ``to_manifest``
+    of its fold to ``main``.
+
+    :param state: a fold state, as :func:`fold_log` returns
+    :return: a manifest dict
+    """
+    scene = state["scene"]
+    meta = copy.deepcopy(scene.get("meta")) if isinstance(scene.get("meta"), dict) else {}
+    meta["name"] = state.get("name", "")
+    manifest = {"version": scene.get("version"), "meta": meta}
+    if state.get("environment") is not None:
+        manifest["environment"] = copy.deepcopy(state["environment"])
+    if state.get("camera") is not None:
+        manifest["camera"] = copy.deepcopy(state["camera"])
+    if "avatar" in scene:
+        manifest["avatar"] = copy.deepcopy(scene["avatar"])
+    if scene.get("tours"):
+        manifest["tours"] = copy.deepcopy(scene["tours"])
+    if "soundtrack" in scene:
+        manifest["soundtrack"] = copy.deepcopy(scene["soundtrack"])
+    if state.get("ambience"):
+        manifest["ambience"] = copy.deepcopy(state["ambience"])
+    manifest["entities"] = copy.deepcopy(state["entities"])
+    if scene.get("creations"):
+        manifest["creations"] = copy.deepcopy(scene["creations"])
+    past = max((e["id"] + 1 for e in state["entities"]), default=1)
+    manifest["next_entity_id"] = max(scene["next_entity_id"], past)
+    return manifest
+
+
 def fold_log(manifest: dict, entries: list) -> dict:
     """Fold log entries over a manifest: the document at the last entry.
 
@@ -701,7 +806,8 @@ def fold_log(manifest: dict, entries: list) -> dict:
     fold-so-far including the entry's own edits (spec/world.md
     "Identity" — saved worlds always contain ids).
 
-    :param manifest: a parsed manifest (the base, at base_revision)
+    :param manifest: a parsed manifest (the base, at base_revision — in a
+        head-first package, ``snapshots/base.json``)
     :param entries: parsed log entries, in order
     :return: ``{"name", "entities", "environment", "camera", "ambience",
         "audio_emitters", "applied_edits"}`` — plus the internal
@@ -717,7 +823,8 @@ def fold_log(manifest: dict, entries: list) -> dict:
         "entities": copy.deepcopy(_coalesce(manifest.get("entities"), [])),
         "environment": manifest.get("environment"),
         "camera": manifest.get("camera"),
-        "ambience": _coalesce(manifest.get("ambience"), []),
+        "ambience": copy.deepcopy(_coalesce(manifest.get("ambience"), [])),
+        "scene": _scene_of(manifest),
         "audio_emitters": {},
         "applied_edits": 0,
     }
@@ -751,15 +858,6 @@ def fold_log(manifest: dict, entries: list) -> dict:
 # ---------------------------------------------------------------------------
 # Undo and merge
 # ---------------------------------------------------------------------------
-
-#: The camera a world with no camera has — the schema's own defaults,
-#: restored when SetCamera's inverse has nothing older to restore.
-_DEFAULT_CAMERA = {
-    "position": [5, 5, 5],
-    "look_at": [0, 0, 0],
-    "fov_degrees": 45,
-}
-
 
 def _subtree_parent_first(state: dict, id_) -> list:
     """The entity and its descendants, every parent before its children —
@@ -839,12 +937,28 @@ def compute_inverse(op: dict, state: dict) -> dict:
         return {"ModifyEntity": {"id": entity["id"], "patch": {
             field: copy.deepcopy(entity.get(field)) for field in patch
         }}}
+    # A scene setting that didn't exist comes back as absent, not as a
+    # default one: ModifyWorld clears it.
     if edit == "SetEnvironment":
-        env = _coalesce(state.get("environment"), {})
-        return {"SetEnvironment": {"env": copy.deepcopy(env)}}
+        if state.get("environment") is None:
+            return {"ModifyWorld": {"patch": {"environment": None}}}
+        return {"SetEnvironment": {"env": copy.deepcopy(state["environment"])}}
     if edit == "SetCamera":
-        camera = _coalesce(state.get("camera"), _DEFAULT_CAMERA)
-        return {"SetCamera": {"camera": copy.deepcopy(camera)}}
+        if state.get("camera") is None:
+            return {"ModifyWorld": {"patch": {"camera": None}}}
+        return {"SetCamera": {"camera": copy.deepcopy(state["camera"])}}
+    if edit == "ModifyWorld":
+        patch = _coalesce(value.get("patch"), {}) if isinstance(value, dict) else {}
+        now = to_manifest(state)
+        inverse = {}
+        for field in patch:
+            if field not in WORLD_PATCH_KEYS:
+                continue  # must-ignore
+            if field in ("tours", "creations", "ambience"):
+                inverse[field] = copy.deepcopy(now.get(field, []))
+            else:
+                inverse[field] = copy.deepcopy(now.get(field))
+        return {"ModifyWorld": {"patch": inverse}}
     if edit == "SetAmbience":
         ambience = _coalesce(state.get("ambience"), [])
         return {"SetAmbience": {"ambience": copy.deepcopy(ambience)}}
@@ -1084,82 +1198,85 @@ def compact_package(package_json: dict, head_revision: int) -> dict:
     return updated
 
 
-def compact(world_dir, head_revision: int | None = None) -> Path:
-    """Compact a package (spec/session.md "Snapshots"): fold it to its
-    head — or the given revision — write the folded document as the new
-    ``manifest.json``, move ``package.json``'s ``base_revision`` to the
-    head, archive the log as ``ops.archive.jsonl`` and start a fresh
-    empty ``ops.jsonl``. Compaction changes nothing observable about
-    the current state — folding the package before and after reaches
-    the same world — it truncates structural replay and nothing else.
-    Snapshots and the state document stay as they are.
+def read_package(world_dir) -> tuple:
+    """Read a package the head-first way (spec/package.md): the base the
+    log folds from, the log, the head and ``package.json``.
 
-    :param world_dir: the package directory (``manifest.json`` plus its
-        ``ops.jsonl``)
-    :param head_revision: the revision to fold to; None for the log's
-        own head
-    :return: the package directory, compacted
-    :raises WorldFormatError: as :func:`fold_log` — a compaction is a
-        fold, and it must succeed
+    The base is ``snapshots/base.json``; a package whose log holds no
+    edits may leave it out, and its base is then its head.
+
+    :param world_dir: the package directory
+    :return: ``(base, entries, head, package)`` — ``package`` is None
+        when there is no ``package.json``
+    :raises WorldFormatError: when the log holds edits but the package
+        has no base to fold them from
     """
     world = Path(world_dir)
-    manifest = parse_manifest((world / "manifest.json").read_text())
+    head = parse_manifest((world / "manifest.json").read_text())
+    log = world / "ops.jsonl"
+    entries = [
+        parse_log_line(line) for line in log.read_text().splitlines() if line.strip()
+    ] if log.exists() else []
+    base_path = world / BASE_SNAPSHOT
+    if base_path.exists():
+        base = parse_manifest(base_path.read_text())
+    elif any(edit_ops(e) for e in entries):
+        raise WorldFormatError(
+            f"{world.name}: the log holds edits but there is no {BASE_SNAPSHOT} to fold them from"
+        )
+    else:
+        base = head
     package_path = world / "package.json"
-    package = None
-    if package_path.exists():
-        package = json.loads(package_path.read_text())
+    package = json.loads(package_path.read_text()) if package_path.exists() else None
+    return base, entries, head, package
 
+
+def compact(world_dir, head_revision: int | None = None) -> Path:
+    """Compact a head-first package (spec/session.md "Snapshots"): move
+    the base up to the head — or to the given revision — archive the
+    entries the new base already holds as ``ops.archive.jsonl``, and keep
+    the rest in ``ops.jsonl``. ``manifest.json`` (the head) is untouched:
+    compaction changes nothing observable about the current state, it
+    truncates structural replay and nothing else.
+
+    :param world_dir: the package directory
+    :param head_revision: the revision the new base holds; None for the
+        log's own head
+    :return: the package directory, compacted
+    :raises WorldFormatError: as :func:`fold_log` — moving the base to a
+        revision is a fold, and it must succeed
+    """
+    world = Path(world_dir)
+    base, entries, _head, package = read_package(world)
     log_path = world / "ops.jsonl"
-    entries = []
-    if log_path.exists():
-        entries = [
-            parse_log_line(line)
-            for line in log_path.read_text().splitlines() if line.strip()
-        ]
+    lines = [line for line in log_path.read_text().splitlines() if line.strip()] \
+        if log_path.exists() else []
+
     if head_revision is None:
         head_revision = max(
             (e["revision"] for e in entries),
             default=_coalesce(_coalesce(package, {}).get("base_revision"), 0),
         )
+        new_base = (world / "manifest.json").read_text()
+        archived, kept = lines, []
     else:
-        entries = [e for e in entries if e["revision"] <= head_revision]
+        cut = [i for i, e in enumerate(entries) if e["revision"] <= head_revision]
+        upto = (cut[-1] + 1) if cut else 0
+        state = fold_log(base, entries[:upto])
+        new_base = json.dumps(to_manifest(state), indent=2) + "\n"
+        archived, kept = lines[:upto], lines[upto:]
 
-    state = fold_log(manifest, entries)
-
-    # The folded document as the new base: entities inline, the next id
-    # one past the highest (capped at the ceiling), the scene as the
-    # fold left it — environment and camera from the fold (edits move
-    # them), meta, avatar and tours carried from the base, which no
-    # edit op touches.
-    meta = manifest.get("meta")
-    if not isinstance(meta, dict) or not meta:
-        meta = {"name": state["name"]} if state["name"] else {}
-    document = {
-        "version": SUPPORTED_SCHEMA_VERSION,
-        "meta": copy.deepcopy(meta),
-        "entities": copy.deepcopy(state["entities"]),
-        "next_entity_id": min(
-            max((e.get("id", 0) for e in state["entities"]), default=0) + 1,
-            MAX_ENTITY_ID,
-        ),
-    }
-    if state.get("environment") is not None:
-        document["environment"] = copy.deepcopy(state["environment"])
-    if state.get("camera") is not None:
-        document["camera"] = copy.deepcopy(state["camera"])
-    for field in ("avatar", "tours", "soundtrack", "creations"):
-        if field in manifest:
-            document[field] = copy.deepcopy(manifest[field])
-
-    (world / "manifest.json").write_text(json.dumps(document, indent=2) + "\n")
+    (world / "snapshots").mkdir(exist_ok=True)
+    (world / BASE_SNAPSHOT).write_text(new_base)
 
     if package is None:
         package = {"format_version": SUPPORTED_FORMAT_VERSION}
+    package_path = world / "package.json"
     package_path.write_text(
         json.dumps(compact_package(package, head_revision), indent=2) + "\n"
     )
 
-    if log_path.exists():
-        log_path.rename(world / "ops.archive.jsonl")
-    log_path.write_text("")
+    if archived:
+        (world / "ops.archive.jsonl").write_text("\n".join(archived) + "\n")
+    log_path.write_text("".join(line + "\n" for line in kept))
     return world

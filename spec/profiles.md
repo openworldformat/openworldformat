@@ -11,6 +11,7 @@ declares which profiles it uses.
 | **Viewer** (core, required of everyone) | manifest, entities, parametric shapes + mesh refs, PBR materials, punctual lights, environment, hierarchy, ids/names, versioning | any renderer, converter, gallery |
 | **Player** | behaviors, triggers, ambient/emitter audio, soundtrack + modulation, avatar, tours, the state document | games, walkable documents, song worlds |
 | **Session** | the ops log, revisions, authorship, snapshots, undo semantics | multiplayer, recordings, editors, save games |
+| **Authoring** | an authority's ingestion of batches (names bound, ids allocated, struct patches merged as JSON Merge Patch, strict reading, assets stored, all-or-nothing), the head-first write order, the canonical text | editors, agent canvases, command-line tools — anything that changes a package |
 
 ## The must-ignore rule
 
@@ -25,6 +26,11 @@ else gates softly.
 ### Strict Mode for Authoring
 
 While runtime consumers (viewers, players) MUST follow the must-ignore rule, authoring tools and validators SHOULD implement a "Strict Mode". In Strict Mode, unknown fields, unregistered extensions, and unmapped properties are treated as validation errors rather than ignored. This prevents silent typos during world generation and ensures emitted packages are fully compliant.
+
+An authority implementing the Authoring profile MUST read the batches it
+is sent strictly: a key the format would drop is a refusal with a JSON
+pointer to it ([the session log](session.md), "Authoring"). An author is
+told about its typo; a viewer reading the world later never has to be.
 
 ## Extensions
 

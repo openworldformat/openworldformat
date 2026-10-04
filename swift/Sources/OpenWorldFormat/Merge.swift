@@ -75,7 +75,8 @@ public func mergeBranch(
                 timestampMs: entry.timestampMs,
                 ops: ops,
                 id: entry.id,
-                parent: entry.parent)
+                parent: entry.parent,
+                message: entry.message)
             : entry)
     }
     return (entries: rewritten, remapped: remapped)

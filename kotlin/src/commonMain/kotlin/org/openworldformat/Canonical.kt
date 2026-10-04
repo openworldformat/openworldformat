@@ -237,6 +237,7 @@ fun computeEntryId(entry: LogEntry): String {
         entry.timestampMs?.let { put("timestamp_ms", timestampPrimitive(it)) }
         put("ops", JsonArray(entry.ops))
         entry.parent?.let { put("parent", it) }
+        entry.message?.let { put("message", it) }
     }
     val digest = sha256(canonicalJson(hashed).encodeToByteArray())
     return "sha256:" + hexLower(digest)

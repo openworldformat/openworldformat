@@ -1,5 +1,5 @@
 {
-  "format_version": 1,
+  "format_version": 2,
   "name": "the-drop-test",
   "profiles": [
     "viewer",
@@ -12,8 +12,9 @@
   "base_revision": 0,
   "head_revision": 1,
   "refs": {
-    "main": "line-2"
+    "main": "line-1"
   },
   "seed": null,
-  "updated_ms": 1790000100300
+  "updated_ms": 1790000100300,
+  "world_sha256": "5c840a770bae772f836e6bbca337f0f8d1d8e4478a7a931a79fcce998450a12c"
 }

@@ -14,13 +14,17 @@ cargo add --path rust openworldformat
 ```rust
 use openworldformat::{WorldManifest, OpLogEntry, fold_log, fold_path};
 
-let manifest: WorldManifest = serde_json::from_str(&manifest_text)?;
+// A head-first package: manifest.json is the world now…
+let world: WorldManifest = serde_json::from_str(&manifest_text)?;
+// …and the log folds over snapshots/base.json back to it.
+let base: WorldManifest = serde_json::from_str(&base_text)?;
 let entries: Vec<OpLogEntry> = log_text.lines()
     .filter(|l| !l.trim().is_empty())
     .map(serde_json::from_str).collect::<Result<_, _>>()?;
 
-let doc = fold_log(&manifest.as_base()?, &entries)?;   // the world at head
-let (doc, path) = fold_path(&base, &entries, Some("e3"))?; // or at any tip
+let doc = fold_log(&base.as_base()?, &entries)?;      // the world at head
+let (doc, path) = fold_path(&base.as_base()?, &entries, Some("e3"))?; // or at any tip
+let same = doc.to_manifest();                          // a whole manifest again
 ```
 
 `openworldformat::state::fold_state` folds the game state over
@@ -28,6 +32,25 @@ let (doc, path) = fold_path(&base, &entries, Some("e3"))?; // or at any tip
 `openworldformat::physics` carries the extension's deterministic
 reference solver, trajectory write/fold, and the conformance outcome
 runner; the `schema` feature generates `world.schema.json`.
+
+## The 0.3 surface (draft 0.3: head-first, live authoring)
+
+- **The fold is total.** `WorldDoc` carries every manifest field —
+  version, meta, soundtrack, creations, ambience, a `next_entity_id` that
+  never goes down — and `to_manifest` writes them all back.
+- **`EditOp::ModifyWorld { patch: Box<WorldPatch> }`** reaches meta,
+  environment, camera, avatar, tours, soundtrack, ambience and creations
+  (absent unchanged, `null` clears); its inverse restores them. A first
+  `SetEnvironment`/`SetCamera` now inverts to a clearing `ModifyWorld`.
+- **`authoring::ingest(&doc, &batch)`** — the Authoring profile: names to
+  ids, ids for spawns, partial struct patches merged (`merge_patch`, RFC
+  7396), strict reading, whole-batch refusal with a reason per op.
+- **`manifest_text` / `manifest_text_of`** — the canonical text an
+  authority writes, byte-identical to the JS `manifestText`.
+- **`OpLogEntry.message`** (optional) — part of the entry's identity.
+- **Head-first packages**: `PACKAGE_FORMAT_VERSION` is 2,
+  `BASE_SNAPSHOT` is `snapshots/base.json`; `MergeRecord` reads the
+  spec's `{"merge": {"branch": …}}` (it read `{"branch": …}` before).
 
 ## The 0.2 surface (draft 0.2 compliance)
 

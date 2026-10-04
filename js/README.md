@@ -31,17 +31,22 @@ npm install openworldformat
 ## Use
 
 ```js
-import { parseManifest, parseLogLine, foldLog } from "openworldformat";
+import { parseManifest, parseLogLine, foldLog, toManifest } from "openworldformat";
 
-const manifest = parseManifest(await fs.readFile("world/manifest.json", "utf8"));
+// A head-first package: manifest.json is the world now; a viewer stops here.
+const world = parseManifest(await fs.readFile("world/manifest.json", "utf8"));
+
+// The log folds over snapshots/base.json back to it.
+const base = parseManifest(await fs.readFile("world/snapshots/base.json", "utf8"));
 const entries = (await fs.readFile("world/ops.jsonl", "utf8"))
   .split("\n")
   .filter((l) => l.trim() !== "")
   .map(parseLogLine);
 
-const state = foldLog(manifest, entries);
+const state = foldLog(base, entries);
 state.entities; // the world at head revision
 state.appliedEdits; // how many edits the log held
+toManifest(state); // the whole manifest again — the fold is total
 ```
 
 The fold applies the spec's rules: only `edit` ops change the document;
@@ -78,6 +83,10 @@ unchanged — peer `three`, nothing else.
 | `opKindShapeOk(kind)` | the shape collision rule: edits PascalCase, history kinds lowercase |
 | `editOps(entry)` | an entry's edits, in order |
 | `foldLog(manifest, entries)` | the document at the last entry (the linear fold) |
+| `toManifest(state)` | the fold's state as a whole manifest — `toManifest(foldLog(m, []))` is `m` again |
+| `ingest(state, batch)` | the Authoring profile: a batch by name, partial patches merged, read strictly, all or nothing |
+| `mergePatch(current, change)` | JSON Merge Patch (RFC 7396), as ingestion applies it |
+| `manifestText(manifest)` | the canonical text an authority writes (byte-identical to the Rust reference's) |
 | `buildHistory(entries)` | ids, parents, children and tips of a branching log |
 | `foldPath(manifest, entries, tip?)` | the document at a tip — fork anywhere, fold that path |
 | `foldState(stateDoc, entries)` | the game state at the last entry (declared fields, map subkeys, tolerant of the undeclared) |
@@ -89,6 +98,8 @@ unchanged — peer `three`, nothing else.
 | `compactPackage(packageJson, headRevision)` | the `package.json` half of compaction (`base_revision` to head) |
 | `extProvenance(manifest)` | read `meta["ext-provenance"]` lineage, or null |
 | `SUPPORTED_SCHEMA_VERSION` | the manifest schema this reads (3) |
+| `SUPPORTED_FORMAT_VERSION`, `BASE_SNAPSHOT` | the package format (2, head-first) and where its base lives |
+| `WORLD_PATCH_KEYS` | the fields `ModifyWorld` reaches |
 | `MAX_ENTITY_ID` | the id ceiling, 2^53 − 1 |
 | `REGISTERED_EXTENSIONS` | the extensions the registry has accepted |
 

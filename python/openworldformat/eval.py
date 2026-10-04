@@ -39,6 +39,7 @@ from . import (
     fold_state,
     parse_log_line,
     parse_manifest,
+    read_package,
 )
 
 __all__ = ["run_task", "load_task_file", "entry_metrics", "main"]
@@ -181,9 +182,7 @@ def load_task_file(path) -> tuple:
     world = Path(task["world"])
     if not world.is_absolute():
         world = (path.parent / world).resolve()
-    manifest = parse_manifest((world / "manifest.json").read_text())
-    log = world / "ops.jsonl"
-    entries = [parse_log_line(l) for l in log.read_text().splitlines() if l.strip()] if log.exists() else []
+    manifest, entries, _head, _package = read_package(world)
     state_file = world / (task.get("state") or "state.json")
     state_doc = json.loads(state_file.read_text()) if state_file.exists() else None
     return manifest, entries, task, state_doc

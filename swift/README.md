@@ -54,7 +54,7 @@ for entity in state.entities {
 
 // Branches: the same log, a different tip.
 let history = try package.history()                  // tips, children
-let variant = try foldPath(package.manifest, package.entries, tip: "e5")
+let variant = try foldPath(package.base, package.entries, tip: "e5")
 
 // Save-game state: typed fields, folded over the declaration.
 let stateValues = package.stateValues().values       // ["score.tour": 1]
@@ -63,13 +63,20 @@ let stateValues = package.stateValues().values       // ["score.tour": 1]
 Piece by piece, if a package is more than folders for you:
 
 ```swift
-let manifest = try parseManifest(manifestText)
+let base = try parseManifest(baseText)              // snapshots/base.json
 let entries = try logText.split(separator: "\n")
     .filter { !$0.isEmpty }
     .map(String.init)
     .map(parseLogLine)
-let world = try foldLog(manifest, entries)           // the world at head
+let world = try foldLog(base, entries)               // the world at head
+let same = try toManifest(world)                     // a whole manifest again
 ```
+
+`package.manifest` is the world now — a head-first package's
+`manifest.json`, all a viewer needs; `package.base` is
+`snapshots/base.json`, what the log folds from. The fold is total
+(`toManifest`), `ModifyWorld` applies and inverts, and an entry's
+`message` is part of its identity (spec draft 0.3).
 
 ## What it carries, what it doesn't
 

@@ -19,7 +19,9 @@ use crate::history::EditOp;
 use crate::oplog::OpLogEntry;
 
 /// The session package format's version (`session.json`'s `format_version`).
-pub const SESSION_FORMAT_VERSION: u32 = 1;
+/// Version 2 is head-first: `manifest.json` holds the world at the tip of
+/// `main` and the base lives in `snapshots/base.json` (spec/package.md).
+pub const SESSION_FORMAT_VERSION: u32 = 2;
 
 /// The edit op kinds, as the shape collision rule spells them:
 /// PascalCase, always — history kinds are lowercase, always, and the
@@ -33,6 +35,7 @@ pub const EDIT_KEYS: &[&str] = &[
     "SetAmbience",
     "SpawnAudioEmitter",
     "RemoveAudioEmitter",
+    "ModifyWorld",
     "Batch",
 ];
 
@@ -123,9 +126,16 @@ impl<'de> Deserialize<'de> for ExtensionRecord {
     }
 }
 
-/// Where a merged batch came from.
+/// Where a merged batch came from: `{"merge": {"branch": "…"}}`, the
+/// history kind's key wrapping its body, as `state` and `clock` do.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MergeRecord {
+    pub merge: MergeSource,
+}
+
+/// The body of a merge record.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MergeSource {
     /// The merged branch's name (a ref in the source package).
     pub branch: String,
 }
@@ -205,14 +215,14 @@ pub struct SessionMeta {
     /// Which app wrote the package ("gen", "md", "verse").
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub app: Option<String>,
-    /// The revision `world.ron` holds.
+    /// The revision `snapshots/base.json` holds.
     pub base_revision: u64,
     /// The newest revision the log reaches.
     pub head_revision: u64,
     /// The session's seed, for deterministic replay. Reserved.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub seed: Option<u64>,
-    /// SHA-256 of `world.ron`, hex.
+    /// SHA-256 of `manifest.json` (the head) as last written, hex.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub world_sha256: Option<String>,
     /// SHA-256 of `ops.jsonl` as of `head_revision`, hex.
@@ -456,6 +466,7 @@ pub fn merge_branch(main: &WorldDoc, entries: &[OpLogEntry]) -> Result<MergedBra
             timestamp_ms: entry.timestamp_ms,
             id: entry.id.clone(),
             parent: entry.parent.clone(),
+            message: None,
         })
         .collect();
     Ok(MergedBranch {
@@ -615,6 +626,7 @@ mod tests {
             timestamp_ms: 9,
             id: None,
             parent: None,
+            message: None,
         };
         let line = crate::encode_line(&entry).unwrap();
         let back: OpLogEntry = crate::decode_line(&line).unwrap();
@@ -641,6 +653,7 @@ mod tests {
             timestamp_ms: rev,
             id: id.map(Into::into),
             parent: parent.map(Into::into),
+            message: None,
         };
         vec![
             mk(Some("e1"), None, 1, "keep"),
@@ -654,13 +667,26 @@ mod tests {
                     name: "host".into(),
                 },
                 ops: vec![SessionOp::Merge(MergeRecord {
-                    branch: "moat-variant".into(),
+                    merge: MergeSource {
+                        branch: "moat-variant".into(),
+                    },
                 })],
                 timestamp_ms: 4,
                 id: Some("e5".into()),
                 parent: Some("e4".into()),
+                message: None,
             },
         ]
+    }
+
+    #[test]
+    fn a_merge_record_reads_as_the_spec_writes_it() {
+        let op: SessionOp = serde_json::from_str(r#"{"merge":{"branch":"moat-variant"}}"#).unwrap();
+        assert!(matches!(&op, SessionOp::Merge(m) if m.merge.branch == "moat-variant"));
+        assert_eq!(
+            serde_json::to_string(&op).unwrap(),
+            r#"{"merge":{"branch":"moat-variant"}}"#
+        );
     }
 
     #[test]
@@ -703,6 +729,7 @@ mod tests {
                 timestamp_ms: 0,
                 id: None,
                 parent: None,
+                message: None,
             },
             OpLogEntry {
                 revision: 2,
@@ -714,6 +741,7 @@ mod tests {
                 timestamp_ms: 1,
                 id: None,
                 parent: None,
+                message: None,
             },
         ];
         let (doc, path) = fold_path(&base, &entries, None).unwrap();
@@ -749,6 +777,7 @@ mod tests {
                 timestamp_ms: 3,
                 id: Some("b1".into()),
                 parent: None,
+                message: None,
             },
             OpLogEntry {
                 revision: 4,
@@ -760,6 +789,7 @@ mod tests {
                 timestamp_ms: 4,
                 id: Some("b2".into()),
                 parent: Some("b1".into()),
+                message: None,
             },
         ];
 
@@ -807,6 +837,7 @@ mod tests {
             timestamp_ms: 2,
             id: Some("b1".into()),
             parent: None,
+            message: None,
         };
         let merged = merge_branch(&main, &[entry]).unwrap();
         assert!(merged.remapped.is_empty());
@@ -861,6 +892,7 @@ mod tests {
                 timestamp_ms: 0,
                 id: None,
                 parent: None,
+                message: None,
             },
             OpLogEntry {
                 revision: 1,
@@ -878,6 +910,7 @@ mod tests {
                 timestamp_ms: 1,
                 id: None,
                 parent: None,
+                message: None,
             },
             OpLogEntry {
                 revision: 2,
@@ -889,6 +922,7 @@ mod tests {
                 timestamp_ms: 2,
                 id: None,
                 parent: None,
+                message: None,
             },
         ];
         let doc = fold_log(&base, &entries).unwrap();
@@ -905,6 +939,7 @@ mod tests {
             timestamp_ms: 3,
             id: None,
             parent: None,
+            message: None,
         }];
         assert!(fold_log(&base, &broken).is_err());
     }

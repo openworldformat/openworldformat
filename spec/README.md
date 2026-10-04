@@ -1,7 +1,7 @@
 # The Open World Format specification
 
-**Status: draft 0.2.** This specification describes `.world` packages at
-manifest schema version 3. The normative definitions are:
+**Status: draft 0.3.** This specification describes `.world` packages at
+manifest schema version 3, package format 2 (head-first). The normative definitions are:
 
 1. [`schema/world.schema.json`](../schema/world.schema.json) — the world
    document's data model, machine-readable. Where prose and schema
@@ -33,11 +33,16 @@ manifest schema version 3. The normative definitions are:
 fold(base, path from base to tip) == state at tip
 ```
 
-Everything the format offers is a consequence: rendering (fold nothing,
-read the base), editing (append edit ops), multiplayer (one authority
+Everything the format offers is a consequence: rendering (read
+`manifest.json`, the fold at the tip of `main`, already written down),
+editing (send edit ops to the one authority), multiplayer (one authority
 orders the ops), undo (append inverses), save games (base + a player's
-log), replays (fold with a clock), mods (patches against a pinned base
-revision), forking (base + log prefix).
+log), replays (fold with a clock, or walk the keyframes), mods (patches
+against a pinned base revision), forking (base + log prefix).
+
+The fold is total — its state is a whole manifest, and every field is
+reachable by an edit — so the head can always be written down, and an
+agent working from outside the app can change anything a person can.
 
 ## What this format is not
 
@@ -61,7 +66,10 @@ engine's.
   package to write them (a challenge chain: two runs, one fork each).
   No app writes branches yet, and the viewer has no branch rail.
 - More prose around replay determinism as implementers arrive.
-- **Live authoring** is proposed ([rfcs/live-authoring.md](rfcs/live-authoring.md)):
-  agents outside the app submit ops to one authority, `manifest.json`
-  becomes the head, a `ModifyWorld` op makes the fold total, and git may
-  carry the history.
+- **Live authoring** is accepted ([rfcs/live-authoring.md](rfcs/live-authoring.md))
+  and normative in [the package](package.md) and [the session log](session.md):
+  agents outside the app submit ops to one authority, `manifest.json` is
+  the head, `ModifyWorld` makes the fold total, and git may carry the
+  history. Still open: a semantic merge driver for git, and the Authoring
+  profile in the Python, Swift and Kotlin references (they read
+  everything it writes).

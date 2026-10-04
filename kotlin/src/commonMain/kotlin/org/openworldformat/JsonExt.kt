@@ -21,8 +21,20 @@ import kotlinx.serialization.json.doubleOrNull
 /** The manifest schema version this package reads. */
 const val SUPPORTED_SCHEMA_VERSION: Int = 3
 
-/** The package format version this package reads. */
-const val SUPPORTED_FORMAT_VERSION: Int = 1
+/**
+ * The package format version this package reads: 2, head-first —
+ * `manifest.json` is the world at the tip of `main`, the base lives in
+ * `snapshots/base.json` (spec/package.md).
+ */
+const val SUPPORTED_FORMAT_VERSION: Int = 2
+
+/** Where a head-first package keeps the state its log folds from. */
+const val BASE_SNAPSHOT: String = "snapshots/base.json"
+
+/** The fields `ModifyWorld`'s patch reaches (spec/session.md). */
+val WORLD_PATCH_KEYS: List<String> = listOf(
+    "meta", "environment", "camera", "avatar", "tours", "soundtrack", "ambience", "creations",
+)
 
 /**
  * The entity id ceiling: 2^53 − 1, the largest integer every JSON

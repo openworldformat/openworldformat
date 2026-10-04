@@ -1,0 +1,35 @@
+{
+  "version": 3,
+  "meta": {
+    "name": "castle-exploration",
+    "description": "One trunk, one fork: the same castle up to the wall, then a garden variant and a moat variant diverge. Fold either tip."
+  },
+  "entities": [
+    {
+      "id": 1,
+      "name": "ground",
+      "transform": {
+        "position": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "shape": {
+        "Plane": {
+          "x": 40.0,
+          "z": 40.0
+        }
+      },
+      "material": {
+        "color": [
+          0.35,
+          0.45,
+          0.3,
+          1.0
+        ],
+        "roughness": 0.95
+      }
+    }
+  ]
+}

@@ -17,7 +17,7 @@ class SuiteTest(unittest.TestCase):
     task's own log is its solution."""
 
     def setUp(self):
-        self.manifest = parse_manifest((HELLO / "manifest.json").read_text())
+        self.manifest = parse_manifest((HELLO / "snapshots" / "base.json").read_text())
         self.state_doc = json.loads((HELLO / "state.json").read_text())
 
     def test_every_demo_task_passes_with_its_own_log(self):
@@ -55,7 +55,7 @@ class SuiteTest(unittest.TestCase):
 
 class PredicateTest(unittest.TestCase):
     def setUp(self):
-        self.manifest = parse_manifest((HELLO / "manifest.json").read_text())
+        self.manifest = parse_manifest((HELLO / "snapshots" / "base.json").read_text())
         self.state_doc = json.loads((HELLO / "state.json").read_text())
 
     def run_goal(self, goal, budget=None):

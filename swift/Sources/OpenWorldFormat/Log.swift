@@ -17,6 +17,7 @@ public let EDIT_KEYS: Set<String> = [
     "SetAmbience",
     "SpawnAudioEmitter",
     "RemoveAudioEmitter",
+    "ModifyWorld",
     "Batch",
 ]
 
@@ -88,6 +89,9 @@ public struct LogEntry: Equatable, Sendable {
     public var ops: [JSONValue]
     public var id: String?
     public var parent: String?
+    /// What the author says the batch is for — a commit message. It is
+    /// part of the entry's identity and folds to nothing.
+    public var message: String?
     public var classified: [ClassifiedOp]
 
     public init(
@@ -96,8 +100,10 @@ public struct LogEntry: Equatable, Sendable {
         timestampMs: Double? = nil,
         ops: [JSONValue],
         id: String? = nil,
-        parent: String? = nil
+        parent: String? = nil,
+        message: String? = nil
     ) {
+        self.message = message
         self.revision = revision
         self.author = author
         self.timestampMs = timestampMs
@@ -156,7 +162,8 @@ public func parseLogLine(_ line: String, strict: Bool = false) throws -> LogEntr
         timestampMs: o["timestamp_ms"]?.double,
         ops: ops,
         id: id,
-        parent: parent
+        parent: parent,
+        message: o["message"]?.string
     )
 }
 
