@@ -61,3 +61,7 @@ engine's.
   package to write them (a challenge chain: two runs, one fork each).
   No app writes branches yet, and the viewer has no branch rail.
 - More prose around replay determinism as implementers arrive.
+- **Live authoring** is proposed ([rfcs/live-authoring.md](rfcs/live-authoring.md)):
+  agents outside the app submit ops to one authority, `manifest.json`
+  becomes the head, a `ModifyWorld` op makes the fold total, and git may
+  carry the history.
