@@ -39,7 +39,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 /** @typedef {import('./index.js').EnvironmentDef} EnvironmentDef */
 /** @typedef {import('./index.js').Shape} Shape */
 
-export const VIEWER_VERSION = '0.1.0';
+export const VIEWER_VERSION = '0.3.0';
 
 /// Calibration between Bevy's light units and three.js', in one place.
 /// Bevy renders physical units through an exposure; three's lights are
