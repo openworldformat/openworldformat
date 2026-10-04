@@ -66,6 +66,30 @@ Reference-grade, not production physics; deterministic within an
 engine, semantic-only across engines, exactly as the core spec refuses
 bit-exactness.
 
+## Live authoring: agents outside, ops in
+
+What a host does with an agent that wants to change the world:
+`ingest` a batch against the fold — names bind to ids (a string where
+an entity id goes is a name), a spawn without an id gets the next one,
+partial transforms and materials merge with what's there, keys the
+format would drop are refused with a path to each, and any failure
+refuses the whole batch. The state you pass in is never touched:
+
+```python
+from openworldformat import fold_log, ingest
+
+done = ingest(state, [{"SpawnEntity": {"entity": {"name": "lamp", "parent": "crate"}}}])
+done["ok"]         # True
+done["spawned"]    # {"lamp": 3} — the ids the batch's names got
+done["ops"]        # the committed ops, bound: serialize into an entry and append
+done["state"]      # the new world; the old one is unchanged
+```
+
+`merge_patch` is the RFC 7396 helper the merges use; `manifest_text`
+is the canonical pretty form an authority writes to `manifest.json` —
+members sorted, nulls left out, entities by id, plain arrays inline —
+so the same world is always the same bytes.
+
 ## Tasks: the benchmark harness
 
 A task is a world, a trajectory, and a goal — a list of predicates over
@@ -183,6 +207,7 @@ notebooks.
 | `edit_ops(entry)` | an entry's edits, in order |
 | `canonical_json(value)` | the canonical form for hashing — sorted, whitespace-free |
 | `compute_entry_id(entry)` | an entry's content id, `sha256:<hex>` |
+| `manifest_text(manifest)` | the canonical pretty text an authority writes to `manifest.json` |
 | `fold_log(manifest, entries)` | the document at the last entry (the linear fold; by-name references bind to ids here, at ingestion) |
 | `build_history(entries)` | a log's ids, parents, children and tips |
 | `fold_path(manifest, entries, tip=None)` | the document at any tip (a branch) |
@@ -193,6 +218,8 @@ notebooks.
 | `compact_package(package_json, head_revision)` | the package.json of a compaction |
 | `read_package(world_dir)` | a head-first package: `(base, entries, head, package_json)` |
 | `to_manifest(state)` | the fold's state as a whole manifest — `to_manifest(fold_log(m, []))` is `m` again |
+| `ingest(state, batch)` | live authoring: bind, validate and apply a batch whole-or-refused; the state passed in is never touched |
+| `merge_patch(current, change)` | JSON merge patch, RFC 7396 — the rule partial transforms merge by |
 | `compact(world_dir, head_revision=None)` | move the base up to the head (or a revision): `snapshots/base.json` rewritten, the entries it holds archived |
 | `ext_provenance(manifest)` | the provenance extension's five lineage fields, or None |
 

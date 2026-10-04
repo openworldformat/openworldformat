@@ -43,11 +43,14 @@ __all__ = [
     "edit_ops",
     "canonical_json",
     "compute_entry_id",
+    "manifest_text",
     "fold_state",
     "build_history",
     "fold_path",
     "fold_log",
     "to_manifest",
+    "ingest",
+    "merge_patch",
     "compute_inverse",
     "merge_branch",
     "snapshot_filename",
@@ -95,7 +98,9 @@ REGISTERED_EXTENSIONS = (
     "ext-provenance",
 )
 
-EDIT_KEYS = frozenset({
+#: The edit kinds in the spec's own order — the order error messages
+#: name them in, kept deterministic where a frozenset would not be.
+_EDIT_KIND_ORDER = (
     "SpawnEntity",
     "DeleteEntity",
     "ModifyEntity",
@@ -106,7 +111,9 @@ EDIT_KEYS = frozenset({
     "RemoveAudioEmitter",
     "ModifyWorld",
     "Batch",
-})
+)
+
+EDIT_KEYS = frozenset(_EDIT_KIND_ORDER)
 
 #: The history kinds — lowercase, per the collision rule.
 HISTORY_KEYS = frozenset({"tool", "input", "state", "clock", "merge"})
@@ -130,6 +137,26 @@ _ENTITY_KEYS = frozenset({
     "light", "audio", "behaviors", "modulations", "triggers",
     "mesh_asset", "instance_of", "creation_id",
 })
+
+#: The keys a live-authored op may carry, by where it carries them
+#: (spec/world.md) — what :func:`ingest` refuses beyond, not what the
+#: fold ignores: the fold must tolerate, the authoring surface must not
+#: write keys the format would silently drop.
+_TRANSFORM_KEYS = frozenset({"position", "rotation_degrees", "scale", "visible"})
+_MATERIAL_KEYS = frozenset({
+    "alpha_mode", "base_color_texture", "color", "double_sided", "emissive",
+    "emissive_texture", "metallic", "metallic_roughness_texture",
+    "normal_map_texture", "reflectance", "roughness", "unlit",
+})
+_LIGHT_KEYS = frozenset({
+    "color", "direction", "inner_angle", "intensity", "light_type",
+    "outer_angle", "range", "shadows",
+})
+_ENVIRONMENT_KEYS = frozenset({
+    "ambient_color", "ambient_intensity", "background_color", "fog_color",
+    "fog_density",
+})
+_CAMERA_KEYS = frozenset({"fov_degrees", "look_at", "position"})
 
 #: Behavior fields that reference another entity, by behavior kind:
 #: ``Orbit`` circles one, ``LookAt`` watches one. ``modulations[]``
@@ -412,6 +439,55 @@ def compute_entry_id(entry: dict) -> str:
     body.pop("classified", None)
     digest = hashlib.sha256(canonical_json(body).encode("utf-8")).hexdigest()
     return f"sha256:{digest}"
+
+
+def manifest_text(manifest: dict) -> str:
+    """A manifest as its canonical text (spec/package.md "Canonical
+    text"): what an authority writes to ``manifest.json``, so that the
+    same world is always the same bytes — small diffs, ordinary git
+    merges, a ``world_sha256`` that means something. Members sorted by
+    code point, null members left out, entities in id order, two-space
+    indentation, arrays of plain values on one line, numbers in their
+    shortest form (integral values without a fraction), a trailing
+    newline.
+
+    :param manifest: a world document
+    :return: its canonical text
+    """
+    world = copy.deepcopy(manifest)
+    if isinstance(world.get("entities"), list):
+        world["entities"].sort(key=lambda e: e.get("id", 0))
+    return _canonical_pretty(world, 0) + "\n"
+
+
+def _canonical_scalar(value: Any) -> str:
+    """One non-container value in its shortest JSON form — ``1.0`` is
+    ``1``, as every JSON writer but Python's would print it."""
+    if isinstance(value, float) and value.is_integer() and abs(value) < 1e16:
+        return str(int(value))
+    return json.dumps(value, ensure_ascii=False)
+
+
+def _canonical_pretty(value: Any, depth: int) -> str:
+    """The canonical pretty form: objects multi-line with sorted members,
+    arrays of plain values inline, nested arrays multi-line."""
+    if value is None or not isinstance(value, (dict, list)):
+        return _canonical_scalar(value)
+    pad = "  " * depth
+    inner = "  " * (depth + 1)
+    if isinstance(value, list):
+        if not value:
+            return "[]"
+        if all(x is None or not isinstance(x, (dict, list)) for x in value):
+            return "[" + ", ".join(_canonical_scalar(x) for x in value) + "]"
+        return ("[\n" + ",\n".join(inner + _canonical_pretty(x, depth + 1) for x in value)
+                + "\n" + pad + "]")
+    keys = sorted(k for k in value if value[k] is not None)
+    if not keys:
+        return "{}"
+    return ("{\n" + ",\n".join(
+        f'{inner}{json.dumps(k, ensure_ascii=False)}: {_canonical_pretty(value[k], depth + 1)}'
+        for k in keys) + "\n" + pad + "}")
 
 
 def _with_identity(entries: list) -> tuple:
@@ -853,6 +929,235 @@ def fold_log(manifest: dict, entries: list) -> dict:
         _commit_trial(state, trial)
         state["applied_edits"] += len(edits)
     return state
+
+
+# ---------------------------------------------------------------------------
+# Live authoring (spec/session.md "Authoring")
+# ---------------------------------------------------------------------------
+
+
+def merge_patch(current: Any, change: Any) -> Any:
+    """JSON merge patch (RFC 7396): objects merge key by key, ``None``
+    removes, anything else replaces.
+
+    :param current: the value as it stands
+    :param change: the patch
+    :return: the patched value — neither input is touched
+    """
+    if not isinstance(current, dict) or not isinstance(change, dict):
+        return copy.deepcopy(change)
+    out = copy.deepcopy(current)
+    for key, value in change.items():
+        if value is None:
+            out.pop(key, None)
+        else:
+            out[key] = merge_patch(out[key], value) if key in out else copy.deepcopy(value)
+    return out
+
+
+def _bind_op(trial: dict, op: dict, spawned: dict) -> None:
+    """Names to ids, ids for spawns, merged struct patches — in place
+    (spec/session.md "Authoring"). A string where an entity id goes is a
+    name; a spawn without an id gets the next one; the struct fields of
+    a patch merge into the current value so an author may send a
+    partial transform and keep the scale they never mentioned.
+
+    :raises WorldFormatError: when a name nothing owns is used
+    """
+    if not isinstance(op, dict):
+        raise WorldFormatError('an op is an object like {"SpawnEntity": {…}}')
+    kinds = list(op)
+    if len(kinds) != 1:
+        raise WorldFormatError(
+            f"an op holds exactly one kind, one of: {', '.join(_EDIT_KIND_ORDER)}"
+        )
+    kind = kinds[0]
+    body = op[kind]
+
+    def resolve(ref):
+        if not isinstance(ref, str):
+            return ref
+        id_ = spawned.get(ref)
+        if id_ is None:
+            id_ = trial["name_to_id"].get(ref)
+        if id_ is None:
+            raise WorldFormatError(f'no entity is named "{ref}"')
+        return id_
+
+    if kind == "SpawnEntity":
+        entity = body.get("entity") if isinstance(body, dict) else None
+        if not isinstance(entity, dict):
+            raise WorldFormatError('SpawnEntity needs an "entity" object')
+        if entity.get("id") is None:
+            entity["id"] = max(
+                [trial["scene"]["next_entity_id"]] + [i + 1 for i in spawned.values()]
+            )
+        elif not _is_num(entity["id"]):
+            raise WorldFormatError("a new entity's id is a number, or left out to get one")
+        if "parent" in entity:
+            entity["parent"] = resolve(entity["parent"])
+        if isinstance(entity.get("name"), str):
+            spawned[entity["name"]] = entity["id"]
+    elif kind == "ModifyEntity":
+        if not isinstance(body, dict):
+            raise WorldFormatError("ModifyEntity needs an object body")
+        body["id"] = resolve(body.get("id"))
+        current = trial["by_id"].get(body["id"])
+        patch = body.get("patch")
+        if isinstance(patch, dict):
+            if "parent" in patch:
+                patch["parent"] = resolve(patch["parent"])
+            if current is not None:
+                for field in ("transform", "material", "light"):
+                    change, held = patch.get(field), current.get(field)
+                    if isinstance(change, dict) and isinstance(held, dict):
+                        patch[field] = merge_patch(held, change)
+    elif kind == "DeleteEntity":
+        if not isinstance(body, dict):
+            raise WorldFormatError("DeleteEntity needs an object body")
+        body["id"] = resolve(body.get("id"))
+    elif kind == "SetEnvironment":
+        env = body.get("env") if isinstance(body, dict) else None
+        if isinstance(env, dict) and isinstance(trial.get("environment"), dict):
+            body["env"] = merge_patch(trial["environment"], env)
+    elif kind == "ModifyWorld":
+        patch = body.get("patch") if isinstance(body, dict) else None
+        if isinstance(patch, dict):
+            now = to_manifest(trial)
+            for field in ("meta", "environment", "camera", "avatar", "soundtrack"):
+                change, held = patch.get(field), now.get(field)
+                if isinstance(change, dict) and isinstance(held, dict):
+                    patch[field] = merge_patch(held, change)
+    elif kind == "Batch":
+        inner = body.get("ops") if isinstance(body, dict) else None
+        if isinstance(inner, list):
+            for op_ in inner:
+                _bind_op(trial, op_, spawned)
+    elif kind not in EDIT_KEYS:
+        raise WorldFormatError(
+            f'"{kind}" isn\'t an op kind; the format has: {", ".join(_EDIT_KIND_ORDER)}'
+        )
+
+
+def _strict_op(op: dict) -> None:
+    """Refuse keys the format would drop, with a path to each — the
+    authoring side of must-ignore: a tolerant fold would silently lose
+    an unknown key, so the surface that writes ops refuses it instead.
+
+    :raises WorldFormatError: naming every key outside the schema
+    """
+    unknown: list = []
+
+    def check(obj, allowed, path):
+        if not isinstance(obj, dict):
+            return
+        for key in obj:
+            if key in allowed or key in REGISTERED_EXTENSIONS:
+                continue
+            unknown.append(f"{path}/{key}")
+
+    def check_entity(entity, path, is_patch):
+        keys = set(_ENTITY_KEYS)
+        if is_patch:
+            keys.discard("id")
+        check(entity, keys, path)
+        transform = entity.get("transform") if isinstance(entity, dict) else None
+        check(transform, _TRANSFORM_KEYS, f"{path}/transform")
+        material = entity.get("material") if isinstance(entity, dict) else None
+        check(material, _MATERIAL_KEYS, f"{path}/material")
+        light = entity.get("light") if isinstance(entity, dict) else None
+        check(light, _LIGHT_KEYS, f"{path}/light")
+
+    kind = next(iter(op))
+    body = op[kind]
+    if kind == "SpawnEntity":
+        check(body, {"entity"}, f"/{kind}")
+        check_entity(body.get("entity") if isinstance(body, dict) else None,
+                     f"/{kind}/entity", False)
+    elif kind == "ModifyEntity":
+        check(body, {"id", "patch"}, f"/{kind}")
+        check_entity(body.get("patch") if isinstance(body, dict) else None,
+                     f"/{kind}/patch", True)
+    elif kind == "DeleteEntity":
+        check(body, {"id"}, f"/{kind}")
+    elif kind == "SetEnvironment":
+        check(body.get("env") if isinstance(body, dict) else None,
+              _ENVIRONMENT_KEYS, f"/{kind}/env")
+    elif kind == "SetCamera":
+        check(body.get("camera") if isinstance(body, dict) else None,
+              _CAMERA_KEYS, f"/{kind}/camera")
+    elif kind == "ModifyWorld":
+        patch = body.get("patch") if isinstance(body, dict) else None
+        check(patch, frozenset(WORLD_PATCH_KEYS), f"/{kind}/patch")
+        check(patch.get("meta") if isinstance(patch, dict) else None,
+              _META_KEYS, f"/{kind}/patch/meta")
+        check(patch.get("environment") if isinstance(patch, dict) else None,
+              _ENVIRONMENT_KEYS, f"/{kind}/patch/environment")
+        check(patch.get("camera") if isinstance(patch, dict) else None,
+              _CAMERA_KEYS, f"/{kind}/patch/camera")
+    elif kind == "Batch":
+        inner = body.get("ops") if isinstance(body, dict) else None
+        if isinstance(inner, list):
+            for op_ in inner:
+                _strict_op(op_)
+    if unknown:
+        raise WorldFormatError(
+            "; ".join(f"{p} is not a field of the format" for p in unknown)
+        )
+
+
+def ingest(state: dict, batch) -> dict:
+    """Ingest a batch — ``[op, …]`` or ``{"ops": [op, …]}`` — against a
+    fold state (spec/session.md "Authoring": agents outside, ops in, the
+    world in front). Each op, in order, against a trial holding the
+    batch's earlier ops: names bind to ids (a string where an entity id
+    goes is a name), a spawn without an id gets the next one, the struct
+    fields of a patch (:func:`merge_patch` above) merge into the current
+    value, no key the format would drop is allowed, and the op must
+    apply. Any failure refuses the whole batch.
+
+    :param state: the world as it stands (unchanged by this call)
+    :param batch: the ops an author or agent is sending
+    :return: ``{"ok": True, "ops", "spawned", "state"}`` — the committed
+        ops as they bind (serialize into an entry and append), the names
+        the batch spawned with the ids they got, the new world — or
+        ``{"ok": False, "errors"}``, one reason per op
+    """
+    ops = batch if isinstance(batch, list) else (
+        batch.get("ops") if isinstance(batch, dict) else None
+    )
+    if not isinstance(ops, list):
+        return {"ok": False, "errors": ['a batch is [op, …] or {"ops": [op, …]}']}
+    if not ops:
+        return {"ok": False, "errors": ["the batch holds no ops"]}
+    trial = _fresh_trial(state)["state"]
+    trial["applied_edits"] = state.get("applied_edits", 0)
+    spawned: dict = {}
+    errors: list = []
+    committed: list = []
+    for i, raw in enumerate(ops):
+        try:
+            op = copy.deepcopy(raw)
+            _bind_op(trial, op, spawned)
+            _strict_op(op)
+            c = classify_op(op)
+            if c["kind"] != "edit":
+                raise WorldFormatError("only edit ops can be sent")
+            # An op is an entry of one: apply, then bind the names it wrote.
+            step = _fresh_trial(trial)
+            _apply_edit(step["state"], c["edit"], c["value"])
+            for id_ in _touched_ids([c]):
+                entity = step["state"]["by_id"].get(id_)
+                if entity is not None:
+                    _resolve_names(step["state"], entity)
+            _commit_trial(trial, step)
+            committed.append(op)
+        except WorldFormatError as e:
+            errors.append(f"op {i}: {e}")
+    if errors:
+        return {"ok": False, "errors": errors}
+    trial["applied_edits"] += len(committed)
+    return {"ok": True, "ops": committed, "spawned": spawned, "state": trial}
 
 
 # ---------------------------------------------------------------------------
