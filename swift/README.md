@@ -19,7 +19,7 @@ too, with the same entity counts pinned in its tests.
 ```swift
 // Package.swift
 dependencies: [
-    .package(url: "https://github.com/openworldformat/openworldformat", from: "0.2.0")
+    .package(url: "https://github.com/openworldformat/openworldformat", from: "0.3.0")
 ],
 targets: [
     .target(name: "YourTarget", dependencies: [
@@ -31,7 +31,7 @@ targets: [
 or Xcode → File → Add Package Dependencies → the same URL, then
 `import OpenWorldFormat`. The manifest lives at the repository root
 (SwiftPM requires it at the checkout root); the sources and tests are
-this directory. Releases are bare semver tags (`v0.2.0` on) — the
+this directory. Releases are bare semver tags (`v0.3.0` on) — the
 `js-v*`/`rust-v*` tags don't parse as versions. Consumers need
 macOS 14 / iOS 17 / visionOS 1 or later.
 
@@ -58,6 +58,20 @@ let variant = try foldPath(package.base, package.entries, tip: "e5")
 
 // Save-game state: typed fields, folded over the declaration.
 let stateValues = package.stateValues().values       // ["score.tour": 1]
+
+// Authoring: a batch by name, partial patches merged, refused whole.
+let batch = try JSONValue(parsing: #"""
+  [{"ModifyEntity": {"id": "lantern",
+     "patch": {"transform": {"position": [-12, 0.5, 3]}}}}]
+  """#)
+switch ingest(state, batch) {
+case .ingested(let done):
+    done.ops        // to commit: names bound to ids, patches merged whole
+    done.state      // the world the batch makes
+    manifestText(try toManifest(done.state))  // the head's canonical bytes
+case .refused(let errors):
+    errors          // one reason per failing op; nothing was written
+}
 ```
 
 Piece by piece, if a package is more than folders for you:
@@ -76,7 +90,12 @@ let same = try toManifest(world)                     // a whole manifest again
 `manifest.json`, all a viewer needs; `package.base` is
 `snapshots/base.json`, what the log folds from. The fold is total
 (`toManifest`), `ModifyWorld` applies and inverts, and an entry's
-`message` is part of its identity (spec draft 0.3).
+`message` is part of its identity (spec draft 0.3). Authoring is
+`ingest` (spec/session.md, "Authoring"): names bound to ids, ids
+allocated for spawns that left theirs out, struct patches merged as a
+JSON merge patch (`mergePatch`, RFC 7396), read strictly, all-or-nothing
+— and `manifestText` writes the head's canonical bytes, the same bytes
+the Rust and JS references write.
 
 ## What it carries, what it doesn't
 
@@ -84,8 +103,9 @@ let same = try toManifest(world)                     // a whole manifest again
   `ext-*` fields riding untouched per must-ignore), op classification
   (edits first, the compatibility rule), the fold (all-or-nothing per
   entry and per batch), branching histories (`buildHistory`,
-  `foldPath`), and the state fold (declared, dotted-map-subkey and
-  undeclared keys).
+  `foldPath`), the state fold (declared, dotted-map-subkey and
+  undeclared keys), and the Authoring profile's batch ingestion
+  (`ingest`, `mergePatch`) with the canonical head text (`manifestText`).
 - **Doesn't** — the `ext-physics` solver (the Rust crate owns the
   reference one), schema validation (the JSON Schema is normative;
   AJV in CI is the checker), and any rendering, audio or asset

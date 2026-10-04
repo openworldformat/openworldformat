@@ -1,4 +1,4 @@
-// Canonical JSON and entry identity.
+// Canonical JSON, the canonical text, and entry identity.
 //
 // A content hash is only as good as its bytes agreeing across
 // languages, so the format pins one serialization for hashing
@@ -27,7 +27,7 @@ public func canonicalJson(_ value: JSONValue) -> String {
     return out
 }
 
-private func write(_ value: JSONValue, into out: inout String) {
+func write(_ value: JSONValue, into out: inout String) {
     switch value {
     case .null:
         out += "null"
@@ -60,7 +60,7 @@ private func write(_ value: JSONValue, into out: inout String) {
 /// round-trip form. A non-finite double has no JSON form — null is what
 /// a JavaScript JSON.stringify would have written, and this serializer
 /// follows.
-private func writeNumber(_ n: Double, into out: inout String) {
+func writeNumber(_ n: Double, into out: inout String) {
     guard n.isFinite else {
         out += "null"
         return
@@ -74,7 +74,7 @@ private func writeNumber(_ n: Double, into out: inout String) {
 
 /// The two quotes, the standard escapes, and everything else as UTF-8 —
 /// non-ASCII passes through unescaped, as the other references write it.
-private func writeString(_ s: String, into out: inout String) {
+func writeString(_ s: String, into out: inout String) {
     out += "\""
     for scalar in s.unicodeScalars {
         switch scalar {
@@ -94,6 +94,64 @@ private func writeString(_ s: String, into out: inout String) {
         }
     }
     out += "\""
+}
+
+// MARK: - The canonical text of a manifest
+
+/// A manifest as its canonical text — what an authority writes to
+/// `manifest.json`, so that the same world is always the same bytes:
+/// small diffs, ordinary git merges, and a `world_sha256` that changes
+/// only when the world does (spec/package.md, "Canonical text").
+///
+/// Members sorted by code point, `null` members left out, entities in
+/// ascending id order, two-space indentation, arrays of plain values on
+/// one line, numbers in their shortest form, a trailing newline — the
+/// same bytes the Rust and JS references' writers put down.
+public func manifestText(_ manifest: WorldManifest) -> String {
+    var world = manifest.json
+    if case var .object(o) = world, case let .array(entities)? = o["entities"] {
+        o["entities"] = .array(entities.sorted { ($0["id"]?.int ?? 0) < ($1["id"]?.int ?? 0) })
+        world = .object(o)
+    }
+    return canonicalPretty(world, 0) + "\n"
+}
+
+/// The pretty canonical form: scalars compact, objects one member per
+/// line with sorted non-null keys, arrays one element per line unless
+/// every element is a plain value.
+private func canonicalPretty(_ value: JSONValue, _ depth: Int) -> String {
+    let pad = String(repeating: "  ", count: depth)
+    let inner = String(repeating: "  ", count: depth + 1)
+    func scalar(_ value: JSONValue) -> String {
+        var out = ""
+        write(value, into: &out)
+        return out
+    }
+    func isPlain(_ value: JSONValue) -> Bool {
+        switch value {
+        case .null, .bool, .number, .string: return true
+        case .array, .object: return false
+        }
+    }
+    switch value {
+    case .null, .bool, .number, .string:
+        return scalar(value)
+    case .array(let a):
+        if a.isEmpty { return "[]" }
+        if a.allSatisfy(isPlain) {
+            return "[" + a.map(scalar).joined(separator: ", ") + "]"
+        }
+        return "[\n" + a.map { inner + canonicalPretty($0, depth + 1) }
+            .joined(separator: ",\n") + "\n" + pad + "]"
+    case .object(let o):
+        let keys = o.keys.filter { o[$0] != .null }.sorted()
+        if keys.isEmpty { return "{}" }
+        return "{\n" + keys.map { key -> String in
+            var name = ""
+            writeString(key, into: &name)
+            return inner + name + ": " + canonicalPretty(o[key]!, depth + 1)
+        }.joined(separator: ",\n") + "\n" + pad + "}"
+    }
 }
 
 // MARK: - Entry identity
