@@ -1,0 +1,54 @@
+{
+  "version": 3,
+  "meta": {
+    "name": "conformance-hierarchy-rotations",
+    "description": "Pins rotation semantics: intrinsic XYZ Euler angles in degrees (applied in X, Y, Z order relative to the local moving frame — R = Rx * Ry * Rz on column vectors), in a right-handed Y-up frame, and parent-relative composition (world = parent * local). Case A: the beam with rotation [90, 90, 0] must run along +X, its far tip at (-3, 2, 0) — an extrinsic or wrong-order reading sends it to (-4, 1, 0) instead. Case B: the X-elongated beam with rotation [30, 45, 60] must point along (0.3536, 0.9268, 0.1268), far tip at (0.3536, 2.9268, 0.1268) — all three angles engaged. Case C: the child (local position (1, 0, 0), pitch 90) of the yaw-90 parent at (4, 2, 0) must sit at (4, 2, -1) with its long axis along +X, far tip at (5, 2, -1) — pinning composition order and the yaw sign. A small marker sphere waits at every expected tip: a wrong convention visibly misses.",
+    "tags": ["conformance"]
+  },
+  "environment": {
+    "background_color": [0.15, 0.1, 0.2, 1.0],
+    "ambient_color": [0.7, 0.6, 0.9, 1.0],
+    "ambient_intensity": 120.0
+  },
+  "camera": {
+    "position": [0.0, 7.0, 16.0],
+    "look_at": [0.0, 2.0, 0.0],
+    "fov_degrees": 50.0
+  },
+  "entities": [
+    { "id": 1, "name": "ground",
+      "shape": { "Plane": { "x": 40.0, "z": 40.0 } },
+      "material": { "color": [0.3, 0.32, 0.28, 1.0], "roughness": 0.95 } },
+    { "id": 2, "name": "sun", "transform": { "position": [0.0, 20.0, 0.0] },
+      "light": { "light_type": "directional", "color": [0.7, 0.75, 1.0, 1.0], "intensity": 1500.0, "direction": [0.2, -1.0, -0.4] } },
+
+    { "id": 10, "name": "case_a_beam",
+      "transform": { "position": [-4.0, 2.0, 0.0], "rotation_degrees": [90.0, 90.0, 0.0] },
+      "shape": { "Cuboid": { "x": 0.3, "y": 0.3, "z": 2.0 } },
+      "material": { "color": [0.85, 0.4, 0.3, 1.0], "roughness": 0.6 } },
+    { "id": 11, "name": "case_a_expected_tip",
+      "transform": { "position": [-3.0, 2.0, 0.0] },
+      "shape": { "Sphere": { "radius": 0.15 } },
+      "material": { "color": [1.0, 0.9, 0.2, 1.0], "roughness": 0.3 } },
+
+    { "id": 20, "name": "case_b_beam",
+      "transform": { "position": [0.0, 2.0, 0.0], "rotation_degrees": [30.0, 45.0, 60.0] },
+      "shape": { "Cuboid": { "x": 2.0, "y": 0.3, "z": 0.3 } },
+      "material": { "color": [0.3, 0.6, 0.85, 1.0], "roughness": 0.6 } },
+    { "id": 21, "name": "case_b_expected_tip",
+      "transform": { "position": [0.3536, 2.9268, 0.1268] },
+      "shape": { "Sphere": { "radius": 0.15 } },
+      "material": { "color": [1.0, 0.9, 0.2, 1.0], "roughness": 0.3 } },
+
+    { "id": 30, "name": "case_c_parent",
+      "transform": { "position": [4.0, 2.0, 0.0], "rotation_degrees": [0.0, 90.0, 0.0] } },
+    { "id": 31, "name": "case_c_child", "parent": 30,
+      "transform": { "position": [1.0, 0.0, 0.0], "rotation_degrees": [90.0, 0.0, 0.0] },
+      "shape": { "Cuboid": { "x": 0.3, "y": 2.0, "z": 0.3 } },
+      "material": { "color": [0.5, 0.85, 0.45, 1.0], "roughness": 0.6 } },
+    { "id": 32, "name": "case_c_expected_tip",
+      "transform": { "position": [5.0, 2.0, -1.0] },
+      "shape": { "Sphere": { "radius": 0.15 } },
+      "material": { "color": [1.0, 0.9, 0.2, 1.0], "roughness": 0.3 } }
+  ]
+}
