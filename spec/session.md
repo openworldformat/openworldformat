@@ -31,7 +31,7 @@ subject of the git commit the batch becomes in a git-backed package.
 
 ## The op kinds
 
-An entry's `ops` hold any mix of five kinds. Each kind is serialized as
+An entry's `ops` hold any mix of these kinds. Each kind is serialized as
 its own fields (there is no wrapping tag object); an op is recognized by
 its shape:
 
@@ -89,6 +89,7 @@ against the document it is about to change:
 - `ModifyEntity` inverses to a `ModifyEntity` restoring the old values (clearing fields the entity didn't have).
 - `ModifyWorld` inverses to a `ModifyWorld` restoring the old values of the fields it touches.
 - `SetEnvironment` and `SetCamera` inverse to the setting they replace — or, when the document had none, to a `ModifyWorld` clearing it. `SetAmbience` inverses to the ambience it replaces.
+- `SpawnAudioEmitter` inverses to `RemoveAudioEmitter`; `RemoveAudioEmitter` inverses to a `SpawnAudioEmitter` carrying the emitter it removed.
 - A `Batch` inverses to its ops' inverses in reverse order, each computed against the state its op was about to change.
 
 ## The fold is total
@@ -176,7 +177,7 @@ linear prefix. `revision` stays the room's total order; `parent` records
 causality — sequence is not causality.
 
 Forks and refs live in `package.json` ([the package](package.md)); the
-`merge` op records where a merged batch came from. When merging a branch, the merge authority must handle ID collisions. If the branch introduces entities with IDs that were concurrently allocated on the main branch, the merge authority MUST reallocate those colliding IDs and rewrite all their references within the merged batch. See
+`merge` op records where a merged batch came from. When merging a branch, the merge authority must handle ID collisions. If the branch introduces entities with IDs that were concurrently allocated on the main branch, the merge authority MUST reallocate those colliding IDs and rewrite all their references within the merged batch. Names collide the same way: two branches that each mint a `lighthouse` merge into one world with two of them, and the authority MUST rename the merged side — references are ids by then ([the world document](world.md)), so a rename breaks nothing in the log. See
 [`rfcs/branching-histories.md`](rfcs/branching-histories.md). In a git-backed package, branches are git branches and the
 same merge rules resolve a merge's conflicts ([the package](package.md), "Git").
 
@@ -214,4 +215,8 @@ Three levels, and only the first two are part of this format:
    and MUST NOT be promised by implementations of it.** Floats, physics
    ordering and renderer differences make it a lie waiting to be caught;
    `package.json`'s `seed` is reserved for engines that want to try
-   anyway, and means nothing to the contract above.
+   anyway, and means nothing to the contract above. The exception is
+   opt-in: a package declaring
+   [`ext-strict-determinism`](extensions/strict-determinism.md) asks for
+   exactly this, and an engine claiming that extension makes the promise
+   the core forbids.
