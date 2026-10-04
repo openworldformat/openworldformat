@@ -14,6 +14,8 @@ for in the format's lineage.
   draw, so it is a new version rather than an optional field
   ([the package](package.md)).
 
+These numbers are intentionally unaligned with each other and with the spec/library draft version (e.g., `0.2.x`). They track different lifecycles: forcing a schema version bump simply because the file layout changed (or because a library added a new feature) would break backwards compatibility for parsers unnecessarily.
+
 ## Rules
 
 1. **Minor schema versions add optional fields.** A reader of version N
