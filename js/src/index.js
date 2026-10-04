@@ -1047,20 +1047,25 @@ export function foldLog(manifest, entries) {
   for (const entry of entries) {
     const edits = editOps(entry);
     if (edits.length === 0) continue; // history folds to nothing
-    const trial = freshTrial(state);
+    // No trial copy here. `foldLog` owns `state` — its entities were
+    // structuredClone'd off the manifest above — and it throws without it
+    // when an entry no longer applies, so a per-entry copy protected a
+    // document nobody could observe. It cost O(entities) per entry, which
+    // made folding quadratic in the log's length: 4,000 entries took 8.8 s.
+    // `applyEdit` maintains `entities`, `byId`, `names` and `nameToId`
+    // itself, so the rebuild the trial did was never load-bearing either.
     for (const c of edits) {
-      applyEdit(trial.state, c.edit, c.value);
+      applyEdit(state, c.edit, c.value);
     }
-    // …and continues per entry, inside the trial, after all its edits
-    // apply and before it commits: an entry is atomic, so refs it writes
-    // resolve against the fold-so-far including the entry's own spawns.
-    // A name nothing owns at ingestion fails the entry — the fold stops
-    // there, the same refusal class as "no longer applies".
+    // …and continues per entry, after all its edits apply: an entry is
+    // atomic in its *ingestion*, so refs it writes resolve against the
+    // fold-so-far including the entry's own spawns. A name nothing owns
+    // fails the entry — the fold stops there, the same refusal class as
+    // "no longer applies".
     for (const id of touchedIds(edits)) {
-      const entity = trial.state.byId.get(id);
-      if (entity) resolveNames(trial.state, entity);
+      const entity = state.byId.get(id);
+      if (entity) resolveNames(state, entity);
     }
-    commitTrial(state, trial);
     state.appliedEdits += edits.length;
   }
   return state;

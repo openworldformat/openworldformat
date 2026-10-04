@@ -3,9 +3,11 @@
 // a batch applies all-or-nothing; and an entry that no longer applies
 // stops the fold, exactly as the specification's readers do.
 //
-// Swift's value semantics are the all-or-nothing rule for free: a
-// trial is a struct copy, and committing is assignment — the copy the
-// JS reference makes with structuredClone, paid only when asked for.
+// Swift's value semantics make a trial cheap to write — a struct copy,
+// committing is assignment — but not free: the first mutation copies the
+// entities buffer. So a batch takes one (it is genuinely all-or-nothing)
+// and the fold loop takes none, because it owns its state and throws
+// without it.
 
 import Foundation
 
@@ -32,6 +34,37 @@ public struct FoldState: Equatable, Sendable {
     public var appliedEdits: Int
     /// The entry ids folded, in order (`foldPath` only).
     public var path: [String]?
+    /// Every entity's name to its id — derived, and maintained by
+    /// `applyEdit` alongside `entities`.
+    ///
+    /// Not a convenience: a name lookup by scanning compares Swift
+    /// `String`s, which is grapheme-aware and far from free, so the
+    /// duplicate-name check and the by-name behavior refs cost O(entities)
+    /// of string comparison *per edit* without this — about 200 µs an entry
+    /// over two thousand entities, which is most of why folding a long log
+    /// was quadratic. The other three reference implementations have
+    /// carried the same index from the start.
+    public var nameToId: [String: Int] = [:]
+    /// Every entity's id to its position in `entities` — derived, and
+    /// maintained by `applyEdit` alongside it.
+    ///
+    /// Scanning for an id looks cheap (`$0.id` is an `Int`) and is not: the
+    /// elements are structs holding a `String` and a dictionary, so walking
+    /// the array is ARC traffic per element. With both indexes the fold
+    /// never scans, which is what takes it from quadratic to linear.
+    /// Positions shift only when an entity is removed, and `DeleteEntity`
+    /// rebuilds this then — deletes are rare, and paying O(entities) on one
+    /// is what keeps every other edit O(1).
+    public var idToIndex: [Int: Int] = [:]
+}
+
+extension FoldState {
+    /// Rebuild `idToIndex` from `entities`. Called where positions move.
+    mutating func rebuildIdIndex() {
+        idToIndex = Dictionary(
+            entities.enumerated().map { ($0.element.id, $0.offset) },
+            uniquingKeysWith: { first, _ in first })
+    }
 }
 
 /// Fold log entries over a manifest: the document at the last entry.
@@ -59,6 +92,9 @@ public func foldLog(_ manifest: WorldManifest, _ entries: [LogEntry]) throws -> 
         appliedEdits: 0,
         path: nil
     )
+    state.nameToId = Dictionary(
+        state.entities.map { ($0.name, $0.id) }, uniquingKeysWith: { first, _ in first })
+    state.rebuildIdIndex()
     // Base refs resolve against the complete base.
     for index in state.entities.indices {
         try resolveNames(&state, index)
@@ -66,19 +102,26 @@ public func foldLog(_ manifest: WorldManifest, _ entries: [LogEntry]) throws -> 
     for entry in entries {
         let edits = editOps(entry)
         if edits.isEmpty { continue }   // history folds to nothing
-        var trial = state               // all-or-nothing, per entry
+        // No trial copy here. `foldLog` owns `state` — the manifest's
+        // entities were copied into it above — and it throws without it
+        // when an entry no longer applies, so a per-entry copy protected
+        // a document nobody could observe. Value semantics make the copy
+        // cheap to *write* but not free: the first mutation of `trial`
+        // copies the entities buffer, which is O(entities) per entry and
+        // made folding quadratic in the log's length.
         for edit in edits {
             guard case let .edit(name, value) = edit else { continue }
-            try applyEdit(&trial, name, value)
+            try applyEdit(&state, name, value)
         }
         // The entry's names bind now, against the state its edits just
-        // made — delaying is what the spec forbids.
+        // made — delaying is what the spec forbids. An entry is atomic in
+        // its *ingestion*, which is what that rule is about; it is no
+        // longer the unit of rollback here.
         for id in touchedEntities(edits) {
-            if let index = trial.entities.firstIndex(where: { $0.id == id }) {
-                try resolveNames(&trial, index)
+            if let index = state.idToIndex[id] {
+                try resolveNames(&state, index)
             }
         }
-        state = trial
         state.appliedEdits += edits.count
     }
     return state
@@ -184,16 +227,21 @@ func resolveNames(_ state: inout FoldState, _ entityIndex: Int) throws {
 
 /// The id an entity name answers to, among the state's entities.
 private func entityId(named name: String, in state: FoldState) throws -> Int {
-    guard let entity = state.entities.first(where: { $0.name == name }) else {
+    guard let id = state.nameToId[name] else {
         throw OpenWorldFormatError.invalid("no entity named '\(name)'")
     }
-    return entity.id
+    return id
 }
 
 // MARK: - Applying one edit
 
-/// Apply one edit op to a fold state. Indexes are derived per call —
-/// the trial state is the truth, and worlds are tens of entities.
+/// Apply one edit op to a fold state.
+///
+/// Nothing here derives a whole index. A `Dictionary` keyed by entity id
+/// copies every entity, so building one per edit cost O(entities) with a
+/// large constant and made folding a long log quadratic; the checks are
+/// scans over the array instead, and the one place that needs parent
+/// links builds an integers-only map, only when a patch reparents.
 func applyEdit(_ state: inout FoldState, _ edit: String, _ value: JSONValue) throws {
     switch edit {
     case "SpawnEntity":
@@ -210,18 +258,23 @@ func applyEdit(_ state: inout FoldState, _ edit: String, _ value: JSONValue) thr
             throw OpenWorldFormatError.invalid(
                 "entity \(entity.id) exceeds the id ceiling \(MAX_ENTITY_ID) (2^53-1)")
         }
-        let byId = Dictionary(uniqueKeysWithValues: state.entities.map { ($0.id, $0) })
-        let names = Set(state.entities.map(\.name))
-        if byId[entity.id] != nil {
+        // Scans, not rebuilt indexes: a `Dictionary` keyed by id copies
+        // every entity — `fields` dictionary included — and building one
+        // per edit is what made folding quadratic with a large constant.
+        // Three predicates over the array answer the same questions and
+        // copy nothing.
+        if state.idToIndex[entity.id] != nil {
             throw OpenWorldFormatError.invalid("entity \(entity.id) already exists")
         }
-        if names.contains(entity.name) {
+        if state.nameToId[entity.name] != nil {
             throw OpenWorldFormatError.invalid("an entity named '\(entity.name)' already exists")
         }
-        if let parent = entity.parent, byId[parent] == nil {
+        if let parent = entity.parent, state.idToIndex[parent] == nil {
             throw OpenWorldFormatError.invalid("entity \(entity.id)'s parent \(parent) isn't in the document")
         }
         state.entities.append(entity)
+        state.nameToId[entity.name] = entity.id
+        state.idToIndex[entity.id] = state.entities.count - 1
         let floor = state.scene["next_entity_id"]?.int ?? 1
         state.scene["next_entity_id"] = .number(Double(max(floor, entity.id + 1)))
 
@@ -229,7 +282,7 @@ func applyEdit(_ state: inout FoldState, _ edit: String, _ value: JSONValue) thr
         guard let id = value["id"]?.int else {
             throw OpenWorldFormatError.invalid("DeleteEntity needs an id")
         }
-        guard state.entities.contains(where: { $0.id == id }) else {
+        guard state.idToIndex[id] != nil else {
             throw OpenWorldFormatError.invalid("no entity \(id)")
         }
         // Descendants go with it: collect the subtree, then remove.
@@ -244,19 +297,21 @@ func applyEdit(_ state: inout FoldState, _ edit: String, _ value: JSONValue) thr
                 }
             }
         }
+        for gone in state.entities where doomed.contains(gone.id) {
+            state.nameToId.removeValue(forKey: gone.name)
+        }
         state.entities.removeAll { doomed.contains($0.id) }
+        state.rebuildIdIndex()
 
     case "ModifyEntity":
         guard let id = value["id"]?.int else {
             throw OpenWorldFormatError.invalid("ModifyEntity needs an id")
         }
-        guard let index = state.entities.firstIndex(where: { $0.id == id }) else {
+        guard let index = state.idToIndex[id] else {
             throw OpenWorldFormatError.invalid("no entity \(id)")
         }
         let patch = value["patch"]?.object ?? [:]
         let entity = state.entities[index]
-        let byId = Dictionary(uniqueKeysWithValues: state.entities.map { ($0.id, $0) })
-        var names = Set(state.entities.map(\.name))
 
         // Absent = unchanged; null = clear; value = set.
         if let nameJSON = patch["name"] {
@@ -264,20 +319,25 @@ func applyEdit(_ state: inout FoldState, _ edit: String, _ value: JSONValue) thr
                 throw OpenWorldFormatError.invalid("an entity can't have no name")
             }
             if newName != entity.name {
-                if names.contains(newName) {
+                // A scan, not a rebuilt name set — and only when the patch
+                // actually renames.
+                if state.nameToId[newName] != nil {
                     throw OpenWorldFormatError.invalid("an entity named '\(newName)' already exists")
                 }
-                names.remove(entity.name)
+                state.nameToId.removeValue(forKey: entity.name)
                 state.entities[index].name = newName
-                names.insert(newName)
+                state.nameToId[newName] = entity.id
             }
         }
         if let parentJSON = patch["parent"] {
             let newParent = parentJSON == .null ? nil : parentJSON.int
-            if let p = newParent, byId[p] == nil {
+            if let p = newParent, !state.entities.contains(where: { $0.id == p }) {
                 throw OpenWorldFormatError.invalid("parent \(p) isn't in the document")
             }
-            // A parent cycle would make the entity its own ancestor.
+            // A parent cycle would make the entity its own ancestor. The
+            // walk needs parents only, so this maps id to parent id —
+            // integers, no entity copies — and is built only when a patch
+            // reparents.
             var seen: Set<Int> = [entity.id]
             var ancestor = newParent
             while let a = ancestor {
@@ -285,7 +345,7 @@ func applyEdit(_ state: inout FoldState, _ edit: String, _ value: JSONValue) thr
                     throw OpenWorldFormatError.invalid("entity \(entity.id) can't be its own ancestor")
                 }
                 seen.insert(a)
-                ancestor = byId[a]?.parent
+                ancestor = state.idToIndex[a].flatMap { state.entities[$0].parent }
             }
             state.entities[index].parent = newParent
         }

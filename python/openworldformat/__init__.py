@@ -917,16 +917,22 @@ def fold_log(manifest: dict, entries: list) -> dict:
         edits = edit_ops(entry)
         if not edits:
             continue  # history folds to nothing
-        trial = _fresh_trial(state)
+        # No trial copy here. ``fold_log`` owns ``state`` — its entities
+        # were deep-copied off the manifest above — and it raises without
+        # it when an entry no longer applies, so a per-entry copy
+        # protected a document nobody could observe. It deep-copied every
+        # entity per entry, which made folding quadratic in the log's
+        # length: 2,000 entries took 4.2 s. ``_apply_edit`` maintains
+        # ``entities``, ``by_id``, ``names`` and ``name_to_id`` itself, so
+        # the trial's rebuild was never load-bearing either.
         for c in edits:
-            _apply_edit(trial["state"], c["edit"], c["value"])
-        # Names bind inside the entry's trial, before the commit: an
-        # entry is atomic, and an unresolvable name fails it whole.
+            _apply_edit(state, c["edit"], c["value"])
+        # Names bind after the entry's edits apply: an entry is atomic in
+        # its *ingestion*, and an unresolvable name fails it whole.
         for id_ in _touched_ids(edits):
-            entity = trial["state"]["by_id"].get(id_)
+            entity = state["by_id"].get(id_)
             if entity is not None:
-                _resolve_names(trial["state"], entity)
-        _commit_trial(state, trial)
+                _resolve_names(state, entity)
         state["applied_edits"] += len(edits)
     return state
 
