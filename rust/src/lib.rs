@@ -90,7 +90,7 @@ pub use package::{
     BASE_SNAPSHOT, PACKAGE_FORMAT_VERSION, compact_plan, manifest_text, manifest_text_of,
     snapshot_filename,
 };
-pub use session::{MergedBranch, fold_log, fold_path, merge_branch};
+pub use session::{MergedBranch, fold_log, fold_path, main_tip, merge_branch};
 pub use shape::{PrimitiveShapeKind, Shape};
 pub use soundtrack::{SoundtrackDef, StemCurves, curve_at};
 pub use spatial::ChunkCoord;

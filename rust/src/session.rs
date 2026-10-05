@@ -235,6 +235,22 @@ pub struct SessionMeta {
     /// When the package was last written, milliseconds since the epoch.
     #[serde(default)]
     pub updated_ms: u64,
+    /// Named tips of the history — `"main": "<entry id>"` and any others.
+    ///
+    /// spec/package.md: refs MUST name an entry `id`, never a line number,
+    /// so they survive compaction and branching. `main` decides what
+    /// `manifest.json` is (see [`main_tip`]). Absent means none are named.
+    #[serde(default, skip_serializing_if = "std::collections::BTreeMap::is_empty")]
+    pub refs: std::collections::BTreeMap<String, String>,
+    /// Every member this version doesn't model, kept as read.
+    ///
+    /// The must-ignore rule as it applies to a *writer*: a reader skips what
+    /// it doesn't know, but an authority rewrites `package.json` on every
+    /// commit, and one that dropped unknown members would destroy whatever a
+    /// newer writer — or a person — put there. Before this field existed,
+    /// that is exactly what happened to `refs`.
+    #[serde(flatten)]
+    pub extra: serde_json::Map<String, serde_json::Value>,
 }
 
 impl SessionMeta {
@@ -251,8 +267,27 @@ impl SessionMeta {
             log_sha256: None,
             forked_from: None,
             updated_ms: 0,
+            refs: std::collections::BTreeMap::new(),
+            extra: serde_json::Map::new(),
         }
     }
+}
+
+/// The tip whose fold is `manifest.json`: spec/package.md's head rule —
+/// `refs.main` when the package names one, else the log's last entry (its
+/// own id, or the synthesized `line-<n>` for an entry without one), else
+/// `None`, meaning the base is the head.
+///
+/// This is the one place the rule lives in Rust, so an authority deciding
+/// whether a commit extends `main`, and a reader deciding what the head is,
+/// cannot disagree. The Swift and Kotlin references implement the same rule
+/// over raw `package.json`.
+pub fn main_tip(meta: &SessionMeta, entries: &[OpLogEntry]) -> Option<String> {
+    if let Some(main) = meta.refs.get("main").filter(|m| !m.is_empty()) {
+        return Some(main.clone());
+    }
+    let n = entries.len().checked_sub(1)?;
+    Some(entries[n].id.clone().unwrap_or_else(|| format!("line-{n}")))
 }
 
 impl SessionOp {
@@ -569,6 +604,77 @@ mod tests {
         let mut e = wt::WorldEntity::new(id, name);
         e.transform.position = [id as f32, 0.0, 0.0];
         e
+    }
+
+    fn bare_entry(id: Option<&str>, revision: u64) -> OpLogEntry {
+        OpLogEntry {
+            revision,
+            author: Default::default(),
+            ops: Vec::new(),
+            timestamp_ms: 0,
+            id: id.map(str::to_string),
+            parent: None,
+            message: None,
+        }
+    }
+
+    #[test]
+    fn refs_survive_a_read_and_a_rewrite() {
+        // An authority rewrites package.json on every commit. Before refs
+        // were modelled, a package that named its main tip lost it here.
+        let text = r#"{"format_version": 2, "name": "castle", "base_revision": 0,
+                       "head_revision": 3, "refs": {"main": "e3", "moat": "e5"}}"#;
+        let meta: SessionMeta = serde_json::from_str(text).unwrap();
+        assert_eq!(meta.refs.get("main").map(String::as_str), Some("e3"));
+        let again: serde_json::Value =
+            serde_json::from_str(&serde_json::to_string(&meta).unwrap()).unwrap();
+        assert_eq!(again["refs"]["main"], "e3");
+        assert_eq!(again["refs"]["moat"], "e5");
+    }
+
+    #[test]
+    fn members_this_version_does_not_know_are_kept_on_a_rewrite() {
+        // The must-ignore rule for writers: skip what you don't know when
+        // reading, and keep it when writing back.
+        let text = r#"{"format_version": 2, "name": "castle", "base_revision": 0,
+                       "head_revision": 0, "profiles": ["authoring"],
+                       "x-studio": {"camera": "north"}}"#;
+        let meta: SessionMeta = serde_json::from_str(text).unwrap();
+        let again: serde_json::Value =
+            serde_json::from_str(&serde_json::to_string(&meta).unwrap()).unwrap();
+        assert_eq!(again["profiles"], serde_json::json!(["authoring"]));
+        assert_eq!(again["x-studio"]["camera"], "north");
+    }
+
+    #[test]
+    fn no_refs_and_no_extras_write_nothing_new() {
+        // A package written by an older authority must not grow members it
+        // never had just by being opened and saved.
+        let meta = SessionMeta::new("castle");
+        let value = serde_json::to_value(&meta).unwrap();
+        assert!(value.get("refs").is_none(), "{value}");
+    }
+
+    #[test]
+    fn the_main_tip_is_refs_main_else_the_last_entry_else_the_base() {
+        let mut meta = SessionMeta::new("castle");
+        // No log: the base is the head.
+        assert_eq!(main_tip(&meta, &[]), None);
+
+        // A log: its last entry, by its own id or the synthesized one.
+        let entries = [bare_entry(Some("e1"), 1), bare_entry(None, 2)];
+        assert_eq!(main_tip(&meta, &entries).as_deref(), Some("line-1"));
+        let entries = [bare_entry(Some("e1"), 1), bare_entry(Some("e2"), 2)];
+        assert_eq!(main_tip(&meta, &entries).as_deref(), Some("e2"));
+
+        // refs.main wins over file order — which is what lets a branch be
+        // appended to the log without becoming main.
+        meta.refs.insert("main".into(), "e1".into());
+        assert_eq!(main_tip(&meta, &entries).as_deref(), Some("e1"));
+
+        // An empty name is no name.
+        meta.refs.insert("main".into(), String::new());
+        assert_eq!(main_tip(&meta, &entries).as_deref(), Some("e2"));
     }
 
     #[test]
