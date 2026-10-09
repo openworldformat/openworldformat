@@ -1,0 +1,350 @@
+{
+  "name": "random-0065",
+  "description": "Seeded random case (seed 65): shared prefix, concurrent spawns, deletes, batches, ModifyWorld refs, name collisions.",
+  "base": {
+    "version": 3,
+    "meta": {
+      "name": "case-65"
+    },
+    "entities": []
+  },
+  "main": [
+    {
+      "revision": 1,
+      "message": "shared-0",
+      "ops": [
+        {
+          "SpawnEntity": {
+            "entity": {
+              "id": 1,
+              "name": "shared-1"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "revision": 2,
+      "message": "main-0",
+      "ops": [
+        {
+          "SpawnEntity": {
+            "entity": {
+              "id": 2,
+              "name": "tower"
+            }
+          }
+        },
+        {
+          "SpawnEntity": {
+            "entity": {
+              "id": 3,
+              "name": "gate"
+            }
+          }
+        },
+        {
+          "SpawnEntity": {
+            "entity": {
+              "id": 4,
+              "name": "mill"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "revision": 3,
+      "message": "main-1",
+      "ops": [
+        {
+          "SpawnEntity": {
+            "entity": {
+              "id": 5,
+              "name": "gate-m5"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "revision": 4,
+      "message": "main-2",
+      "ops": [
+        {
+          "SpawnEntity": {
+            "entity": {
+              "id": 6,
+              "name": "mill-m6"
+            }
+          }
+        },
+        {
+          "SpawnEntity": {
+            "entity": {
+              "id": 7,
+              "name": "lighthouse-2"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "revision": 5,
+      "ops": [
+        {
+          "ModifyWorld": {
+            "patch": {
+              "avatar": {
+                "model_entity": 2
+              }
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "branch": [
+    {
+      "revision": 2,
+      "author": {
+        "peer": 2,
+        "name": "branch"
+      },
+      "message": "branch-0",
+      "ops": [
+        {
+          "SpawnEntity": {
+            "entity": {
+              "id": 2,
+              "name": "tower"
+            }
+          }
+        },
+        {
+          "ModifyWorld": {
+            "patch": {
+              "avatar": {
+                "model_entity": 2
+              },
+              "creations": [
+                {
+                  "name": "set-0",
+                  "entities": [
+                    2
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "revision": 3,
+      "author": {
+        "peer": 2,
+        "name": "branch"
+      },
+      "message": "branch-1",
+      "ops": [
+        {
+          "SpawnEntity": {
+            "entity": {
+              "id": 3,
+              "name": "mill"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "revision": 4,
+      "author": {
+        "peer": 2,
+        "name": "branch"
+      },
+      "message": "branch-2",
+      "ops": [
+        {
+          "Batch": {
+            "ops": [
+              {
+                "SpawnEntity": {
+                  "entity": {
+                    "id": 4,
+                    "name": "tower",
+                    "parent": 2,
+                    "behaviors": [
+                      {
+                        "LookAt": {
+                          "target": 2
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "revision": 5,
+      "author": {
+        "peer": 2,
+        "name": "branch"
+      },
+      "message": "branch-3",
+      "ops": [
+        {
+          "Batch": {
+            "ops": [
+              {
+                "SpawnEntity": {
+                  "entity": {
+                    "id": 5,
+                    "name": "mill"
+                  }
+                }
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "expected": {
+    "remapped": [
+      [
+        2,
+        8
+      ],
+      [
+        3,
+        9
+      ],
+      [
+        4,
+        10
+      ],
+      [
+        5,
+        11
+      ]
+    ],
+    "entries": [
+      {
+        "revision": 2,
+        "author": {
+          "peer": 2,
+          "name": "branch"
+        },
+        "message": "branch-0",
+        "ops": [
+          {
+            "SpawnEntity": {
+              "entity": {
+                "id": 8,
+                "name": "tower-2"
+              }
+            }
+          },
+          {
+            "ModifyWorld": {
+              "patch": {
+                "avatar": {
+                  "model_entity": 8
+                },
+                "creations": [
+                  {
+                    "name": "set-0",
+                    "entities": [
+                      8
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        ]
+      },
+      {
+        "revision": 3,
+        "author": {
+          "peer": 2,
+          "name": "branch"
+        },
+        "message": "branch-1",
+        "ops": [
+          {
+            "SpawnEntity": {
+              "entity": {
+                "id": 9,
+                "name": "mill-2"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "revision": 4,
+        "author": {
+          "peer": 2,
+          "name": "branch"
+        },
+        "message": "branch-2",
+        "ops": [
+          {
+            "Batch": {
+              "ops": [
+                {
+                  "SpawnEntity": {
+                    "entity": {
+                      "id": 10,
+                      "name": "tower-3",
+                      "parent": 8,
+                      "behaviors": [
+                        {
+                          "LookAt": {
+                            "target": 8
+                          }
+                        }
+                      ]
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "revision": 5,
+        "author": {
+          "peer": 2,
+          "name": "branch"
+        },
+        "message": "branch-3",
+        "ops": [
+          {
+            "Batch": {
+              "ops": [
+                {
+                  "SpawnEntity": {
+                    "entity": {
+                      "id": 11,
+                      "name": "mill-3"
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    ],
+    "head": "{\n  \"avatar\": {\n    \"model_entity\": 8\n  },\n  \"creations\": [\n    {\n      \"entities\": [8],\n      \"name\": \"set-0\"\n    }\n  ],\n  \"entities\": [\n    {\n      \"id\": 1,\n      \"name\": \"shared-1\"\n    },\n    {\n      \"id\": 2,\n      \"name\": \"tower\"\n    },\n    {\n      \"id\": 3,\n      \"name\": \"gate\"\n    },\n    {\n      \"id\": 4,\n      \"name\": \"mill\"\n    },\n    {\n      \"id\": 5,\n      \"name\": \"gate-m5\"\n    },\n    {\n      \"id\": 6,\n      \"name\": \"mill-m6\"\n    },\n    {\n      \"id\": 7,\n      \"name\": \"lighthouse-2\"\n    },\n    {\n      \"id\": 8,\n      \"name\": \"tower-2\"\n    },\n    {\n      \"id\": 9,\n      \"name\": \"mill-2\"\n    },\n    {\n      \"behaviors\": [\n        {\n          \"LookAt\": {\n            \"target\": 8\n          }\n        }\n      ],\n      \"id\": 10,\n      \"name\": \"tower-3\",\n      \"parent\": 8\n    },\n    {\n      \"id\": 11,\n      \"name\": \"mill-3\"\n    }\n  ],\n  \"meta\": {\n    \"name\": \"case-65\"\n  },\n  \"next_entity_id\": 12,\n  \"version\": 3\n}\n"
+  }
+}

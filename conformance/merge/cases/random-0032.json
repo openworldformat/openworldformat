@@ -1,0 +1,221 @@
+{
+  "name": "random-0032",
+  "description": "Seeded random case (seed 32): shared prefix, concurrent spawns, deletes, batches, ModifyWorld refs, name collisions.",
+  "base": {
+    "version": 3,
+    "meta": {
+      "name": "case-32"
+    },
+    "entities": [
+      {
+        "id": 1,
+        "name": "base-1"
+      }
+    ]
+  },
+  "main": [
+    {
+      "revision": 1,
+      "message": "shared-0",
+      "ops": [
+        {
+          "SpawnEntity": {
+            "entity": {
+              "id": 2,
+              "name": "shared-2"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "revision": 2,
+      "message": "shared-1",
+      "ops": [
+        {
+          "SpawnEntity": {
+            "entity": {
+              "id": 3,
+              "name": "shared-3"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "revision": 3,
+      "message": "main-0",
+      "ops": [
+        {
+          "SpawnEntity": {
+            "entity": {
+              "id": 4,
+              "name": "dock"
+            }
+          }
+        },
+        {
+          "SpawnEntity": {
+            "entity": {
+              "id": 5,
+              "name": "tower"
+            }
+          }
+        },
+        {
+          "SpawnEntity": {
+            "entity": {
+              "id": 6,
+              "name": "lighthouse"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "revision": 4,
+      "message": "main-1",
+      "ops": [
+        {
+          "SpawnEntity": {
+            "entity": {
+              "id": 7,
+              "name": "gate"
+            }
+          }
+        },
+        {
+          "SpawnEntity": {
+            "entity": {
+              "id": 8,
+              "name": "lighthouse-m8"
+            }
+          }
+        },
+        {
+          "SpawnEntity": {
+            "entity": {
+              "id": 9,
+              "name": "gate-m9"
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "branch": [
+    {
+      "revision": 3,
+      "author": {
+        "peer": 2,
+        "name": "branch"
+      },
+      "message": "branch-0",
+      "ops": [
+        {
+          "SpawnEntity": {
+            "entity": {
+              "id": 4,
+              "name": "dock"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "revision": 4,
+      "author": {
+        "peer": 2,
+        "name": "branch"
+      },
+      "message": "branch-1",
+      "ops": [
+        {
+          "Batch": {
+            "ops": [
+              {
+                "SpawnEntity": {
+                  "entity": {
+                    "id": 5,
+                    "name": "mill",
+                    "behaviors": [
+                      {
+                        "LookAt": {
+                          "target": 4
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "expected": {
+    "remapped": [
+      [
+        4,
+        10
+      ],
+      [
+        5,
+        11
+      ]
+    ],
+    "entries": [
+      {
+        "revision": 3,
+        "author": {
+          "peer": 2,
+          "name": "branch"
+        },
+        "message": "branch-0",
+        "ops": [
+          {
+            "SpawnEntity": {
+              "entity": {
+                "id": 10,
+                "name": "dock-2"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "revision": 4,
+        "author": {
+          "peer": 2,
+          "name": "branch"
+        },
+        "message": "branch-1",
+        "ops": [
+          {
+            "Batch": {
+              "ops": [
+                {
+                  "SpawnEntity": {
+                    "entity": {
+                      "id": 11,
+                      "name": "mill",
+                      "behaviors": [
+                        {
+                          "LookAt": {
+                            "target": 10
+                          }
+                        }
+                      ]
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    ],
+    "head": "{\n  \"entities\": [\n    {\n      \"id\": 1,\n      \"name\": \"base-1\"\n    },\n    {\n      \"id\": 2,\n      \"name\": \"shared-2\"\n    },\n    {\n      \"id\": 3,\n      \"name\": \"shared-3\"\n    },\n    {\n      \"id\": 4,\n      \"name\": \"dock\"\n    },\n    {\n      \"id\": 5,\n      \"name\": \"tower\"\n    },\n    {\n      \"id\": 6,\n      \"name\": \"lighthouse\"\n    },\n    {\n      \"id\": 7,\n      \"name\": \"gate\"\n    },\n    {\n      \"id\": 8,\n      \"name\": \"lighthouse-m8\"\n    },\n    {\n      \"id\": 9,\n      \"name\": \"gate-m9\"\n    },\n    {\n      \"id\": 10,\n      \"name\": \"dock-2\"\n    },\n    {\n      \"behaviors\": [\n        {\n          \"LookAt\": {\n            \"target\": 10\n          }\n        }\n      ],\n      \"id\": 11,\n      \"name\": \"mill\"\n    }\n  ],\n  \"meta\": {\n    \"name\": \"case-32\"\n  },\n  \"next_entity_id\": 12,\n  \"version\": 3\n}\n"
+  }
+}

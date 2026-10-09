@@ -1,0 +1,283 @@
+{
+  "name": "random-0086",
+  "description": "Seeded random case (seed 86): shared prefix, concurrent spawns, deletes, batches, ModifyWorld refs, name collisions.",
+  "base": {
+    "version": 3,
+    "meta": {
+      "name": "case-86"
+    },
+    "entities": []
+  },
+  "main": [
+    {
+      "revision": 1,
+      "message": "shared-0",
+      "ops": [
+        {
+          "SpawnEntity": {
+            "entity": {
+              "id": 1,
+              "name": "shared-1"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "revision": 2,
+      "message": "shared-1",
+      "ops": [
+        {
+          "SpawnEntity": {
+            "entity": {
+              "id": 2,
+              "name": "shared-2"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "revision": 3,
+      "message": "main-0",
+      "ops": [
+        {
+          "SpawnEntity": {
+            "entity": {
+              "id": 3,
+              "name": "tower"
+            }
+          }
+        },
+        {
+          "SpawnEntity": {
+            "entity": {
+              "id": 4,
+              "name": "lighthouse"
+            }
+          }
+        },
+        {
+          "SpawnEntity": {
+            "entity": {
+              "id": 5,
+              "name": "tower-m5"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "revision": 4,
+      "message": "main-1",
+      "ops": [
+        {
+          "SpawnEntity": {
+            "entity": {
+              "id": 6,
+              "name": "lighthouse-m6"
+            }
+          }
+        },
+        {
+          "SpawnEntity": {
+            "entity": {
+              "id": 7,
+              "name": "gate"
+            }
+          }
+        },
+        {
+          "SpawnEntity": {
+            "entity": {
+              "id": 8,
+              "name": "dock"
+            }
+          }
+        },
+        {
+          "DeleteEntity": {
+            "id": 8
+          }
+        }
+      ]
+    },
+    {
+      "revision": 5,
+      "message": "main-2",
+      "ops": [
+        {
+          "Batch": {
+            "ops": [
+              {
+                "SpawnEntity": {
+                  "entity": {
+                    "id": 9,
+                    "name": "dock-m9"
+                  }
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "revision": 6,
+      "message": "main-3",
+      "ops": [
+        {
+          "SpawnEntity": {
+            "entity": {
+              "id": 10,
+              "name": "gate-m10"
+            }
+          }
+        },
+        {
+          "SpawnEntity": {
+            "entity": {
+              "id": 11,
+              "name": "lighthouse-2"
+            }
+          }
+        },
+        {
+          "SpawnEntity": {
+            "entity": {
+              "id": 12,
+              "name": "lighthouse-2-m12"
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "branch": [
+    {
+      "revision": 3,
+      "author": {
+        "peer": 2,
+        "name": "branch"
+      },
+      "message": "branch-0",
+      "ops": [
+        {
+          "SpawnEntity": {
+            "entity": {
+              "id": 3,
+              "name": "gate"
+            }
+          }
+        },
+        {
+          "SpawnEntity": {
+            "entity": {
+              "id": 4,
+              "name": "gate"
+            }
+          }
+        },
+        {
+          "SpawnEntity": {
+            "entity": {
+              "id": 5,
+              "name": "tower"
+            }
+          }
+        },
+        {
+          "ModifyWorld": {
+            "patch": {
+              "avatar": {
+                "model_entity": 3
+              },
+              "creations": [
+                {
+                  "name": "set-0",
+                  "entities": [
+                    3,
+                    4,
+                    5
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "expected": {
+    "remapped": [
+      [
+        3,
+        13
+      ],
+      [
+        4,
+        14
+      ],
+      [
+        5,
+        15
+      ]
+    ],
+    "entries": [
+      {
+        "revision": 3,
+        "author": {
+          "peer": 2,
+          "name": "branch"
+        },
+        "message": "branch-0",
+        "ops": [
+          {
+            "SpawnEntity": {
+              "entity": {
+                "id": 13,
+                "name": "gate-2"
+              }
+            }
+          },
+          {
+            "SpawnEntity": {
+              "entity": {
+                "id": 14,
+                "name": "gate-3"
+              }
+            }
+          },
+          {
+            "SpawnEntity": {
+              "entity": {
+                "id": 15,
+                "name": "tower-2"
+              }
+            }
+          },
+          {
+            "ModifyWorld": {
+              "patch": {
+                "avatar": {
+                  "model_entity": 13
+                },
+                "creations": [
+                  {
+                    "name": "set-0",
+                    "entities": [
+                      13,
+                      14,
+                      15
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        ]
+      }
+    ],
+    "head": "{\n  \"avatar\": {\n    \"model_entity\": 13\n  },\n  \"creations\": [\n    {\n      \"entities\": [13, 14, 15],\n      \"name\": \"set-0\"\n    }\n  ],\n  \"entities\": [\n    {\n      \"id\": 1,\n      \"name\": \"shared-1\"\n    },\n    {\n      \"id\": 2,\n      \"name\": \"shared-2\"\n    },\n    {\n      \"id\": 3,\n      \"name\": \"tower\"\n    },\n    {\n      \"id\": 4,\n      \"name\": \"lighthouse\"\n    },\n    {\n      \"id\": 5,\n      \"name\": \"tower-m5\"\n    },\n    {\n      \"id\": 6,\n      \"name\": \"lighthouse-m6\"\n    },\n    {\n      \"id\": 7,\n      \"name\": \"gate\"\n    },\n    {\n      \"id\": 9,\n      \"name\": \"dock-m9\"\n    },\n    {\n      \"id\": 10,\n      \"name\": \"gate-m10\"\n    },\n    {\n      \"id\": 11,\n      \"name\": \"lighthouse-2\"\n    },\n    {\n      \"id\": 12,\n      \"name\": \"lighthouse-2-m12\"\n    },\n    {\n      \"id\": 13,\n      \"name\": \"gate-2\"\n    },\n    {\n      \"id\": 14,\n      \"name\": \"gate-3\"\n    },\n    {\n      \"id\": 15,\n      \"name\": \"tower-2\"\n    }\n  ],\n  \"meta\": {\n    \"name\": \"case-86\"\n  },\n  \"next_entity_id\": 16,\n  \"version\": 3\n}\n"
+  }
+}

@@ -1,0 +1,154 @@
+{
+  "name": "random-0039",
+  "description": "Seeded random case (seed 39): shared prefix, concurrent spawns, deletes, batches, ModifyWorld refs, name collisions.",
+  "base": {
+    "version": 3,
+    "meta": {
+      "name": "case-39"
+    },
+    "entities": []
+  },
+  "main": [
+    {
+      "revision": 1,
+      "message": "shared-0",
+      "ops": [
+        {
+          "SpawnEntity": {
+            "entity": {
+              "id": 1,
+              "name": "shared-1"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "revision": 2,
+      "message": "shared-1",
+      "ops": [
+        {
+          "SpawnEntity": {
+            "entity": {
+              "id": 2,
+              "name": "shared-2"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "revision": 3,
+      "message": "main-0",
+      "ops": [
+        {
+          "Batch": {
+            "ops": [
+              {
+                "SpawnEntity": {
+                  "entity": {
+                    "id": 3,
+                    "name": "mill"
+                  }
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "revision": 4,
+      "message": "main-1",
+      "ops": [
+        {
+          "SpawnEntity": {
+            "entity": {
+              "id": 4,
+              "name": "mill-m4"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "revision": 5,
+      "message": "main-2",
+      "ops": [
+        {
+          "SpawnEntity": {
+            "entity": {
+              "id": 5,
+              "name": "mill-m5"
+            }
+          }
+        },
+        {
+          "SpawnEntity": {
+            "entity": {
+              "id": 6,
+              "name": "dock"
+            }
+          }
+        },
+        {
+          "SpawnEntity": {
+            "entity": {
+              "id": 7,
+              "name": "gate"
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "branch": [
+    {
+      "revision": 3,
+      "author": {
+        "peer": 2,
+        "name": "branch"
+      },
+      "message": "branch-0",
+      "ops": [
+        {
+          "SpawnEntity": {
+            "entity": {
+              "id": 3,
+              "name": "mill"
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "expected": {
+    "remapped": [
+      [
+        3,
+        8
+      ]
+    ],
+    "entries": [
+      {
+        "revision": 3,
+        "author": {
+          "peer": 2,
+          "name": "branch"
+        },
+        "message": "branch-0",
+        "ops": [
+          {
+            "SpawnEntity": {
+              "entity": {
+                "id": 8,
+                "name": "mill-2"
+              }
+            }
+          }
+        ]
+      }
+    ],
+    "head": "{\n  \"entities\": [\n    {\n      \"id\": 1,\n      \"name\": \"shared-1\"\n    },\n    {\n      \"id\": 2,\n      \"name\": \"shared-2\"\n    },\n    {\n      \"id\": 3,\n      \"name\": \"mill\"\n    },\n    {\n      \"id\": 4,\n      \"name\": \"mill-m4\"\n    },\n    {\n      \"id\": 5,\n      \"name\": \"mill-m5\"\n    },\n    {\n      \"id\": 6,\n      \"name\": \"dock\"\n    },\n    {\n      \"id\": 7,\n      \"name\": \"gate\"\n    },\n    {\n      \"id\": 8,\n      \"name\": \"mill-2\"\n    }\n  ],\n  \"meta\": {\n    \"name\": \"case-39\"\n  },\n  \"next_entity_id\": 9,\n  \"version\": 3\n}\n"
+  }
+}

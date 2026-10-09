@@ -1,0 +1,176 @@
+{
+  "name": "random-0059",
+  "description": "Seeded random case (seed 59): shared prefix, concurrent spawns, deletes, batches, ModifyWorld refs, name collisions.",
+  "base": {
+    "version": 3,
+    "meta": {
+      "name": "case-59"
+    },
+    "entities": [
+      {
+        "id": 1,
+        "name": "base-1"
+      }
+    ]
+  },
+  "main": [
+    {
+      "revision": 1,
+      "message": "shared-0",
+      "ops": [
+        {
+          "SpawnEntity": {
+            "entity": {
+              "id": 2,
+              "name": "shared-2"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "revision": 2,
+      "message": "main-0",
+      "ops": [
+        {
+          "SpawnEntity": {
+            "entity": {
+              "id": 3,
+              "name": "lighthouse"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "revision": 3,
+      "message": "main-1",
+      "ops": [
+        {
+          "Batch": {
+            "ops": [
+              {
+                "SpawnEntity": {
+                  "entity": {
+                    "id": 4,
+                    "name": "mill"
+                  }
+                }
+              },
+              {
+                "DeleteEntity": {
+                  "id": 4
+                }
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "branch": [
+    {
+      "revision": 2,
+      "author": {
+        "peer": 2,
+        "name": "branch"
+      },
+      "message": "branch-0",
+      "ops": [
+        {
+          "SpawnEntity": {
+            "entity": {
+              "id": 3,
+              "name": "dock"
+            }
+          }
+        },
+        {
+          "SpawnEntity": {
+            "entity": {
+              "id": 4,
+              "name": "gate",
+              "parent": 3
+            }
+          }
+        }
+      ]
+    },
+    {
+      "revision": 3,
+      "author": {
+        "peer": 2,
+        "name": "branch"
+      },
+      "message": "branch-1",
+      "ops": [
+        {
+          "SpawnEntity": {
+            "entity": {
+              "id": 5,
+              "name": "gate",
+              "parent": 4
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "expected": {
+    "remapped": [
+      [
+        3,
+        6
+      ]
+    ],
+    "entries": [
+      {
+        "revision": 2,
+        "author": {
+          "peer": 2,
+          "name": "branch"
+        },
+        "message": "branch-0",
+        "ops": [
+          {
+            "SpawnEntity": {
+              "entity": {
+                "id": 6,
+                "name": "dock"
+              }
+            }
+          },
+          {
+            "SpawnEntity": {
+              "entity": {
+                "id": 4,
+                "name": "gate",
+                "parent": 6
+              }
+            }
+          }
+        ]
+      },
+      {
+        "revision": 3,
+        "author": {
+          "peer": 2,
+          "name": "branch"
+        },
+        "message": "branch-1",
+        "ops": [
+          {
+            "SpawnEntity": {
+              "entity": {
+                "id": 5,
+                "name": "gate-2",
+                "parent": 4
+              }
+            }
+          }
+        ]
+      }
+    ],
+    "head": "{\n  \"entities\": [\n    {\n      \"id\": 1,\n      \"name\": \"base-1\"\n    },\n    {\n      \"id\": 2,\n      \"name\": \"shared-2\"\n    },\n    {\n      \"id\": 3,\n      \"name\": \"lighthouse\"\n    },\n    {\n      \"id\": 4,\n      \"name\": \"gate\",\n      \"parent\": 6\n    },\n    {\n      \"id\": 5,\n      \"name\": \"gate-2\",\n      \"parent\": 4\n    },\n    {\n      \"id\": 6,\n      \"name\": \"dock\"\n    }\n  ],\n  \"meta\": {\n    \"name\": \"case-59\"\n  },\n  \"next_entity_id\": 7,\n  \"version\": 3\n}\n"
+  }
+}

@@ -1,0 +1,186 @@
+{
+  "name": "random-0021",
+  "description": "Seeded random case (seed 21): shared prefix, concurrent spawns, deletes, batches, ModifyWorld refs, name collisions.",
+  "base": {
+    "version": 3,
+    "meta": {
+      "name": "case-21"
+    },
+    "entities": [
+      {
+        "id": 1,
+        "name": "base-1"
+      }
+    ]
+  },
+  "main": [
+    {
+      "revision": 1,
+      "message": "shared-0",
+      "ops": [
+        {
+          "SpawnEntity": {
+            "entity": {
+              "id": 2,
+              "name": "shared-2"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "revision": 2,
+      "message": "main-0",
+      "ops": [
+        {
+          "SpawnEntity": {
+            "entity": {
+              "id": 3,
+              "name": "tower"
+            }
+          }
+        },
+        {
+          "SpawnEntity": {
+            "entity": {
+              "id": 4,
+              "name": "mill"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "revision": 3,
+      "message": "main-1",
+      "ops": [
+        {
+          "SpawnEntity": {
+            "entity": {
+              "id": 5,
+              "name": "lighthouse-2"
+            }
+          }
+        },
+        {
+          "SpawnEntity": {
+            "entity": {
+              "id": 6,
+              "name": "gate"
+            }
+          }
+        },
+        {
+          "DeleteEntity": {
+            "id": 6
+          }
+        }
+      ]
+    }
+  ],
+  "branch": [
+    {
+      "revision": 2,
+      "author": {
+        "peer": 2,
+        "name": "branch"
+      },
+      "message": "branch-0",
+      "ops": [
+        {
+          "SpawnEntity": {
+            "entity": {
+              "id": 3,
+              "name": "gate"
+            }
+          }
+        },
+        {
+          "SpawnEntity": {
+            "entity": {
+              "id": 4,
+              "name": "dock",
+              "behaviors": [
+                {
+                  "LookAt": {
+                    "target": 3
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "SpawnEntity": {
+            "entity": {
+              "id": 5,
+              "name": "tower",
+              "parent": 4
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "expected": {
+    "remapped": [
+      [
+        3,
+        7
+      ],
+      [
+        4,
+        8
+      ],
+      [
+        5,
+        9
+      ]
+    ],
+    "entries": [
+      {
+        "revision": 2,
+        "author": {
+          "peer": 2,
+          "name": "branch"
+        },
+        "message": "branch-0",
+        "ops": [
+          {
+            "SpawnEntity": {
+              "entity": {
+                "id": 7,
+                "name": "gate"
+              }
+            }
+          },
+          {
+            "SpawnEntity": {
+              "entity": {
+                "id": 8,
+                "name": "dock",
+                "behaviors": [
+                  {
+                    "LookAt": {
+                      "target": 7
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "SpawnEntity": {
+              "entity": {
+                "id": 9,
+                "name": "tower-2",
+                "parent": 8
+              }
+            }
+          }
+        ]
+      }
+    ],
+    "head": "{\n  \"entities\": [\n    {\n      \"id\": 1,\n      \"name\": \"base-1\"\n    },\n    {\n      \"id\": 2,\n      \"name\": \"shared-2\"\n    },\n    {\n      \"id\": 3,\n      \"name\": \"tower\"\n    },\n    {\n      \"id\": 4,\n      \"name\": \"mill\"\n    },\n    {\n      \"id\": 5,\n      \"name\": \"lighthouse-2\"\n    },\n    {\n      \"id\": 7,\n      \"name\": \"gate\"\n    },\n    {\n      \"behaviors\": [\n        {\n          \"LookAt\": {\n            \"target\": 7\n          }\n        }\n      ],\n      \"id\": 8,\n      \"name\": \"dock\"\n    },\n    {\n      \"id\": 9,\n      \"name\": \"tower-2\",\n      \"parent\": 8\n    }\n  ],\n  \"meta\": {\n    \"name\": \"case-21\"\n  },\n  \"next_entity_id\": 10,\n  \"version\": 3\n}\n"
+  }
+}

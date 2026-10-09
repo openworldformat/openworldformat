@@ -1,0 +1,111 @@
+{
+  "name": "random-0066",
+  "description": "Seeded random case (seed 66): shared prefix, concurrent spawns, deletes, batches, ModifyWorld refs, name collisions.",
+  "base": {
+    "version": 3,
+    "meta": {
+      "name": "case-66"
+    },
+    "entities": []
+  },
+  "main": [
+    {
+      "revision": 1,
+      "message": "main-0",
+      "ops": [
+        {
+          "SpawnEntity": {
+            "entity": {
+              "id": 1,
+              "name": "dock"
+            }
+          }
+        },
+        {
+          "SpawnEntity": {
+            "entity": {
+              "id": 2,
+              "name": "mill"
+            }
+          }
+        },
+        {
+          "SpawnEntity": {
+            "entity": {
+              "id": 3,
+              "name": "lighthouse"
+            }
+          }
+        },
+        {
+          "DeleteEntity": {
+            "id": 3
+          }
+        }
+      ]
+    },
+    {
+      "revision": 2,
+      "ops": [
+        {
+          "ModifyWorld": {
+            "patch": {
+              "avatar": {
+                "model_entity": 1
+              }
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "branch": [
+    {
+      "revision": 1,
+      "author": {
+        "peer": 2,
+        "name": "branch"
+      },
+      "message": "branch-0",
+      "ops": [
+        {
+          "SpawnEntity": {
+            "entity": {
+              "id": 1,
+              "name": "mill"
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "expected": {
+    "remapped": [
+      [
+        1,
+        4
+      ]
+    ],
+    "entries": [
+      {
+        "revision": 1,
+        "author": {
+          "peer": 2,
+          "name": "branch"
+        },
+        "message": "branch-0",
+        "ops": [
+          {
+            "SpawnEntity": {
+              "entity": {
+                "id": 4,
+                "name": "mill-2"
+              }
+            }
+          }
+        ]
+      }
+    ],
+    "head": "{\n  \"avatar\": {\n    \"model_entity\": 1\n  },\n  \"entities\": [\n    {\n      \"id\": 1,\n      \"name\": \"dock\"\n    },\n    {\n      \"id\": 2,\n      \"name\": \"mill\"\n    },\n    {\n      \"id\": 4,\n      \"name\": \"mill-2\"\n    }\n  ],\n  \"meta\": {\n    \"name\": \"case-66\"\n  },\n  \"next_entity_id\": 5,\n  \"version\": 3\n}\n"
+  }
+}

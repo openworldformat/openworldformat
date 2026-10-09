@@ -1,0 +1,198 @@
+{
+  "name": "random-0008",
+  "description": "Seeded random case (seed 8): shared prefix, concurrent spawns, deletes, batches, ModifyWorld refs, name collisions.",
+  "base": {
+    "version": 3,
+    "meta": {
+      "name": "case-8"
+    },
+    "entities": []
+  },
+  "main": [
+    {
+      "revision": 1,
+      "message": "shared-0",
+      "ops": [
+        {
+          "SpawnEntity": {
+            "entity": {
+              "id": 1,
+              "name": "shared-1"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "revision": 2,
+      "message": "main-0",
+      "ops": [
+        {
+          "SpawnEntity": {
+            "entity": {
+              "id": 2,
+              "name": "dock"
+            }
+          }
+        },
+        {
+          "SpawnEntity": {
+            "entity": {
+              "id": 3,
+              "name": "tower"
+            }
+          }
+        },
+        {
+          "SpawnEntity": {
+            "entity": {
+              "id": 4,
+              "name": "lighthouse-2"
+            }
+          }
+        },
+        {
+          "DeleteEntity": {
+            "id": 4
+          }
+        }
+      ]
+    },
+    {
+      "revision": 3,
+      "message": "main-1",
+      "ops": [
+        {
+          "SpawnEntity": {
+            "entity": {
+              "id": 5,
+              "name": "dock-m5"
+            }
+          }
+        },
+        {
+          "DeleteEntity": {
+            "id": 5
+          }
+        }
+      ]
+    },
+    {
+      "revision": 4,
+      "ops": [
+        {
+          "ModifyWorld": {
+            "patch": {
+              "avatar": {
+                "model_entity": 2
+              }
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "branch": [
+    {
+      "revision": 2,
+      "author": {
+        "peer": 2,
+        "name": "branch"
+      },
+      "message": "branch-0",
+      "ops": [
+        {
+          "SpawnEntity": {
+            "entity": {
+              "id": 2,
+              "name": "lighthouse-2"
+            }
+          }
+        },
+        {
+          "SpawnEntity": {
+            "entity": {
+              "id": 3,
+              "name": "lighthouse",
+              "parent": 2
+            }
+          }
+        },
+        {
+          "SpawnEntity": {
+            "entity": {
+              "id": 4,
+              "name": "tower"
+            }
+          }
+        },
+        {
+          "ModifyEntity": {
+            "id": 3,
+            "patch": {
+              "parent": 2
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "expected": {
+    "remapped": [
+      [
+        2,
+        6
+      ],
+      [
+        3,
+        7
+      ]
+    ],
+    "entries": [
+      {
+        "revision": 2,
+        "author": {
+          "peer": 2,
+          "name": "branch"
+        },
+        "message": "branch-0",
+        "ops": [
+          {
+            "SpawnEntity": {
+              "entity": {
+                "id": 6,
+                "name": "lighthouse-2"
+              }
+            }
+          },
+          {
+            "SpawnEntity": {
+              "entity": {
+                "id": 7,
+                "name": "lighthouse",
+                "parent": 6
+              }
+            }
+          },
+          {
+            "SpawnEntity": {
+              "entity": {
+                "id": 4,
+                "name": "tower-2"
+              }
+            }
+          },
+          {
+            "ModifyEntity": {
+              "id": 7,
+              "patch": {
+                "parent": 6
+              }
+            }
+          }
+        ]
+      }
+    ],
+    "head": "{\n  \"avatar\": {\n    \"model_entity\": 2\n  },\n  \"entities\": [\n    {\n      \"id\": 1,\n      \"name\": \"shared-1\"\n    },\n    {\n      \"id\": 2,\n      \"name\": \"dock\"\n    },\n    {\n      \"id\": 3,\n      \"name\": \"tower\"\n    },\n    {\n      \"id\": 4,\n      \"name\": \"tower-2\"\n    },\n    {\n      \"id\": 6,\n      \"name\": \"lighthouse-2\"\n    },\n    {\n      \"id\": 7,\n      \"name\": \"lighthouse\",\n      \"parent\": 6\n    }\n  ],\n  \"meta\": {\n    \"name\": \"case-8\"\n  },\n  \"next_entity_id\": 8,\n  \"version\": 3\n}\n"
+  }
+}

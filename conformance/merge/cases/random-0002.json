@@ -1,0 +1,194 @@
+{
+  "name": "random-0002",
+  "description": "Seeded random case (seed 2): shared prefix, concurrent spawns, deletes, batches, ModifyWorld refs, name collisions.",
+  "base": {
+    "version": 3,
+    "meta": {
+      "name": "case-2"
+    },
+    "entities": [
+      {
+        "id": 1,
+        "name": "base-1"
+      },
+      {
+        "id": 2,
+        "name": "base-2",
+        "parent": 1
+      }
+    ]
+  },
+  "main": [
+    {
+      "revision": 1,
+      "message": "main-0",
+      "ops": [
+        {
+          "Batch": {
+            "ops": [
+              {
+                "SpawnEntity": {
+                  "entity": {
+                    "id": 3,
+                    "name": "dock"
+                  }
+                }
+              },
+              {
+                "SpawnEntity": {
+                  "entity": {
+                    "id": 4,
+                    "name": "tower"
+                  }
+                }
+              },
+              {
+                "SpawnEntity": {
+                  "entity": {
+                    "id": 5,
+                    "name": "tower-m5"
+                  }
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "revision": 2,
+      "message": "main-1",
+      "ops": [
+        {
+          "Batch": {
+            "ops": [
+              {
+                "SpawnEntity": {
+                  "entity": {
+                    "id": 6,
+                    "name": "gate"
+                  }
+                }
+              },
+              {
+                "SpawnEntity": {
+                  "entity": {
+                    "id": 7,
+                    "name": "tower-m7"
+                  }
+                }
+              },
+              {
+                "SpawnEntity": {
+                  "entity": {
+                    "id": 8,
+                    "name": "mill"
+                  }
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "revision": 3,
+      "message": "main-2",
+      "ops": [
+        {
+          "Batch": {
+            "ops": [
+              {
+                "SpawnEntity": {
+                  "entity": {
+                    "id": 9,
+                    "name": "tower-m9"
+                  }
+                }
+              },
+              {
+                "SpawnEntity": {
+                  "entity": {
+                    "id": 10,
+                    "name": "mill-m10"
+                  }
+                }
+              },
+              {
+                "SpawnEntity": {
+                  "entity": {
+                    "id": 11,
+                    "name": "lighthouse"
+                  }
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "revision": 4,
+      "ops": [
+        {
+          "ModifyWorld": {
+            "patch": {
+              "avatar": {
+                "model_entity": 3
+              }
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "branch": [
+    {
+      "revision": 1,
+      "author": {
+        "peer": 2,
+        "name": "branch"
+      },
+      "message": "branch-0",
+      "ops": [
+        {
+          "SpawnEntity": {
+            "entity": {
+              "id": 3,
+              "name": "mill"
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "expected": {
+    "remapped": [
+      [
+        3,
+        12
+      ]
+    ],
+    "entries": [
+      {
+        "revision": 1,
+        "author": {
+          "peer": 2,
+          "name": "branch"
+        },
+        "message": "branch-0",
+        "ops": [
+          {
+            "SpawnEntity": {
+              "entity": {
+                "id": 12,
+                "name": "mill-2"
+              }
+            }
+          }
+        ]
+      }
+    ],
+    "head": "{\n  \"avatar\": {\n    \"model_entity\": 3\n  },\n  \"entities\": [\n    {\n      \"id\": 1,\n      \"name\": \"base-1\"\n    },\n    {\n      \"id\": 2,\n      \"name\": \"base-2\",\n      \"parent\": 1\n    },\n    {\n      \"id\": 3,\n      \"name\": \"dock\"\n    },\n    {\n      \"id\": 4,\n      \"name\": \"tower\"\n    },\n    {\n      \"id\": 5,\n      \"name\": \"tower-m5\"\n    },\n    {\n      \"id\": 6,\n      \"name\": \"gate\"\n    },\n    {\n      \"id\": 7,\n      \"name\": \"tower-m7\"\n    },\n    {\n      \"id\": 8,\n      \"name\": \"mill\"\n    },\n    {\n      \"id\": 9,\n      \"name\": \"tower-m9\"\n    },\n    {\n      \"id\": 10,\n      \"name\": \"mill-m10\"\n    },\n    {\n      \"id\": 11,\n      \"name\": \"lighthouse\"\n    },\n    {\n      \"id\": 12,\n      \"name\": \"mill-2\"\n    }\n  ],\n  \"meta\": {\n    \"name\": \"case-2\"\n  },\n  \"next_entity_id\": 13,\n  \"version\": 3\n}\n"
+  }
+}

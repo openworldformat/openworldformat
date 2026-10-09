@@ -1,0 +1,89 @@
+{
+  "name": "names",
+  "description": "Two branches mint a `lighthouse` each: the merged spawns take the `<name>-<n>` suffix, n from 2 up, first unused — here -2 is taken, so the branch gets -3 and -4.",
+  "base": {
+    "version": 3,
+    "meta": {
+      "name": "names"
+    },
+    "entities": []
+  },
+  "main": [
+    {
+      "revision": 1,
+      "ops": [
+        {
+          "SpawnEntity": {
+            "entity": {
+              "id": 1,
+              "name": "lighthouse"
+            }
+          }
+        },
+        {
+          "SpawnEntity": {
+            "entity": {
+              "id": 2,
+              "name": "lighthouse-2"
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "branch": [
+    {
+      "revision": 1,
+      "ops": [
+        {
+          "SpawnEntity": {
+            "entity": {
+              "id": 1,
+              "name": "lighthouse"
+            }
+          }
+        },
+        {
+          "SpawnEntity": {
+            "entity": {
+              "id": 3,
+              "name": "lighthouse"
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "expected": {
+    "remapped": [
+      [
+        1,
+        4
+      ]
+    ],
+    "entries": [
+      {
+        "revision": 1,
+        "ops": [
+          {
+            "SpawnEntity": {
+              "entity": {
+                "id": 4,
+                "name": "lighthouse-3"
+              }
+            }
+          },
+          {
+            "SpawnEntity": {
+              "entity": {
+                "id": 3,
+                "name": "lighthouse-4"
+              }
+            }
+          }
+        ]
+      }
+    ],
+    "head": "{\n  \"entities\": [\n    {\n      \"id\": 1,\n      \"name\": \"lighthouse\"\n    },\n    {\n      \"id\": 2,\n      \"name\": \"lighthouse-2\"\n    },\n    {\n      \"id\": 3,\n      \"name\": \"lighthouse-4\"\n    },\n    {\n      \"id\": 4,\n      \"name\": \"lighthouse-3\"\n    }\n  ],\n  \"meta\": {\n    \"name\": \"names\"\n  },\n  \"next_entity_id\": 5,\n  \"version\": 3\n}\n"
+  }
+}

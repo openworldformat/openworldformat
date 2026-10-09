@@ -1,0 +1,512 @@
+{
+  "name": "random-0048",
+  "description": "Seeded random case (seed 48): shared prefix, concurrent spawns, deletes, batches, ModifyWorld refs, name collisions.",
+  "base": {
+    "version": 3,
+    "meta": {
+      "name": "case-48"
+    },
+    "entities": [
+      {
+        "id": 1,
+        "name": "base-1"
+      },
+      {
+        "id": 2,
+        "name": "base-2"
+      },
+      {
+        "id": 3,
+        "name": "base-3",
+        "parent": 2
+      }
+    ]
+  },
+  "main": [
+    {
+      "revision": 1,
+      "message": "main-0",
+      "ops": [
+        {
+          "SpawnEntity": {
+            "entity": {
+              "id": 4,
+              "name": "lighthouse"
+            }
+          }
+        },
+        {
+          "SpawnEntity": {
+            "entity": {
+              "id": 5,
+              "name": "tower"
+            }
+          }
+        },
+        {
+          "SpawnEntity": {
+            "entity": {
+              "id": 6,
+              "name": "lighthouse-2"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "revision": 2,
+      "message": "main-1",
+      "ops": [
+        {
+          "SpawnEntity": {
+            "entity": {
+              "id": 7,
+              "name": "dock"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "revision": 3,
+      "ops": [
+        {
+          "ModifyWorld": {
+            "patch": {
+              "avatar": {
+                "model_entity": 4
+              }
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "branch": [
+    {
+      "revision": 1,
+      "author": {
+        "peer": 2,
+        "name": "branch"
+      },
+      "message": "branch-0",
+      "ops": [
+        {
+          "SpawnEntity": {
+            "entity": {
+              "id": 4,
+              "name": "gate"
+            }
+          }
+        },
+        {
+          "SpawnEntity": {
+            "entity": {
+              "id": 5,
+              "name": "gate",
+              "behaviors": [
+                {
+                  "LookAt": {
+                    "target": 4
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "SpawnEntity": {
+            "entity": {
+              "id": 6,
+              "name": "lighthouse",
+              "behaviors": [
+                {
+                  "LookAt": {
+                    "target": 4
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "ModifyWorld": {
+            "patch": {
+              "avatar": {
+                "model_entity": 5
+              },
+              "creations": [
+                {
+                  "name": "set-0",
+                  "entities": [
+                    4,
+                    5,
+                    6
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "revision": 2,
+      "author": {
+        "peer": 2,
+        "name": "branch"
+      },
+      "message": "branch-1",
+      "ops": [
+        {
+          "SpawnEntity": {
+            "entity": {
+              "id": 7,
+              "name": "tower",
+              "behaviors": [
+                {
+                  "Orbit": {
+                    "center": 5,
+                    "radius": 2,
+                    "speed": 10
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "SpawnEntity": {
+            "entity": {
+              "id": 8,
+              "name": "dock"
+            }
+          }
+        },
+        {
+          "ModifyEntity": {
+            "id": 5,
+            "patch": {
+              "name": "renamed-5"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "revision": 3,
+      "author": {
+        "peer": 2,
+        "name": "branch"
+      },
+      "message": "branch-2",
+      "ops": [
+        {
+          "SpawnEntity": {
+            "entity": {
+              "id": 9,
+              "name": "lighthouse-2",
+              "behaviors": [
+                {
+                  "Orbit": {
+                    "center": 5,
+                    "radius": 2,
+                    "speed": 10
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "ModifyWorld": {
+            "patch": {
+              "avatar": {
+                "model_entity": 4
+              },
+              "creations": [
+                {
+                  "name": "set-2",
+                  "entities": [
+                    4,
+                    5,
+                    6,
+                    7,
+                    8,
+                    9
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "revision": 4,
+      "author": {
+        "peer": 2,
+        "name": "branch"
+      },
+      "message": "branch-3",
+      "ops": [
+        {
+          "SpawnEntity": {
+            "entity": {
+              "id": 10,
+              "name": "lighthouse",
+              "parent": 8
+            }
+          }
+        },
+        {
+          "ModifyWorld": {
+            "patch": {
+              "avatar": {
+                "model_entity": 8
+              },
+              "creations": [
+                {
+                  "name": "set-3",
+                  "entities": [
+                    4,
+                    5,
+                    6,
+                    7,
+                    8,
+                    9,
+                    10
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "expected": {
+    "remapped": [
+      [
+        4,
+        11
+      ],
+      [
+        5,
+        12
+      ],
+      [
+        6,
+        13
+      ],
+      [
+        7,
+        14
+      ]
+    ],
+    "entries": [
+      {
+        "revision": 1,
+        "author": {
+          "peer": 2,
+          "name": "branch"
+        },
+        "message": "branch-0",
+        "ops": [
+          {
+            "SpawnEntity": {
+              "entity": {
+                "id": 11,
+                "name": "gate"
+              }
+            }
+          },
+          {
+            "SpawnEntity": {
+              "entity": {
+                "id": 12,
+                "name": "gate-2",
+                "behaviors": [
+                  {
+                    "LookAt": {
+                      "target": 11
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "SpawnEntity": {
+              "entity": {
+                "id": 13,
+                "name": "lighthouse-3",
+                "behaviors": [
+                  {
+                    "LookAt": {
+                      "target": 11
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "ModifyWorld": {
+              "patch": {
+                "avatar": {
+                  "model_entity": 12
+                },
+                "creations": [
+                  {
+                    "name": "set-0",
+                    "entities": [
+                      11,
+                      12,
+                      13
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        ]
+      },
+      {
+        "revision": 2,
+        "author": {
+          "peer": 2,
+          "name": "branch"
+        },
+        "message": "branch-1",
+        "ops": [
+          {
+            "SpawnEntity": {
+              "entity": {
+                "id": 14,
+                "name": "tower-2",
+                "behaviors": [
+                  {
+                    "Orbit": {
+                      "center": 12,
+                      "radius": 2,
+                      "speed": 10
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "SpawnEntity": {
+              "entity": {
+                "id": 8,
+                "name": "dock-2"
+              }
+            }
+          },
+          {
+            "ModifyEntity": {
+              "id": 12,
+              "patch": {
+                "name": "renamed-5"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "revision": 3,
+        "author": {
+          "peer": 2,
+          "name": "branch"
+        },
+        "message": "branch-2",
+        "ops": [
+          {
+            "SpawnEntity": {
+              "entity": {
+                "id": 9,
+                "name": "lighthouse-2-2",
+                "behaviors": [
+                  {
+                    "Orbit": {
+                      "center": 12,
+                      "radius": 2,
+                      "speed": 10
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "ModifyWorld": {
+              "patch": {
+                "avatar": {
+                  "model_entity": 11
+                },
+                "creations": [
+                  {
+                    "name": "set-2",
+                    "entities": [
+                      11,
+                      12,
+                      13,
+                      14,
+                      8,
+                      9
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        ]
+      },
+      {
+        "revision": 4,
+        "author": {
+          "peer": 2,
+          "name": "branch"
+        },
+        "message": "branch-3",
+        "ops": [
+          {
+            "SpawnEntity": {
+              "entity": {
+                "id": 10,
+                "name": "lighthouse-4",
+                "parent": 8
+              }
+            }
+          },
+          {
+            "ModifyWorld": {
+              "patch": {
+                "avatar": {
+                  "model_entity": 8
+                },
+                "creations": [
+                  {
+                    "name": "set-3",
+                    "entities": [
+                      11,
+                      12,
+                      13,
+                      14,
+                      8,
+                      9,
+                      10
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        ]
+      }
+    ],
+    "head": "{\n  \"avatar\": {\n    \"model_entity\": 8\n  },\n  \"creations\": [\n    {\n      \"entities\": [11, 12, 13, 14, 8, 9, 10],\n      \"name\": \"set-3\"\n    }\n  ],\n  \"entities\": [\n    {\n      \"id\": 1,\n      \"name\": \"base-1\"\n    },\n    {\n      \"id\": 2,\n      \"name\": \"base-2\"\n    },\n    {\n      \"id\": 3,\n      \"name\": \"base-3\",\n      \"parent\": 2\n    },\n    {\n      \"id\": 4,\n      \"name\": \"lighthouse\"\n    },\n    {\n      \"id\": 5,\n      \"name\": \"tower\"\n    },\n    {\n      \"id\": 6,\n      \"name\": \"lighthouse-2\"\n    },\n    {\n      \"id\": 7,\n      \"name\": \"dock\"\n    },\n    {\n      \"id\": 8,\n      \"name\": \"dock-2\"\n    },\n    {\n      \"behaviors\": [\n        {\n          \"Orbit\": {\n            \"center\": 12,\n            \"radius\": 2,\n            \"speed\": 10\n          }\n        }\n      ],\n      \"id\": 9,\n      \"name\": \"lighthouse-2-2\"\n    },\n    {\n      \"id\": 10,\n      \"name\": \"lighthouse-4\",\n      \"parent\": 8\n    },\n    {\n      \"id\": 11,\n      \"name\": \"gate\"\n    },\n    {\n      \"behaviors\": [\n        {\n          \"LookAt\": {\n            \"target\": 11\n          }\n        }\n      ],\n      \"id\": 12,\n      \"name\": \"renamed-5\"\n    },\n    {\n      \"behaviors\": [\n        {\n          \"LookAt\": {\n            \"target\": 11\n          }\n        }\n      ],\n      \"id\": 13,\n      \"name\": \"lighthouse-3\"\n    },\n    {\n      \"behaviors\": [\n        {\n          \"Orbit\": {\n            \"center\": 12,\n            \"radius\": 2,\n            \"speed\": 10\n          }\n        }\n      ],\n      \"id\": 14,\n      \"name\": \"tower-2\"\n    }\n  ],\n  \"meta\": {\n    \"name\": \"case-48\"\n  },\n  \"next_entity_id\": 15,\n  \"version\": 3\n}\n"
+  }
+}

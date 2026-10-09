@@ -1,0 +1,203 @@
+{
+  "name": "random-0026",
+  "description": "Seeded random case (seed 26): shared prefix, concurrent spawns, deletes, batches, ModifyWorld refs, name collisions.",
+  "base": {
+    "version": 3,
+    "meta": {
+      "name": "case-26"
+    },
+    "entities": [
+      {
+        "id": 1,
+        "name": "base-1"
+      },
+      {
+        "id": 2,
+        "name": "base-2"
+      }
+    ]
+  },
+  "main": [
+    {
+      "revision": 1,
+      "message": "shared-0",
+      "ops": [
+        {
+          "SpawnEntity": {
+            "entity": {
+              "id": 3,
+              "name": "shared-3"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "revision": 2,
+      "message": "main-0",
+      "ops": [
+        {
+          "SpawnEntity": {
+            "entity": {
+              "id": 4,
+              "name": "dock"
+            }
+          }
+        },
+        {
+          "SpawnEntity": {
+            "entity": {
+              "id": 5,
+              "name": "mill"
+            }
+          }
+        },
+        {
+          "SpawnEntity": {
+            "entity": {
+              "id": 6,
+              "name": "lighthouse-2"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "revision": 3,
+      "ops": [
+        {
+          "ModifyWorld": {
+            "patch": {
+              "avatar": {
+                "model_entity": 4
+              }
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "branch": [
+    {
+      "revision": 2,
+      "author": {
+        "peer": 2,
+        "name": "branch"
+      },
+      "message": "branch-0",
+      "ops": [
+        {
+          "SpawnEntity": {
+            "entity": {
+              "id": 4,
+              "name": "mill"
+            }
+          }
+        },
+        {
+          "SpawnEntity": {
+            "entity": {
+              "id": 5,
+              "name": "mill",
+              "parent": 4
+            }
+          }
+        },
+        {
+          "SpawnEntity": {
+            "entity": {
+              "id": 6,
+              "name": "lighthouse-2",
+              "parent": 5,
+              "behaviors": [
+                {
+                  "LookAt": {
+                    "target": 5
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "ModifyEntity": {
+            "id": 6,
+            "patch": {
+              "name": "renamed-6"
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "expected": {
+    "remapped": [
+      [
+        4,
+        7
+      ],
+      [
+        5,
+        8
+      ],
+      [
+        6,
+        9
+      ]
+    ],
+    "entries": [
+      {
+        "revision": 2,
+        "author": {
+          "peer": 2,
+          "name": "branch"
+        },
+        "message": "branch-0",
+        "ops": [
+          {
+            "SpawnEntity": {
+              "entity": {
+                "id": 7,
+                "name": "mill-2"
+              }
+            }
+          },
+          {
+            "SpawnEntity": {
+              "entity": {
+                "id": 8,
+                "name": "mill-3",
+                "parent": 7
+              }
+            }
+          },
+          {
+            "SpawnEntity": {
+              "entity": {
+                "id": 9,
+                "name": "lighthouse-2-2",
+                "parent": 8,
+                "behaviors": [
+                  {
+                    "LookAt": {
+                      "target": 8
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "ModifyEntity": {
+              "id": 9,
+              "patch": {
+                "name": "renamed-6"
+              }
+            }
+          }
+        ]
+      }
+    ],
+    "head": "{\n  \"avatar\": {\n    \"model_entity\": 4\n  },\n  \"entities\": [\n    {\n      \"id\": 1,\n      \"name\": \"base-1\"\n    },\n    {\n      \"id\": 2,\n      \"name\": \"base-2\"\n    },\n    {\n      \"id\": 3,\n      \"name\": \"shared-3\"\n    },\n    {\n      \"id\": 4,\n      \"name\": \"dock\"\n    },\n    {\n      \"id\": 5,\n      \"name\": \"mill\"\n    },\n    {\n      \"id\": 6,\n      \"name\": \"lighthouse-2\"\n    },\n    {\n      \"id\": 7,\n      \"name\": \"mill-2\"\n    },\n    {\n      \"id\": 8,\n      \"name\": \"mill-3\",\n      \"parent\": 7\n    },\n    {\n      \"behaviors\": [\n        {\n          \"LookAt\": {\n            \"target\": 8\n          }\n        }\n      ],\n      \"id\": 9,\n      \"name\": \"renamed-6\",\n      \"parent\": 8\n    }\n  ],\n  \"meta\": {\n    \"name\": \"case-26\"\n  },\n  \"next_entity_id\": 10,\n  \"version\": 3\n}\n"
+  }
+}

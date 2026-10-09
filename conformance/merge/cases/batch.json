@@ -1,0 +1,111 @@
+{
+  "name": "batch",
+  "description": "A colliding spawn inside a Batch is remapped like any other, and the references its siblings make (parent, modify id) follow it.",
+  "base": {
+    "version": 3,
+    "meta": {
+      "name": "batch"
+    },
+    "entities": []
+  },
+  "main": [
+    {
+      "revision": 1,
+      "ops": [
+        {
+          "SpawnEntity": {
+            "entity": {
+              "id": 1,
+              "name": "main-one"
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "branch": [
+    {
+      "revision": 1,
+      "ops": [
+        {
+          "Batch": {
+            "ops": [
+              {
+                "SpawnEntity": {
+                  "entity": {
+                    "id": 1,
+                    "name": "batched"
+                  }
+                }
+              },
+              {
+                "SpawnEntity": {
+                  "entity": {
+                    "id": 2,
+                    "name": "child",
+                    "parent": 1
+                  }
+                }
+              },
+              {
+                "ModifyEntity": {
+                  "id": 1,
+                  "patch": {
+                    "name": "batched-renamed"
+                  }
+                }
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "expected": {
+    "remapped": [
+      [
+        1,
+        3
+      ]
+    ],
+    "entries": [
+      {
+        "revision": 1,
+        "ops": [
+          {
+            "Batch": {
+              "ops": [
+                {
+                  "SpawnEntity": {
+                    "entity": {
+                      "id": 3,
+                      "name": "batched"
+                    }
+                  }
+                },
+                {
+                  "SpawnEntity": {
+                    "entity": {
+                      "id": 2,
+                      "name": "child",
+                      "parent": 3
+                    }
+                  }
+                },
+                {
+                  "ModifyEntity": {
+                    "id": 3,
+                    "patch": {
+                      "name": "batched-renamed"
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    ],
+    "head": "{\n  \"entities\": [\n    {\n      \"id\": 1,\n      \"name\": \"main-one\"\n    },\n    {\n      \"id\": 2,\n      \"name\": \"child\",\n      \"parent\": 3\n    },\n    {\n      \"id\": 3,\n      \"name\": \"batched-renamed\"\n    }\n  ],\n  \"meta\": {\n    \"name\": \"batch\"\n  },\n  \"next_entity_id\": 4,\n  \"version\": 3\n}\n"
+  }
+}

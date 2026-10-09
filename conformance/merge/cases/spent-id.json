@@ -1,0 +1,87 @@
+{
+  "name": "spent-id",
+  "description": "Main spawns 101 and 102 and deletes 102; the branch spawns its own 101. Fresh ids come from the fold's floor (103), never from the spent 102.",
+  "base": {
+    "version": 3,
+    "meta": {
+      "name": "spent-id"
+    },
+    "entities": []
+  },
+  "main": [
+    {
+      "revision": 1,
+      "message": "two",
+      "ops": [
+        {
+          "SpawnEntity": {
+            "entity": {
+              "id": 101,
+              "name": "a"
+            }
+          }
+        },
+        {
+          "SpawnEntity": {
+            "entity": {
+              "id": 102,
+              "name": "b"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "revision": 2,
+      "message": "drop b",
+      "ops": [
+        {
+          "DeleteEntity": {
+            "id": 102
+          }
+        }
+      ]
+    }
+  ],
+  "branch": [
+    {
+      "revision": 2,
+      "message": "branch's a",
+      "ops": [
+        {
+          "SpawnEntity": {
+            "entity": {
+              "id": 101,
+              "name": "branch-a"
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "expected": {
+    "remapped": [
+      [
+        101,
+        103
+      ]
+    ],
+    "entries": [
+      {
+        "revision": 2,
+        "message": "branch's a",
+        "ops": [
+          {
+            "SpawnEntity": {
+              "entity": {
+                "id": 103,
+                "name": "branch-a"
+              }
+            }
+          }
+        ]
+      }
+    ],
+    "head": "{\n  \"entities\": [\n    {\n      \"id\": 101,\n      \"name\": \"a\"\n    },\n    {\n      \"id\": 103,\n      \"name\": \"branch-a\"\n    }\n  ],\n  \"meta\": {\n    \"name\": \"spent-id\"\n  },\n  \"next_entity_id\": 104,\n  \"version\": 3\n}\n"
+  }
+}

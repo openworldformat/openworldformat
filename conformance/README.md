@@ -46,6 +46,21 @@ Beyond rendering, two rules hold for the documents themselves
 - **Head-first.** Every example package's `manifest.json` is the fold of
   its log over `snapshots/base.json` to `main`, `package.json` names its
   bytes in `world_sha256`, and it is in canonical text.
+- **Merges agree.** Every merge case in `merge/cases/` merges to the
+  same rewritten entries and the same head, in every reference.
+
+## Merge cases
+
+`merge/` holds the shared merge corpus ([spec/session.md](../spec/session.md),
+"The merge rules, exactly"). Each case in `merge/cases/` is one JSON
+file: a `base` world, the `main` line's entries, the `branch`'s entries,
+and the `expected` half — the merge's remap table, the rewritten branch
+entries, and the fold of main plus the merged branch as canonical text.
+Expected results come from the JS reference: `node merge/generate.mjs`
+regenerates the corpus (seeded; same code, same cases), and every
+reference runs every case in its own test suite. A reference that
+disagrees fails its own CI, which makes the corpus a differential test
+without a cross-language harness.
 
 ## Adding a case
 

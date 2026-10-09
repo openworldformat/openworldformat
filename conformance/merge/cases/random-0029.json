@@ -1,0 +1,179 @@
+{
+  "name": "random-0029",
+  "description": "Seeded random case (seed 29): shared prefix, concurrent spawns, deletes, batches, ModifyWorld refs, name collisions.",
+  "base": {
+    "version": 3,
+    "meta": {
+      "name": "case-29"
+    },
+    "entities": []
+  },
+  "main": [
+    {
+      "revision": 1,
+      "message": "main-0",
+      "ops": [
+        {
+          "SpawnEntity": {
+            "entity": {
+              "id": 1,
+              "name": "tower"
+            }
+          }
+        },
+        {
+          "DeleteEntity": {
+            "id": 1
+          }
+        }
+      ]
+    },
+    {
+      "revision": 2,
+      "message": "main-1",
+      "ops": [
+        {
+          "SpawnEntity": {
+            "entity": {
+              "id": 2,
+              "name": "gate"
+            }
+          }
+        },
+        {
+          "DeleteEntity": {
+            "id": 2
+          }
+        }
+      ]
+    }
+  ],
+  "branch": [
+    {
+      "revision": 1,
+      "author": {
+        "peer": 2,
+        "name": "branch"
+      },
+      "message": "branch-0",
+      "ops": [
+        {
+          "SpawnEntity": {
+            "entity": {
+              "id": 1,
+              "name": "lighthouse-2"
+            }
+          }
+        },
+        {
+          "SpawnEntity": {
+            "entity": {
+              "id": 2,
+              "name": "mill",
+              "parent": 1,
+              "behaviors": [
+                {
+                  "LookAt": {
+                    "target": 1
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "ModifyEntity": {
+            "id": 2,
+            "patch": {
+              "parent": 1
+            }
+          }
+        },
+        {
+          "ModifyWorld": {
+            "patch": {
+              "avatar": {
+                "model_entity": 1
+              },
+              "creations": [
+                {
+                  "name": "set-0",
+                  "entities": [
+                    1,
+                    2
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "expected": {
+    "remapped": [],
+    "entries": [
+      {
+        "revision": 1,
+        "author": {
+          "peer": 2,
+          "name": "branch"
+        },
+        "message": "branch-0",
+        "ops": [
+          {
+            "SpawnEntity": {
+              "entity": {
+                "id": 1,
+                "name": "lighthouse-2"
+              }
+            }
+          },
+          {
+            "SpawnEntity": {
+              "entity": {
+                "id": 2,
+                "name": "mill",
+                "parent": 1,
+                "behaviors": [
+                  {
+                    "LookAt": {
+                      "target": 1
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "ModifyEntity": {
+              "id": 2,
+              "patch": {
+                "parent": 1
+              }
+            }
+          },
+          {
+            "ModifyWorld": {
+              "patch": {
+                "avatar": {
+                  "model_entity": 1
+                },
+                "creations": [
+                  {
+                    "name": "set-0",
+                    "entities": [
+                      1,
+                      2
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        ]
+      }
+    ],
+    "head": "{\n  \"avatar\": {\n    \"model_entity\": 1\n  },\n  \"creations\": [\n    {\n      \"entities\": [1, 2],\n      \"name\": \"set-0\"\n    }\n  ],\n  \"entities\": [\n    {\n      \"id\": 1,\n      \"name\": \"lighthouse-2\"\n    },\n    {\n      \"behaviors\": [\n        {\n          \"LookAt\": {\n            \"target\": 1\n          }\n        }\n      ],\n      \"id\": 2,\n      \"name\": \"mill\",\n      \"parent\": 1\n    }\n  ],\n  \"meta\": {\n    \"name\": \"case-29\"\n  },\n  \"next_entity_id\": 3,\n  \"version\": 3\n}\n"
+  }
+}

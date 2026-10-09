@@ -1,0 +1,149 @@
+{
+  "name": "random-0027",
+  "description": "Seeded random case (seed 27): shared prefix, concurrent spawns, deletes, batches, ModifyWorld refs, name collisions.",
+  "base": {
+    "version": 3,
+    "meta": {
+      "name": "case-27"
+    },
+    "entities": [
+      {
+        "id": 1,
+        "name": "base-1"
+      }
+    ]
+  },
+  "main": [
+    {
+      "revision": 1,
+      "message": "main-0",
+      "ops": [
+        {
+          "SpawnEntity": {
+            "entity": {
+              "id": 2,
+              "name": "lighthouse-2"
+            }
+          }
+        },
+        {
+          "DeleteEntity": {
+            "id": 2
+          }
+        }
+      ]
+    }
+  ],
+  "branch": [
+    {
+      "revision": 1,
+      "author": {
+        "peer": 2,
+        "name": "branch"
+      },
+      "message": "branch-0",
+      "ops": [
+        {
+          "SpawnEntity": {
+            "entity": {
+              "id": 2,
+              "name": "dock"
+            }
+          }
+        },
+        {
+          "SpawnEntity": {
+            "entity": {
+              "id": 3,
+              "name": "tower"
+            }
+          }
+        },
+        {
+          "ModifyEntity": {
+            "id": 2,
+            "patch": {
+              "name": "renamed-2"
+            }
+          }
+        },
+        {
+          "ModifyWorld": {
+            "patch": {
+              "avatar": {
+                "model_entity": 3
+              },
+              "creations": [
+                {
+                  "name": "set-0",
+                  "entities": [
+                    2,
+                    3
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "expected": {
+    "remapped": [],
+    "entries": [
+      {
+        "revision": 1,
+        "author": {
+          "peer": 2,
+          "name": "branch"
+        },
+        "message": "branch-0",
+        "ops": [
+          {
+            "SpawnEntity": {
+              "entity": {
+                "id": 2,
+                "name": "dock"
+              }
+            }
+          },
+          {
+            "SpawnEntity": {
+              "entity": {
+                "id": 3,
+                "name": "tower"
+              }
+            }
+          },
+          {
+            "ModifyEntity": {
+              "id": 2,
+              "patch": {
+                "name": "renamed-2"
+              }
+            }
+          },
+          {
+            "ModifyWorld": {
+              "patch": {
+                "avatar": {
+                  "model_entity": 3
+                },
+                "creations": [
+                  {
+                    "name": "set-0",
+                    "entities": [
+                      2,
+                      3
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        ]
+      }
+    ],
+    "head": "{\n  \"avatar\": {\n    \"model_entity\": 3\n  },\n  \"creations\": [\n    {\n      \"entities\": [2, 3],\n      \"name\": \"set-0\"\n    }\n  ],\n  \"entities\": [\n    {\n      \"id\": 1,\n      \"name\": \"base-1\"\n    },\n    {\n      \"id\": 2,\n      \"name\": \"renamed-2\"\n    },\n    {\n      \"id\": 3,\n      \"name\": \"tower\"\n    }\n  ],\n  \"meta\": {\n    \"name\": \"case-27\"\n  },\n  \"next_entity_id\": 4,\n  \"version\": 3\n}\n"
+  }
+}
