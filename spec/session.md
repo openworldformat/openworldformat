@@ -138,10 +138,16 @@ holds the batch's earlier ops:
    says.
 5. **Apply** to the trial — an op that no longer applies fails here.
 
-Then the world the batch makes must validate. **Any failure refuses the
-whole batch**: nothing is written, and the reply lists a reason for every
-op that failed. Success appends one entry — the batch's edits, its
-author and its message — and writes the new head.
+Then the world the batch makes must validate. Validation is structural:
+the document holds against the schema and every reference resolves —
+the same checks the fold's apply step runs. Budget limits — an entity's
+extent, a chunk's entity or triangle count, an entity's behavior or
+modulation count — are an authority's policy, not the format's: the
+authority reports them to the author as warnings, and they never refuse
+a batch. **Any structural failure refuses the whole batch**: nothing is
+written, and the reply lists a reason for every op that failed. Success
+appends one entry — the batch's edits, its author and its message — and
+writes the new head.
 
 Undo is a batch like any other: the inverse of the newest batch nobody
 has undone, appended. Two authorities never write one package at once;
@@ -177,9 +183,44 @@ linear prefix. `revision` stays the room's total order; `parent` records
 causality — sequence is not causality.
 
 Forks and refs live in `package.json` ([the package](package.md)); the
-`merge` op records where a merged batch came from. When merging a branch, the merge authority must handle ID collisions. If the branch introduces entities with IDs that were concurrently allocated on the main branch, the merge authority MUST reallocate those colliding IDs and rewrite all their references within the merged batch. Names collide the same way: two branches that each mint a `lighthouse` merge into one world with two of them, and the authority MUST rename the merged side — references are ids by then ([the world document](world.md)), so a rename breaks nothing in the log. See
+`merge` op records where a merged batch came from. When merging a branch, the merge authority must handle ID collisions. See
 [`rfcs/branching-histories.md`](rfcs/branching-histories.md). In a git-backed package, branches are git branches and the
 same merge rules resolve a merge's conflicts ([the package](package.md), "Git").
+
+### The merge rules, exactly
+
+A merge appends the branch's entries to main, rewritten so they apply
+cleanly on main's head. The rewriting is deterministic — the same main
+head and the same branch entries always produce the same merged entries:
+
+1. **Fresh ids.** An id the branch spawned that the main line also
+   allocated is colliding. Colliding ids are reallocated in ascending
+   order. Fresh ids start at main's **effective** `next_entity_id` — the
+   fold already carries it: the larger of the declared value and one past
+   every id main has ever held, deleted ones included — and count up,
+   skipping every id the branch spawns. An id main deleted stays spent:
+   fresh ids come from that floor, never from the live set.
+2. **Every entity reference rewritten.** Within the merged batch, every
+   field that holds an entity id is rewritten through the remap:
+
+   | Op | Fields that hold entity ids |
+   |---|---|
+   | `SpawnEntity` | `entity.id`, `entity.parent`, the numeric `Orbit.center` / `LookAt.target` in `entity.behaviors[]` |
+   | `ModifyEntity` | `id`, `patch.parent`, the numeric behavior refs in `patch.behaviors[]` |
+   | `DeleteEntity` | `id` |
+   | `Batch` | every inner op, recursively |
+   | `ModifyWorld` | `patch.avatar.model_entity` (numeric), `patch.creations[].entities[]` |
+
+3. **Names.** Two branches that each mint a `lighthouse` merge into one
+   world with two of them, and the authority MUST rename the merged side.
+   When a branch spawn's name is already taken — by main, or by an
+   earlier spawn in the same merge — the merge renames the spawn to
+   `<name>-<n>`, `n` counting from 2 up, first unused. Only the
+   `SpawnEntity` changes: references are ids by then ([the world
+   document](world.md)), so a rename breaks nothing in the log.
+
+The merged entries keep their `id`, `parent`, `author` and `message` —
+an entry's identity survives the merge.
 
 ## Snapshots
 
