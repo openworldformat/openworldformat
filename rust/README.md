@@ -2,9 +2,10 @@
 
 The Open World Format's Rust reference: the world document (types and
 edits), the session fold (log, branches, state), and the `ext-physics`
-extension's executable half — one serde-only crate, no Bevy, no async,
-no sockets. The same code that implemented the format in LocalGPT since
-its origin, extracted into the format's own home.
+and `ext-cinematography` extensions' executable halves — one serde-only
+crate, no Bevy, no async, no sockets. The same code that implemented
+the format in LocalGPT since its origin, extracted into the format's
+own home.
 
 ```bash
 cargo add openworldformat        # or, from this checkout:
@@ -31,7 +32,10 @@ let same = doc.to_manifest();                          // a whole manifest again
 `state.json` (save games are base + declaration + a player's log);
 `openworldformat::physics` carries the extension's deterministic
 reference solver, trajectory write/fold, and the conformance outcome
-runner; the `schema` feature generates `world.schema.json`.
+runner; `openworldformat::cinematography` carries the
+`ext-cinematography` extension's crop math, view and projection, shot
+list, and outcome runner; the `schema` feature generates
+`world.schema.json`.
 
 ## The 0.3 surface (draft 0.3: head-first, live authoring)
 
@@ -108,7 +112,7 @@ version-independent.
 ## Test
 
 ```bash
-cargo test                      # unit + conformance + examples + physics outcomes
+cargo test                      # unit + conformance + examples + extension outcomes
 cargo test --features schema    # + the schema snapshot (both generators agree)
 ```
 

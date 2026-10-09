@@ -143,6 +143,21 @@ fn the_physics_conformance_outcomes_pass_under_this_solver() {
 }
 
 #[test]
+fn the_cinematography_conformance_outcomes_pass_under_the_reference_math() {
+    let manifest: Manifest = serde_json::from_str(
+        &std::fs::read_to_string(repo("conformance/cinematography.json")).unwrap(),
+    )
+    .unwrap();
+    let outcomes: openworldformat::cinematography::OutcomesDoc = serde_json::from_str(
+        &std::fs::read_to_string(repo("conformance/outcomes/cinematography.json")).unwrap(),
+    )
+    .unwrap();
+    let result = openworldformat::cinematography::run_outcomes(&manifest, &outcomes);
+    assert_eq!(result.failures, Vec::<String>::new());
+    assert!(result.ok);
+}
+
+#[test]
 fn hand_authored_ron_named_structs_parse() {
     // The regression this pins: serde(flatten) forces map-form
     // deserialization, which rejects RON's named-struct syntax — the

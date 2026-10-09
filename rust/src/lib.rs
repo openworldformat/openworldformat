@@ -4,8 +4,9 @@
 //! `world-types`, `world-sync` and `world-physics` crates — the same
 //! code that implemented the format since its origin, now in the
 //! format's own home. The document (types + edits), the session fold
-//! (log, branches, state), and the `ext-physics` extension's executable
-//! half, in one serde-only crate: no Bevy, no async, no sockets.
+//! (log, branches, state), and the extensions' executable halves
+//! (`ext-physics`, `ext-cinematography`), in one serde-only crate: no
+//! Bevy, no async, no sockets.
 //!
 //! ```no_run
 //! use openworldformat::{WorldManifest, OpLogEntry};
@@ -35,6 +36,7 @@ pub mod asset;
 pub mod audio;
 pub mod avatar;
 pub mod behavior;
+pub mod cinematography;
 pub mod creation;
 pub mod entity;
 pub mod ext_provenance;
