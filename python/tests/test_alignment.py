@@ -535,7 +535,13 @@ class MergeBranchTest(unittest.TestCase):
         ]
         merged = merge_branch(fold_log(mini_manifest(), []), branch)
         self.assertEqual(merged["remapped"], {})
-        self.assertEqual(merged["entries"], branch)
+        # The content rides untouched; the parser's ``classified``
+        # annotation is this reader's and never rides out of a merge.
+        plain = [
+            {k: v for k, v in entry.items() if k != "classified"}
+            for entry in branch
+        ]
+        self.assertEqual(merged["entries"], plain)
 
     def test_by_name_references_and_history_ops_pass_through_untouched(self):
         base = {

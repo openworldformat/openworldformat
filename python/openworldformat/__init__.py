@@ -1326,7 +1326,8 @@ def _spawned_ids(ops: list) -> list:
 def _merge_rewrite_op(op: dict, remapped: dict) -> dict:
     """One op rewritten through a merge's id remapping — a new, deep
     copied op. Numeric references (spawned ids, parents, behavior
-    centers and targets) follow their entities to fresh ids; by-name
+    centers and targets, ``ModifyWorld``'s avatar model and creation
+    entity lists) follow their entities to fresh ids; by-name
     references don't (they bind at ingestion, after the merge); history
     ops pass through untouched, because they fold to nothing and their
     contents are nobody's to rewrite."""
@@ -1383,50 +1384,116 @@ def _merge_rewrite_op(op: dict, remapped: dict) -> dict:
         inner = value.get("ops")
         if isinstance(inner, list):
             value["ops"] = [_merge_rewrite_op(o, remapped) for o in inner]
+    elif edit == "ModifyWorld":
+        patch = value.get("patch")
+        if isinstance(patch, dict):
+            avatar = patch.get("avatar")
+            if isinstance(avatar, dict) and "model_entity" in avatar:
+                avatar["model_entity"] = remap(avatar["model_entity"])
+            creations = patch.get("creations")
+            if isinstance(creations, list):
+                for creation in creations:
+                    if not isinstance(creation, dict):
+                        continue
+                    refs = creation.get("entities")
+                    if isinstance(refs, list):
+                        # Numeric elements are ids and follow the remap;
+                        # string elements are names and ride.
+                        creation["entities"] = [remap(ref) for ref in refs]
     return rewritten
 
 
+def _rename_colliding_spawns(state: dict, entries: list) -> None:
+    """The spec's name rule, in place on the rewritten entries: a spawned
+    name that is taken — by main's fold, or by an earlier spawn in the
+    same merge — becomes ``<name>-<n>``, n from 2 up, first unused. Only
+    the ``SpawnEntity`` changes; references are ids by then, so a rename
+    breaks nothing in the log."""
+    taken = set(state["names"])
+
+    def rename_ops(ops: list) -> None:
+        for op in ops:
+            c = classify_op(op)
+            if c["kind"] != "edit":
+                continue
+            edit, value = c["edit"], c["value"]
+            if not isinstance(value, dict):
+                continue
+            if edit == "Batch":
+                inner = value.get("ops")
+                if isinstance(inner, list):
+                    rename_ops(inner)
+            elif edit == "SpawnEntity":
+                entity = value.get("entity")
+                if not isinstance(entity, dict) or not isinstance(entity.get("name"), str):
+                    continue
+                name = entity["name"]
+                if name not in taken:
+                    taken.add(name)
+                    continue
+                n = 2
+                while f"{name}-{n}" in taken:
+                    n += 1
+                entity["name"] = f"{name}-{n}"
+                taken.add(entity["name"])
+
+    for entry in entries:
+        ops = entry.get("ops")
+        if isinstance(ops, list):
+            rename_ops(ops)
+
+
 def merge_branch(state: dict, entries: list) -> dict:
-    """Merge a branch's entries onto a main branch's fold, rewriting id
-    collisions (spec/session.md "Entry identity, forks and branches"):
-    when the branch introduces entities with ids concurrently allocated
-    on main, the merge authority MUST reallocate the colliding ids and
-    rewrite every reference to them inside the merged batch. Fresh ids
-    come from above the trunk's highest, skipping what either side
-    already spawned, never past the ceiling. Name collisions are out
-    of scope — two entities can't share a name, and which of the two
-    keeps it is a human's call, not a merge's: the caller pre-renames.
+    """Merge a branch's entries onto a main branch's fold (spec/session.md
+    "The merge rules, exactly"): an id the branch spawned that main's
+    fold holds is reallocated — the collisions in ascending order — onto
+    fresh ids from the fold's effective ``next_entity_id`` (the monotonic
+    floor the fold carries: the larger of the declared value and one past
+    every id main has ever held, so an id main deleted stays spent),
+    counting up, skipping every id the branch spawns, never past the
+    ceiling. Every reference to a reallocated id inside the merged batch
+    is rewritten through the remap. A branch spawn whose name is taken —
+    by main, or by an earlier spawn in the same merge — is renamed
+    ``<name>-<n>``, n from 2 up, first unused. The merged entries keep
+    their ``id``, ``parent``, ``author`` and ``message`` — an entry's
+    identity survives the merge.
 
     :param state: the main branch's fold state at its head (as
         :func:`fold_log` returns)
     :param entries: the branch's parsed entries, in order
     :return: ``{"entries": new deep-copied entries with references
-        rewritten and ops reclassified, "remapped": old id -> new id}``
+        rewritten — plain content, the parser's ``classified``
+        annotation stripped —, "remapped": old id -> new id}``
     :raises WorldFormatError: when the ids run out under the ceiling
     """
     main_ids = set(state["by_id"])
     ops = [op for entry in entries for op in (entry.get("ops") or [])]
-    spawned = _spawned_ids(ops)
-    taken = main_ids | set(spawned)
+    spawned = set(_spawned_ids(ops))
     remapped: dict = {}
-    candidate = max(main_ids, default=0) + 1
-    for old in sorted({i for i in spawned if i in main_ids}):
-        while candidate in taken:
+    candidate = state["scene"]["next_entity_id"]
+    for old in sorted(spawned):
+        if old not in main_ids:
+            continue  # no collision, no remap
+        while candidate in spawned:
             candidate += 1
         if candidate > MAX_ENTITY_ID:
             raise _invalid(
                 f"merge ran out of entity ids under the ceiling {MAX_ENTITY_ID}"
             )
         remapped[old] = candidate
-        taken.add(candidate)
+        candidate += 1
 
     rewritten = []
     for entry in entries:
         new_entry = copy.deepcopy(entry)
-        new_ops = [_merge_rewrite_op(op, remapped) for op in new_entry.get("ops") or []]
-        new_entry["ops"] = new_ops
-        new_entry["classified"] = [classify_op(op) for op in new_ops]
+        # ``classified`` is this reader's annotation of the ops, not the
+        # log's content: it never rides out of a merge.
+        new_entry.pop("classified", None)
+        new_entry["ops"] = [
+            _merge_rewrite_op(op, remapped) for op in new_entry.get("ops") or []
+        ]
         rewritten.append(new_entry)
+    _rename_colliding_spawns(state, rewritten)
     return {"entries": rewritten, "remapped": remapped}
 
 
