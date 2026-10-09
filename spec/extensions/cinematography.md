@@ -1,9 +1,11 @@
 # The cinematography extension (`ext-cinematography`), version 0.2
 
-**Status: proposed.** The name is reserved and this page is the
-contract; it becomes experimental with a reference implementation and
-conformance cases, and leaves experimental when a producer ships a
-package using it ([CONTRIBUTING](../../CONTRIBUTING.md),
+**Status: experimental.** Three reference implementations — JS
+(`openworldformat/cinematography`), Rust and Python — all running the
+same conformance outcome assertions, and the JS reference renderer
+looking through a shot letterboxed to its frame. It leaves experimental
+when a producer ships a package using it
+([CONTRIBUTING](../../CONTRIBUTING.md),
 [the registry](registry.json)).
 
 > Version 0.1 of this page promised spline camera paths, keyframed

@@ -36,10 +36,21 @@
       "notes": "Allows authors to conditionally hide entities (e.g. traps, GM secrets) from specific profiles until revealed."
     },
     "ext-cinematography": {
-      "version": "0.1.0",
-      "status": "proposed",
+      "version": "0.2.0",
+      "status": "experimental",
       "spec": "spec/extensions/cinematography.md",
-      "notes": "Provides spline-based camera paths, explicit keyframed animation tracks, and depth-of-field focus targets."
+      "rfc": "spec/rfcs/ext-cinematography.md",
+      "schema": "schema/extensions/ext-cinematography.schema.json",
+      "implementations": [
+        "js/src/cinematography.js (npm openworldformat/cinematography)",
+        "rust/src/cinematography.rs (crates.io openworldformat::cinematography)",
+        "python/openworldformat/cinematography.py (PyPI openworldformat)"
+      ],
+      "conformance": [
+        "conformance/cinematography.json",
+        "conformance/outcomes/cinematography.json"
+      ],
+      "notes": "Cameras as entities with a filmback and a lens; shots as ordered setups on the clock. Three implementations, all running the same outcome assertions — derived FOV, frame membership, the shot list — in their own CI; the JS renderer looks through a shot letterboxed to its frame (world.html?shot=). Version 0.1 promised splines and keyframed tracks and implemented nothing; 0.2 scoped to cameras and shots — tracks return as ext-cinematography.track when a producer needs animatics. Still experimental until a producer outside this repository ships a package using it."
     },
     "ext-provenance": {
       "version": "0.1.0",

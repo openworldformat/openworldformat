@@ -55,19 +55,17 @@ engine's.
 
 **Next, in order:**
 
-1. **Merges that agree.** The merge rules become exact — fresh ids start at
-   the main line's effective `next_entity_id`, every entity reference in an
-   edit is rewritten (`ModifyWorld`'s `avatar.model_entity` and
-   `creations[].entities` included), and a colliding name gets a fixed
-   suffix — and a shared corpus of merge cases runs in all five references,
-   so they cannot drift apart again.
-2. **Cameras and shots** — [`ext-cinematography`](extensions/cinematography.md)
-   0.2: cameras as entities with a filmback and a lens, shots as ordered
-   setups on the clock, outcome assertions instead of pixels. Film previs is
-   the producer need behind it; it rides `ext-*` must-ignore, so it needs no
-   schema bump.
+1. ~~Merges that agree~~ — **done** (2026-10-09): the merge rules are
+   exact in [the session log](session.md) ("The merge rules, exactly"),
+   and `conformance/merge/` pins them in all five references.
+2. ~~Cameras and shots~~ — **done** (2026-10-09):
+   [`ext-cinematography`](extensions/cinematography.md) 0.2 is
+   experimental: cameras as entities with a filmback and a lens, shots
+   as ordered setups on the clock, outcome assertions in three
+   references, and the JS renderer's letterboxed shot view.
 3. **A schema marker on entity-reference fields**, so name binding, merge
-   rewriting and validation read one list instead of five hand-written ones.
+   rewriting and validation read one list instead of five hand-written
+   ones.
 
 **Deferred until a producer needs them:** collision-free ids, an `id` and
 `parent` on every entry, and timed input samples (a breaking bundle, for git
@@ -77,11 +75,12 @@ re-runs triggers over recorded input (semantic replay).
 - The state document is now pinned with its own
   [`schema/state.schema.json`](../schema/state.schema.json); it joins
   `world.schema.json` in the generated core.
-- The **extension registry** holds one experimental extension,
-  [`ext-physics`](extensions/physics.md), and four proposed ones:
+- The **extension registry** holds two experimental extensions,
+  [`ext-physics`](extensions/physics.md) and
+  [`ext-cinematography`](extensions/cinematography.md), and three
+  proposed ones:
   [`ext-strict-determinism`](extensions/strict-determinism.md),
-  [`ext-visibility`](extensions/visibility.md),
-  [`ext-cinematography`](extensions/cinematography.md) and
+  [`ext-visibility`](extensions/visibility.md) and
   [`ext-provenance`](extensions/provenance.md). A proposed extension
   reserves its name; it becomes experimental with a reference
   implementation and conformance cases, and leaves experimental when a
