@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ExtCinematography",
+  "description": "The ext-cinematography extension, version 0.2 (proposed). Everything rides under the namespaced 'ext-cinematography' key on entities: the 'camera' component makes an entity a camera, the 'shot' component makes it a setup in the shot list. The core schema leaves room for the key (unknown fields are allowed and must-ignored); this schema pins the extension's own shape. Spec: spec/extensions/cinematography.md.",
+  "type": "object",
+  "$defs": {
+    "CameraComponent": {
+      "description": "An entity's ext-cinematography camera: a filmback and a lens. Defaults apply per absent field, so an empty object is a 35 mm lens on Super 35 looking down the entity's local -Z.",
+      "type": "object",
+      "properties": {
+        "sensor_mm": {
+          "description": "Sensor (filmback) size [w, h] in millimeters. Default Super 35.",
+          "type": "array",
+          "items": { "type": "number", "exclusiveMinimum": 0 },
+          "minItems": 2,
+          "maxItems": 2,
+          "default": [24.89, 18.66]
+        },
+        "focal_length_mm": {
+          "description": "Lens focal length in millimeters.",
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "default": 35
+        },
+        "aspect_ratio": {
+          "description": "The frame's width/height. The frame is the largest rectangle of this aspect inside the desqueezed sensor, centred; absent means the whole desqueezed sensor.",
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "squeeze": {
+          "description": "Anamorphic squeeze factor; the desqueezed sensor is sensor_mm[0] * squeeze wide.",
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "default": 1
+        },
+        "aim": {
+          "description": "A world point the camera looks at, +Y up. Absent: the camera looks down the entity's local -Z.",
+          "type": "array",
+          "items": { "type": "number" },
+          "minItems": 3,
+          "maxItems": 3
+        },
+        "focus_distance_m": {
+          "description": "Focus distance in meters.",
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "f_stop": {
+          "description": "Aperture f-number.",
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      },
+      "additionalProperties": false
+    },
+    "ShotComponent": {
+      "description": "An entity's ext-cinematography shot: the camera as a setup in the shot list. The entity's name is the shot's name.",
+      "type": "object",
+      "properties": {
+        "scene": { "description": "Scene slug, free text.", "type": "string" },
+        "order": { "description": "Shot list sort key; ties break by entity id.", "type": "integer" },
+        "in_s": { "description": "Setup start on the clock, seconds; <= out_s.", "type": "number" },
+        "out_s": { "description": "Setup end on the clock, seconds.", "type": "number" },
+        "size": { "description": "Shot size, free text; conventionally EWS, WS, MS, MCU, CU, ECU, INSERT, OTS, POV, TWO.", "type": "string" },
+        "description": { "description": "What the setup is, free text.", "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "EntityBlock": {
+      "description": "The entity's ext-cinematography block: a camera, optionally also a shot.",
+      "type": "object",
+      "properties": {
+        "camera": { "$ref": "#/$defs/CameraComponent" },
+        "shot": { "$ref": "#/$defs/ShotComponent" }
+      },
+      "additionalProperties": false,
+      "minProperties": 1
+    }
+  }
+}
