@@ -196,6 +196,7 @@
               },
               "creations": [
                 {
+                  "id": 3,
                   "name": "set-2",
                   "entities": [
                     4,
@@ -245,6 +246,7 @@
               },
               "creations": [
                 {
+                  "id": 4,
                   "name": "set-3",
                   "entities": [
                     4,
@@ -401,6 +403,7 @@
                 },
                 "creations": [
                   {
+                    "id": 3,
                     "name": "set-2",
                     "entities": [
                       12,
@@ -450,6 +453,7 @@
                 },
                 "creations": [
                   {
+                    "id": 4,
                     "name": "set-3",
                     "entities": [
                       12,
@@ -469,6 +473,6 @@
         ]
       }
     ],
-    "head": "{\n  \"avatar\": {\n    \"model_entity\": 7\n  },\n  \"creations\": [\n    {\n      \"entities\": [12, 13, 6, 7, 8, 9, 10, 11],\n      \"name\": \"set-3\"\n    }\n  ],\n  \"entities\": [\n    {\n      \"id\": 1,\n      \"name\": \"base-1\"\n    },\n    {\n      \"id\": 2,\n      \"name\": \"base-2\",\n      \"parent\": 1\n    },\n    {\n      \"id\": 3,\n      \"name\": \"shared-3\"\n    },\n    {\n      \"id\": 4,\n      \"name\": \"lighthouse\"\n    },\n    {\n      \"id\": 5,\n      \"name\": \"lighthouse-m5\"\n    },\n    {\n      \"id\": 6,\n      \"name\": \"mill\",\n      \"parent\": 13\n    },\n    {\n      \"id\": 7,\n      \"name\": \"mill-2\"\n    },\n    {\n      \"behaviors\": [\n        {\n          \"Orbit\": {\n            \"center\": 6,\n            \"radius\": 2,\n            \"speed\": 10\n          }\n        }\n      ],\n      \"id\": 8,\n      \"name\": \"mill-3\",\n      \"parent\": 6\n    },\n    {\n      \"id\": 9,\n      \"name\": \"mill-4\"\n    },\n    {\n      \"id\": 10,\n      \"name\": \"gate\"\n    },\n    {\n      \"behaviors\": [\n        {\n          \"LookAt\": {\n            \"target\": 12\n          }\n        }\n      ],\n      \"id\": 11,\n      \"name\": \"gate-2\",\n      \"parent\": 6\n    },\n    {\n      \"id\": 12,\n      \"name\": \"lighthouse-2\"\n    },\n    {\n      \"id\": 13,\n      \"name\": \"lighthouse-3\",\n      \"parent\": 12\n    }\n  ],\n  \"meta\": {\n    \"name\": \"case-6\"\n  },\n  \"next_entity_id\": 14,\n  \"version\": 3\n}\n"
+    "head": "{\n  \"avatar\": {\n    \"model_entity\": 7\n  },\n  \"creations\": [\n    {\n      \"entities\": [12, 13, 6, 7, 8, 9, 10, 11],\n      \"id\": 4,\n      \"name\": \"set-3\"\n    }\n  ],\n  \"entities\": [\n    {\n      \"id\": 1,\n      \"name\": \"base-1\"\n    },\n    {\n      \"id\": 2,\n      \"name\": \"base-2\",\n      \"parent\": 1\n    },\n    {\n      \"id\": 3,\n      \"name\": \"shared-3\"\n    },\n    {\n      \"id\": 4,\n      \"name\": \"lighthouse\"\n    },\n    {\n      \"id\": 5,\n      \"name\": \"lighthouse-m5\"\n    },\n    {\n      \"id\": 6,\n      \"name\": \"mill\",\n      \"parent\": 13\n    },\n    {\n      \"id\": 7,\n      \"name\": \"mill-2\"\n    },\n    {\n      \"behaviors\": [\n        {\n          \"Orbit\": {\n            \"center\": 6,\n            \"radius\": 2,\n            \"speed\": 10\n          }\n        }\n      ],\n      \"id\": 8,\n      \"name\": \"mill-3\",\n      \"parent\": 6\n    },\n    {\n      \"id\": 9,\n      \"name\": \"mill-4\"\n    },\n    {\n      \"id\": 10,\n      \"name\": \"gate\"\n    },\n    {\n      \"behaviors\": [\n        {\n          \"LookAt\": {\n            \"target\": 12\n          }\n        }\n      ],\n      \"id\": 11,\n      \"name\": \"gate-2\",\n      \"parent\": 6\n    },\n    {\n      \"id\": 12,\n      \"name\": \"lighthouse-2\"\n    },\n    {\n      \"id\": 13,\n      \"name\": \"lighthouse-3\",\n      \"parent\": 12\n    }\n  ],\n  \"meta\": {\n    \"name\": \"case-6\"\n  },\n  \"next_entity_id\": 14,\n  \"version\": 3\n}\n"
   }
 }

@@ -114,6 +114,7 @@
                     },
                     "creations": [
                       {
+                        "id": 1,
                         "name": "set-0",
                         "entities": [
                           1,
@@ -181,6 +182,7 @@
                       },
                       "creations": [
                         {
+                          "id": 1,
                           "name": "set-0",
                           "entities": [
                             1,
@@ -197,6 +199,6 @@
         ]
       }
     ],
-    "head": "{\n  \"avatar\": {\n    \"model_entity\": 1\n  },\n  \"creations\": [\n    {\n      \"entities\": [1, 5],\n      \"name\": \"set-0\"\n    }\n  ],\n  \"entities\": [\n    {\n      \"id\": 1,\n      \"name\": \"tower\"\n    },\n    {\n      \"id\": 2,\n      \"name\": \"lighthouse-2\"\n    },\n    {\n      \"id\": 3,\n      \"name\": \"gate\"\n    },\n    {\n      \"id\": 5,\n      \"name\": \"lighthouse-2-2\",\n      \"parent\": 1\n    }\n  ],\n  \"meta\": {\n    \"name\": \"case-72\"\n  },\n  \"next_entity_id\": 6,\n  \"version\": 3\n}\n"
+    "head": "{\n  \"avatar\": {\n    \"model_entity\": 1\n  },\n  \"creations\": [\n    {\n      \"entities\": [1, 5],\n      \"id\": 1,\n      \"name\": \"set-0\"\n    }\n  ],\n  \"entities\": [\n    {\n      \"id\": 1,\n      \"name\": \"tower\"\n    },\n    {\n      \"id\": 2,\n      \"name\": \"lighthouse-2\"\n    },\n    {\n      \"id\": 3,\n      \"name\": \"gate\"\n    },\n    {\n      \"id\": 5,\n      \"name\": \"lighthouse-2-2\",\n      \"parent\": 1\n    }\n  ],\n  \"meta\": {\n    \"name\": \"case-72\"\n  },\n  \"next_entity_id\": 6,\n  \"version\": 3\n}\n"
   }
 }

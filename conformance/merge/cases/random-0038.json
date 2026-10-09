@@ -195,6 +195,7 @@
               },
               "creations": [
                 {
+                  "id": 1,
                   "name": "set-0",
                   "entities": [
                     3,
@@ -250,6 +251,7 @@
               },
               "creations": [
                 {
+                  "id": 2,
                   "name": "set-1",
                   "entities": [
                     3,
@@ -293,6 +295,7 @@
                     },
                     "creations": [
                       {
+                        "id": 3,
                         "name": "set-2",
                         "entities": [
                           3,
@@ -398,6 +401,7 @@
                 },
                 "creations": [
                   {
+                    "id": 1,
                     "name": "set-0",
                     "entities": [
                       13,
@@ -453,6 +457,7 @@
                 },
                 "creations": [
                   {
+                    "id": 2,
                     "name": "set-1",
                     "entities": [
                       13,
@@ -496,6 +501,7 @@
                       },
                       "creations": [
                         {
+                          "id": 3,
                           "name": "set-2",
                           "entities": [
                             13,
@@ -516,6 +522,6 @@
         ]
       }
     ],
-    "head": "{\n  \"avatar\": {\n    \"model_entity\": 18\n  },\n  \"creations\": [\n    {\n      \"entities\": [13, 14, 15, 16, 17, 18],\n      \"name\": \"set-2\"\n    }\n  ],\n  \"entities\": [\n    {\n      \"id\": 1,\n      \"name\": \"base-1\"\n    },\n    {\n      \"id\": 2,\n      \"name\": \"base-2\"\n    },\n    {\n      \"id\": 3,\n      \"name\": \"tower\"\n    },\n    {\n      \"id\": 4,\n      \"name\": \"tower-m4\"\n    },\n    {\n      \"id\": 5,\n      \"name\": \"gate\"\n    },\n    {\n      \"id\": 6,\n      \"name\": \"lighthouse\"\n    },\n    {\n      \"id\": 7,\n      \"name\": \"lighthouse-2\"\n    },\n    {\n      \"id\": 8,\n      \"name\": \"lighthouse-m8\"\n    },\n    {\n      \"id\": 9,\n      \"name\": \"lighthouse-2-m9\"\n    },\n    {\n      \"id\": 10,\n      \"name\": \"mill\"\n    },\n    {\n      \"id\": 11,\n      \"name\": \"gate-m11\"\n    },\n    {\n      \"id\": 12,\n      \"name\": \"dock\"\n    },\n    {\n      \"id\": 13,\n      \"name\": \"mill-2\"\n    },\n    {\n      \"id\": 14,\n      \"name\": \"renamed-4\"\n    },\n    {\n      \"behaviors\": [\n        {\n          \"Orbit\": {\n            \"center\": 14,\n            \"radius\": 2,\n            \"speed\": 10\n          }\n        }\n      ],\n      \"id\": 15,\n      \"name\": \"renamed-5\"\n    },\n    {\n      \"id\": 16,\n      \"name\": \"tower-2\",\n      \"parent\": 15\n    },\n    {\n      \"id\": 17,\n      \"name\": \"mill-4\",\n      \"parent\": 16\n    },\n    {\n      \"id\": 18,\n      \"name\": \"tower-3\",\n      \"parent\": 17\n    }\n  ],\n  \"meta\": {\n    \"name\": \"case-38\"\n  },\n  \"next_entity_id\": 19,\n  \"version\": 3\n}\n"
+    "head": "{\n  \"avatar\": {\n    \"model_entity\": 18\n  },\n  \"creations\": [\n    {\n      \"entities\": [13, 14, 15, 16, 17, 18],\n      \"id\": 3,\n      \"name\": \"set-2\"\n    }\n  ],\n  \"entities\": [\n    {\n      \"id\": 1,\n      \"name\": \"base-1\"\n    },\n    {\n      \"id\": 2,\n      \"name\": \"base-2\"\n    },\n    {\n      \"id\": 3,\n      \"name\": \"tower\"\n    },\n    {\n      \"id\": 4,\n      \"name\": \"tower-m4\"\n    },\n    {\n      \"id\": 5,\n      \"name\": \"gate\"\n    },\n    {\n      \"id\": 6,\n      \"name\": \"lighthouse\"\n    },\n    {\n      \"id\": 7,\n      \"name\": \"lighthouse-2\"\n    },\n    {\n      \"id\": 8,\n      \"name\": \"lighthouse-m8\"\n    },\n    {\n      \"id\": 9,\n      \"name\": \"lighthouse-2-m9\"\n    },\n    {\n      \"id\": 10,\n      \"name\": \"mill\"\n    },\n    {\n      \"id\": 11,\n      \"name\": \"gate-m11\"\n    },\n    {\n      \"id\": 12,\n      \"name\": \"dock\"\n    },\n    {\n      \"id\": 13,\n      \"name\": \"mill-2\"\n    },\n    {\n      \"id\": 14,\n      \"name\": \"renamed-4\"\n    },\n    {\n      \"behaviors\": [\n        {\n          \"Orbit\": {\n            \"center\": 14,\n            \"radius\": 2,\n            \"speed\": 10\n          }\n        }\n      ],\n      \"id\": 15,\n      \"name\": \"renamed-5\"\n    },\n    {\n      \"id\": 16,\n      \"name\": \"tower-2\",\n      \"parent\": 15\n    },\n    {\n      \"id\": 17,\n      \"name\": \"mill-4\",\n      \"parent\": 16\n    },\n    {\n      \"id\": 18,\n      \"name\": \"tower-3\",\n      \"parent\": 17\n    }\n  ],\n  \"meta\": {\n    \"name\": \"case-38\"\n  },\n  \"next_entity_id\": 19,\n  \"version\": 3\n}\n"
   }
 }

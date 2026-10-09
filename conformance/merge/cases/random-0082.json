@@ -228,6 +228,7 @@
                     },
                     "creations": [
                       {
+                        "id": 2,
                         "name": "set-1",
                         "entities": [
                           5,
@@ -410,6 +411,7 @@
                       },
                       "creations": [
                         {
+                          "id": 2,
                           "name": "set-1",
                           "entities": [
                             13,
@@ -470,6 +472,6 @@
         ]
       }
     ],
-    "head": "{\n  \"avatar\": {\n    \"model_entity\": 16\n  },\n  \"creations\": [\n    {\n      \"entities\": [13, 6, 14, 15, 16, 10],\n      \"name\": \"set-1\"\n    }\n  ],\n  \"entities\": [\n    {\n      \"id\": 1,\n      \"name\": \"base-1\"\n    },\n    {\n      \"id\": 2,\n      \"name\": \"base-2\"\n    },\n    {\n      \"id\": 3,\n      \"name\": \"base-3\"\n    },\n    {\n      \"id\": 4,\n      \"name\": \"shared-4\"\n    },\n    {\n      \"id\": 5,\n      \"name\": \"mill\"\n    },\n    {\n      \"id\": 6,\n      \"name\": \"gate-2\"\n    },\n    {\n      \"id\": 7,\n      \"name\": \"mill-m7\"\n    },\n    {\n      \"id\": 8,\n      \"name\": \"dock\"\n    },\n    {\n      \"id\": 9,\n      \"name\": \"tower-m9\"\n    },\n    {\n      \"id\": 10,\n      \"name\": \"mill-2\",\n      \"parent\": 14\n    },\n    {\n      \"id\": 11,\n      \"name\": \"gate-4\",\n      \"parent\": 16\n    },\n    {\n      \"behaviors\": [\n        {\n          \"LookAt\": {\n            \"target\": 13\n          }\n        }\n      ],\n      \"id\": 12,\n      \"name\": \"gate-5\"\n    },\n    {\n      \"id\": 13,\n      \"name\": \"gate\"\n    },\n    {\n      \"behaviors\": [\n        {\n          \"Orbit\": {\n            \"center\": 13,\n            \"radius\": 2,\n            \"speed\": 10\n          }\n        }\n      ],\n      \"id\": 14,\n      \"name\": \"tower\"\n    },\n    {\n      \"id\": 15,\n      \"name\": \"gate-3\"\n    },\n    {\n      \"behaviors\": [\n        {\n          \"Orbit\": {\n            \"center\": 13,\n            \"radius\": 2,\n            \"speed\": 10\n          }\n        }\n      ],\n      \"id\": 16,\n      \"name\": \"dock-2\"\n    }\n  ],\n  \"meta\": {\n    \"name\": \"case-82\"\n  },\n  \"next_entity_id\": 17,\n  \"version\": 3\n}\n"
+    "head": "{\n  \"avatar\": {\n    \"model_entity\": 16\n  },\n  \"creations\": [\n    {\n      \"entities\": [13, 6, 14, 15, 16, 10],\n      \"id\": 2,\n      \"name\": \"set-1\"\n    }\n  ],\n  \"entities\": [\n    {\n      \"id\": 1,\n      \"name\": \"base-1\"\n    },\n    {\n      \"id\": 2,\n      \"name\": \"base-2\"\n    },\n    {\n      \"id\": 3,\n      \"name\": \"base-3\"\n    },\n    {\n      \"id\": 4,\n      \"name\": \"shared-4\"\n    },\n    {\n      \"id\": 5,\n      \"name\": \"mill\"\n    },\n    {\n      \"id\": 6,\n      \"name\": \"gate-2\"\n    },\n    {\n      \"id\": 7,\n      \"name\": \"mill-m7\"\n    },\n    {\n      \"id\": 8,\n      \"name\": \"dock\"\n    },\n    {\n      \"id\": 9,\n      \"name\": \"tower-m9\"\n    },\n    {\n      \"id\": 10,\n      \"name\": \"mill-2\",\n      \"parent\": 14\n    },\n    {\n      \"id\": 11,\n      \"name\": \"gate-4\",\n      \"parent\": 16\n    },\n    {\n      \"behaviors\": [\n        {\n          \"LookAt\": {\n            \"target\": 13\n          }\n        }\n      ],\n      \"id\": 12,\n      \"name\": \"gate-5\"\n    },\n    {\n      \"id\": 13,\n      \"name\": \"gate\"\n    },\n    {\n      \"behaviors\": [\n        {\n          \"Orbit\": {\n            \"center\": 13,\n            \"radius\": 2,\n            \"speed\": 10\n          }\n        }\n      ],\n      \"id\": 14,\n      \"name\": \"tower\"\n    },\n    {\n      \"id\": 15,\n      \"name\": \"gate-3\"\n    },\n    {\n      \"behaviors\": [\n        {\n          \"Orbit\": {\n            \"center\": 13,\n            \"radius\": 2,\n            \"speed\": 10\n          }\n        }\n      ],\n      \"id\": 16,\n      \"name\": \"dock-2\"\n    }\n  ],\n  \"meta\": {\n    \"name\": \"case-82\"\n  },\n  \"next_entity_id\": 17,\n  \"version\": 3\n}\n"
   }
 }

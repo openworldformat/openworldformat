@@ -194,6 +194,7 @@
               },
               "creations": [
                 {
+                  "id": 1,
                   "name": "set-0",
                   "entities": [
                     3,
@@ -264,6 +265,7 @@
                 },
                 "creations": [
                   {
+                    "id": 1,
                     "name": "set-0",
                     "entities": [
                       13,
@@ -278,6 +280,6 @@
         ]
       }
     ],
-    "head": "{\n  \"avatar\": {\n    \"model_entity\": 13\n  },\n  \"creations\": [\n    {\n      \"entities\": [13, 14, 15],\n      \"name\": \"set-0\"\n    }\n  ],\n  \"entities\": [\n    {\n      \"id\": 1,\n      \"name\": \"shared-1\"\n    },\n    {\n      \"id\": 2,\n      \"name\": \"shared-2\"\n    },\n    {\n      \"id\": 3,\n      \"name\": \"tower\"\n    },\n    {\n      \"id\": 4,\n      \"name\": \"lighthouse\"\n    },\n    {\n      \"id\": 5,\n      \"name\": \"tower-m5\"\n    },\n    {\n      \"id\": 6,\n      \"name\": \"lighthouse-m6\"\n    },\n    {\n      \"id\": 7,\n      \"name\": \"gate\"\n    },\n    {\n      \"id\": 9,\n      \"name\": \"dock-m9\"\n    },\n    {\n      \"id\": 10,\n      \"name\": \"gate-m10\"\n    },\n    {\n      \"id\": 11,\n      \"name\": \"lighthouse-2\"\n    },\n    {\n      \"id\": 12,\n      \"name\": \"lighthouse-2-m12\"\n    },\n    {\n      \"id\": 13,\n      \"name\": \"gate-2\"\n    },\n    {\n      \"id\": 14,\n      \"name\": \"gate-3\"\n    },\n    {\n      \"id\": 15,\n      \"name\": \"tower-2\"\n    }\n  ],\n  \"meta\": {\n    \"name\": \"case-86\"\n  },\n  \"next_entity_id\": 16,\n  \"version\": 3\n}\n"
+    "head": "{\n  \"avatar\": {\n    \"model_entity\": 13\n  },\n  \"creations\": [\n    {\n      \"entities\": [13, 14, 15],\n      \"id\": 1,\n      \"name\": \"set-0\"\n    }\n  ],\n  \"entities\": [\n    {\n      \"id\": 1,\n      \"name\": \"shared-1\"\n    },\n    {\n      \"id\": 2,\n      \"name\": \"shared-2\"\n    },\n    {\n      \"id\": 3,\n      \"name\": \"tower\"\n    },\n    {\n      \"id\": 4,\n      \"name\": \"lighthouse\"\n    },\n    {\n      \"id\": 5,\n      \"name\": \"tower-m5\"\n    },\n    {\n      \"id\": 6,\n      \"name\": \"lighthouse-m6\"\n    },\n    {\n      \"id\": 7,\n      \"name\": \"gate\"\n    },\n    {\n      \"id\": 9,\n      \"name\": \"dock-m9\"\n    },\n    {\n      \"id\": 10,\n      \"name\": \"gate-m10\"\n    },\n    {\n      \"id\": 11,\n      \"name\": \"lighthouse-2\"\n    },\n    {\n      \"id\": 12,\n      \"name\": \"lighthouse-2-m12\"\n    },\n    {\n      \"id\": 13,\n      \"name\": \"gate-2\"\n    },\n    {\n      \"id\": 14,\n      \"name\": \"gate-3\"\n    },\n    {\n      \"id\": 15,\n      \"name\": \"tower-2\"\n    }\n  ],\n  \"meta\": {\n    \"name\": \"case-86\"\n  },\n  \"next_entity_id\": 16,\n  \"version\": 3\n}\n"
   }
 }

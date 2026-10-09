@@ -84,6 +84,7 @@
                     },
                     "creations": [
                       {
+                        "id": 1,
                         "name": "set-0",
                         "entities": [
                           3
@@ -134,6 +135,7 @@
                       },
                       "creations": [
                         {
+                          "id": 1,
                           "name": "set-0",
                           "entities": [
                             5
@@ -149,6 +151,6 @@
         ]
       }
     ],
-    "head": "{\n  \"avatar\": {\n    \"model_entity\": 5\n  },\n  \"creations\": [\n    {\n      \"entities\": [5],\n      \"name\": \"set-0\"\n    }\n  ],\n  \"entities\": [\n    {\n      \"id\": 1,\n      \"name\": \"base-1\"\n    },\n    {\n      \"id\": 2,\n      \"name\": \"base-2\",\n      \"parent\": 1\n    },\n    {\n      \"id\": 3,\n      \"name\": \"mill\"\n    },\n    {\n      \"id\": 4,\n      \"name\": \"tower\"\n    },\n    {\n      \"id\": 5,\n      \"name\": \"gate\"\n    }\n  ],\n  \"meta\": {\n    \"name\": \"case-22\"\n  },\n  \"next_entity_id\": 6,\n  \"version\": 3\n}\n"
+    "head": "{\n  \"avatar\": {\n    \"model_entity\": 5\n  },\n  \"creations\": [\n    {\n      \"entities\": [5],\n      \"id\": 1,\n      \"name\": \"set-0\"\n    }\n  ],\n  \"entities\": [\n    {\n      \"id\": 1,\n      \"name\": \"base-1\"\n    },\n    {\n      \"id\": 2,\n      \"name\": \"base-2\",\n      \"parent\": 1\n    },\n    {\n      \"id\": 3,\n      \"name\": \"mill\"\n    },\n    {\n      \"id\": 4,\n      \"name\": \"tower\"\n    },\n    {\n      \"id\": 5,\n      \"name\": \"gate\"\n    }\n  ],\n  \"meta\": {\n    \"name\": \"case-22\"\n  },\n  \"next_entity_id\": 6,\n  \"version\": 3\n}\n"
   }
 }

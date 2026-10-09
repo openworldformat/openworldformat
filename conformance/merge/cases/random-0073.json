@@ -132,6 +132,7 @@
               },
               "creations": [
                 {
+                  "id": 1,
                   "name": "set-0",
                   "entities": [
                     5,
@@ -185,6 +186,7 @@
               },
               "creations": [
                 {
+                  "id": 2,
                   "name": "set-1",
                   "entities": [
                     5,
@@ -284,6 +286,7 @@
                 },
                 "creations": [
                   {
+                    "id": 1,
                     "name": "set-0",
                     "entities": [
                       12,
@@ -337,6 +340,7 @@
                 },
                 "creations": [
                   {
+                    "id": 2,
                     "name": "set-1",
                     "entities": [
                       12,
@@ -380,6 +384,6 @@
         ]
       }
     ],
-    "head": "{\n  \"avatar\": {\n    \"model_entity\": 14\n  },\n  \"creations\": [\n    {\n      \"entities\": [12, 13, 14, 8, 9],\n      \"name\": \"set-1\"\n    }\n  ],\n  \"entities\": [\n    {\n      \"id\": 1,\n      \"name\": \"base-1\"\n    },\n    {\n      \"id\": 2,\n      \"name\": \"base-2\"\n    },\n    {\n      \"id\": 3,\n      \"name\": \"shared-3\"\n    },\n    {\n      \"id\": 4,\n      \"name\": \"shared-4\"\n    },\n    {\n      \"id\": 5,\n      \"name\": \"lighthouse\"\n    },\n    {\n      \"id\": 6,\n      \"name\": \"gate\"\n    },\n    {\n      \"id\": 7,\n      \"name\": \"lighthouse-m7\"\n    },\n    {\n      \"id\": 8,\n      \"name\": \"lighthouse-2-2\",\n      \"parent\": 14\n    },\n    {\n      \"id\": 9,\n      \"name\": \"dock-2\"\n    },\n    {\n      \"id\": 10,\n      \"name\": \"gate-2\"\n    },\n    {\n      \"id\": 11,\n      \"name\": \"mill\",\n      \"parent\": 12\n    },\n    {\n      \"id\": 12,\n      \"name\": \"tower\"\n    },\n    {\n      \"behaviors\": [\n        {\n          \"LookAt\": {\n            \"target\": 12\n          }\n        }\n      ],\n      \"id\": 13,\n      \"name\": \"dock\",\n      \"parent\": 12\n    },\n    {\n      \"id\": 14,\n      \"name\": \"lighthouse-2\"\n    }\n  ],\n  \"meta\": {\n    \"name\": \"case-73\"\n  },\n  \"next_entity_id\": 15,\n  \"version\": 3\n}\n"
+    "head": "{\n  \"avatar\": {\n    \"model_entity\": 14\n  },\n  \"creations\": [\n    {\n      \"entities\": [12, 13, 14, 8, 9],\n      \"id\": 2,\n      \"name\": \"set-1\"\n    }\n  ],\n  \"entities\": [\n    {\n      \"id\": 1,\n      \"name\": \"base-1\"\n    },\n    {\n      \"id\": 2,\n      \"name\": \"base-2\"\n    },\n    {\n      \"id\": 3,\n      \"name\": \"shared-3\"\n    },\n    {\n      \"id\": 4,\n      \"name\": \"shared-4\"\n    },\n    {\n      \"id\": 5,\n      \"name\": \"lighthouse\"\n    },\n    {\n      \"id\": 6,\n      \"name\": \"gate\"\n    },\n    {\n      \"id\": 7,\n      \"name\": \"lighthouse-m7\"\n    },\n    {\n      \"id\": 8,\n      \"name\": \"lighthouse-2-2\",\n      \"parent\": 14\n    },\n    {\n      \"id\": 9,\n      \"name\": \"dock-2\"\n    },\n    {\n      \"id\": 10,\n      \"name\": \"gate-2\"\n    },\n    {\n      \"id\": 11,\n      \"name\": \"mill\",\n      \"parent\": 12\n    },\n    {\n      \"id\": 12,\n      \"name\": \"tower\"\n    },\n    {\n      \"behaviors\": [\n        {\n          \"LookAt\": {\n            \"target\": 12\n          }\n        }\n      ],\n      \"id\": 13,\n      \"name\": \"dock\",\n      \"parent\": 12\n    },\n    {\n      \"id\": 14,\n      \"name\": \"lighthouse-2\"\n    }\n  ],\n  \"meta\": {\n    \"name\": \"case-73\"\n  },\n  \"next_entity_id\": 15,\n  \"version\": 3\n}\n"
   }
 }

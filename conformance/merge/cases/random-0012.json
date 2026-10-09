@@ -218,6 +218,7 @@
                     },
                     "creations": [
                       {
+                        "id": 3,
                         "name": "set-2",
                         "entities": [
                           2,
@@ -259,6 +260,7 @@
               },
               "creations": [
                 {
+                  "id": 4,
                   "name": "set-3",
                   "entities": [
                     2,
@@ -413,6 +415,7 @@
                       },
                       "creations": [
                         {
+                          "id": 3,
                           "name": "set-2",
                           "entities": [
                             10,
@@ -454,6 +457,7 @@
                 },
                 "creations": [
                   {
+                    "id": 4,
                     "name": "set-3",
                     "entities": [
                       10,
@@ -470,6 +474,6 @@
         ]
       }
     ],
-    "head": "{\n  \"avatar\": {\n    \"model_entity\": 10\n  },\n  \"creations\": [\n    {\n      \"entities\": [10, 11, 12, 13, 14],\n      \"name\": \"set-3\"\n    }\n  ],\n  \"entities\": [\n    {\n      \"id\": 1,\n      \"name\": \"base-1\"\n    },\n    {\n      \"id\": 2,\n      \"name\": \"lighthouse\"\n    },\n    {\n      \"id\": 3,\n      \"name\": \"lighthouse-m3\"\n    },\n    {\n      \"id\": 4,\n      \"name\": \"lighthouse-2\"\n    },\n    {\n      \"id\": 5,\n      \"name\": \"lighthouse-m5\"\n    },\n    {\n      \"id\": 6,\n      \"name\": \"mill\"\n    },\n    {\n      \"id\": 7,\n      \"name\": \"gate\"\n    },\n    {\n      \"id\": 8,\n      \"name\": \"dock\"\n    },\n    {\n      \"id\": 9,\n      \"name\": \"lighthouse-2-m9\"\n    },\n    {\n      \"id\": 10,\n      \"name\": \"renamed-2\"\n    },\n    {\n      \"behaviors\": [\n        {\n          \"Orbit\": {\n            \"center\": 10,\n            \"radius\": 2,\n            \"speed\": 10\n          }\n        }\n      ],\n      \"id\": 11,\n      \"name\": \"gate-2\",\n      \"parent\": 10\n    },\n    {\n      \"behaviors\": [\n        {\n          \"LookAt\": {\n            \"target\": 11\n          }\n        }\n      ],\n      \"id\": 12,\n      \"name\": \"tower-2\"\n    },\n    {\n      \"behaviors\": [\n        {\n          \"Orbit\": {\n            \"center\": 12,\n            \"radius\": 2,\n            \"speed\": 10\n          }\n        }\n      ],\n      \"id\": 13,\n      \"name\": \"tower-3\",\n      \"parent\": 12\n    },\n    {\n      \"id\": 14,\n      \"name\": \"dock-2\"\n    }\n  ],\n  \"meta\": {\n    \"name\": \"case-12\"\n  },\n  \"next_entity_id\": 15,\n  \"version\": 3\n}\n"
+    "head": "{\n  \"avatar\": {\n    \"model_entity\": 10\n  },\n  \"creations\": [\n    {\n      \"entities\": [10, 11, 12, 13, 14],\n      \"id\": 4,\n      \"name\": \"set-3\"\n    }\n  ],\n  \"entities\": [\n    {\n      \"id\": 1,\n      \"name\": \"base-1\"\n    },\n    {\n      \"id\": 2,\n      \"name\": \"lighthouse\"\n    },\n    {\n      \"id\": 3,\n      \"name\": \"lighthouse-m3\"\n    },\n    {\n      \"id\": 4,\n      \"name\": \"lighthouse-2\"\n    },\n    {\n      \"id\": 5,\n      \"name\": \"lighthouse-m5\"\n    },\n    {\n      \"id\": 6,\n      \"name\": \"mill\"\n    },\n    {\n      \"id\": 7,\n      \"name\": \"gate\"\n    },\n    {\n      \"id\": 8,\n      \"name\": \"dock\"\n    },\n    {\n      \"id\": 9,\n      \"name\": \"lighthouse-2-m9\"\n    },\n    {\n      \"id\": 10,\n      \"name\": \"renamed-2\"\n    },\n    {\n      \"behaviors\": [\n        {\n          \"Orbit\": {\n            \"center\": 10,\n            \"radius\": 2,\n            \"speed\": 10\n          }\n        }\n      ],\n      \"id\": 11,\n      \"name\": \"gate-2\",\n      \"parent\": 10\n    },\n    {\n      \"behaviors\": [\n        {\n          \"LookAt\": {\n            \"target\": 11\n          }\n        }\n      ],\n      \"id\": 12,\n      \"name\": \"tower-2\"\n    },\n    {\n      \"behaviors\": [\n        {\n          \"Orbit\": {\n            \"center\": 12,\n            \"radius\": 2,\n            \"speed\": 10\n          }\n        }\n      ],\n      \"id\": 13,\n      \"name\": \"tower-3\",\n      \"parent\": 12\n    },\n    {\n      \"id\": 14,\n      \"name\": \"dock-2\"\n    }\n  ],\n  \"meta\": {\n    \"name\": \"case-12\"\n  },\n  \"next_entity_id\": 15,\n  \"version\": 3\n}\n"
   }
 }

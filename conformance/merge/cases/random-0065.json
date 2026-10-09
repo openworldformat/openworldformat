@@ -129,6 +129,7 @@
               },
               "creations": [
                 {
+                  "id": 1,
                   "name": "set-0",
                   "entities": [
                     2
@@ -259,6 +260,7 @@
                 },
                 "creations": [
                   {
+                    "id": 1,
                     "name": "set-0",
                     "entities": [
                       8
@@ -345,6 +347,6 @@
         ]
       }
     ],
-    "head": "{\n  \"avatar\": {\n    \"model_entity\": 8\n  },\n  \"creations\": [\n    {\n      \"entities\": [8],\n      \"name\": \"set-0\"\n    }\n  ],\n  \"entities\": [\n    {\n      \"id\": 1,\n      \"name\": \"shared-1\"\n    },\n    {\n      \"id\": 2,\n      \"name\": \"tower\"\n    },\n    {\n      \"id\": 3,\n      \"name\": \"gate\"\n    },\n    {\n      \"id\": 4,\n      \"name\": \"mill\"\n    },\n    {\n      \"id\": 5,\n      \"name\": \"gate-m5\"\n    },\n    {\n      \"id\": 6,\n      \"name\": \"mill-m6\"\n    },\n    {\n      \"id\": 7,\n      \"name\": \"lighthouse-2\"\n    },\n    {\n      \"id\": 8,\n      \"name\": \"tower-2\"\n    },\n    {\n      \"id\": 9,\n      \"name\": \"mill-2\"\n    },\n    {\n      \"behaviors\": [\n        {\n          \"LookAt\": {\n            \"target\": 8\n          }\n        }\n      ],\n      \"id\": 10,\n      \"name\": \"tower-3\",\n      \"parent\": 8\n    },\n    {\n      \"id\": 11,\n      \"name\": \"mill-3\"\n    }\n  ],\n  \"meta\": {\n    \"name\": \"case-65\"\n  },\n  \"next_entity_id\": 12,\n  \"version\": 3\n}\n"
+    "head": "{\n  \"avatar\": {\n    \"model_entity\": 8\n  },\n  \"creations\": [\n    {\n      \"entities\": [8],\n      \"id\": 1,\n      \"name\": \"set-0\"\n    }\n  ],\n  \"entities\": [\n    {\n      \"id\": 1,\n      \"name\": \"shared-1\"\n    },\n    {\n      \"id\": 2,\n      \"name\": \"tower\"\n    },\n    {\n      \"id\": 3,\n      \"name\": \"gate\"\n    },\n    {\n      \"id\": 4,\n      \"name\": \"mill\"\n    },\n    {\n      \"id\": 5,\n      \"name\": \"gate-m5\"\n    },\n    {\n      \"id\": 6,\n      \"name\": \"mill-m6\"\n    },\n    {\n      \"id\": 7,\n      \"name\": \"lighthouse-2\"\n    },\n    {\n      \"id\": 8,\n      \"name\": \"tower-2\"\n    },\n    {\n      \"id\": 9,\n      \"name\": \"mill-2\"\n    },\n    {\n      \"behaviors\": [\n        {\n          \"LookAt\": {\n            \"target\": 8\n          }\n        }\n      ],\n      \"id\": 10,\n      \"name\": \"tower-3\",\n      \"parent\": 8\n    },\n    {\n      \"id\": 11,\n      \"name\": \"mill-3\"\n    }\n  ],\n  \"meta\": {\n    \"name\": \"case-65\"\n  },\n  \"next_entity_id\": 12,\n  \"version\": 3\n}\n"
   }
 }

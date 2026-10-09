@@ -170,6 +170,7 @@
               },
               "creations": [
                 {
+                  "id": 1,
                   "name": "set-0",
                   "entities": [
                     1
@@ -214,6 +215,7 @@
                 },
                 "creations": [
                   {
+                    "id": 1,
                     "name": "set-0",
                     "entities": [
                       11
@@ -226,6 +228,6 @@
         ]
       }
     ],
-    "head": "{\n  \"avatar\": {\n    \"model_entity\": 11\n  },\n  \"creations\": [\n    {\n      \"entities\": [11],\n      \"name\": \"set-0\"\n    }\n  ],\n  \"entities\": [\n    {\n      \"id\": 1,\n      \"name\": \"tower\"\n    },\n    {\n      \"id\": 2,\n      \"name\": \"lighthouse\"\n    },\n    {\n      \"id\": 3,\n      \"name\": \"lighthouse-m3\"\n    },\n    {\n      \"id\": 4,\n      \"name\": \"tower-m4\"\n    },\n    {\n      \"id\": 5,\n      \"name\": \"mill\"\n    },\n    {\n      \"id\": 6,\n      \"name\": \"tower-m6\"\n    },\n    {\n      \"id\": 7,\n      \"name\": \"lighthouse-2\"\n    },\n    {\n      \"id\": 8,\n      \"name\": \"dock\"\n    },\n    {\n      \"id\": 9,\n      \"name\": \"dock-m9\"\n    },\n    {\n      \"id\": 11,\n      \"name\": \"mill-2\"\n    }\n  ],\n  \"meta\": {\n    \"name\": \"case-75\"\n  },\n  \"next_entity_id\": 12,\n  \"version\": 3\n}\n"
+    "head": "{\n  \"avatar\": {\n    \"model_entity\": 11\n  },\n  \"creations\": [\n    {\n      \"entities\": [11],\n      \"id\": 1,\n      \"name\": \"set-0\"\n    }\n  ],\n  \"entities\": [\n    {\n      \"id\": 1,\n      \"name\": \"tower\"\n    },\n    {\n      \"id\": 2,\n      \"name\": \"lighthouse\"\n    },\n    {\n      \"id\": 3,\n      \"name\": \"lighthouse-m3\"\n    },\n    {\n      \"id\": 4,\n      \"name\": \"tower-m4\"\n    },\n    {\n      \"id\": 5,\n      \"name\": \"mill\"\n    },\n    {\n      \"id\": 6,\n      \"name\": \"tower-m6\"\n    },\n    {\n      \"id\": 7,\n      \"name\": \"lighthouse-2\"\n    },\n    {\n      \"id\": 8,\n      \"name\": \"dock\"\n    },\n    {\n      \"id\": 9,\n      \"name\": \"dock-m9\"\n    },\n    {\n      \"id\": 11,\n      \"name\": \"mill-2\"\n    }\n  ],\n  \"meta\": {\n    \"name\": \"case-75\"\n  },\n  \"next_entity_id\": 12,\n  \"version\": 3\n}\n"
   }
 }

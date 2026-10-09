@@ -97,6 +97,7 @@
               },
               "creations": [
                 {
+                  "id": 1,
                   "name": "set-0",
                   "entities": [
                     1,
@@ -161,6 +162,7 @@
                 },
                 "creations": [
                   {
+                    "id": 1,
                     "name": "set-0",
                     "entities": [
                       1,
@@ -174,6 +176,6 @@
         ]
       }
     ],
-    "head": "{\n  \"avatar\": {\n    \"model_entity\": 1\n  },\n  \"creations\": [\n    {\n      \"entities\": [1, 2],\n      \"name\": \"set-0\"\n    }\n  ],\n  \"entities\": [\n    {\n      \"id\": 1,\n      \"name\": \"lighthouse-2\"\n    },\n    {\n      \"behaviors\": [\n        {\n          \"LookAt\": {\n            \"target\": 1\n          }\n        }\n      ],\n      \"id\": 2,\n      \"name\": \"mill\",\n      \"parent\": 1\n    }\n  ],\n  \"meta\": {\n    \"name\": \"case-29\"\n  },\n  \"next_entity_id\": 3,\n  \"version\": 3\n}\n"
+    "head": "{\n  \"avatar\": {\n    \"model_entity\": 1\n  },\n  \"creations\": [\n    {\n      \"entities\": [1, 2],\n      \"id\": 1,\n      \"name\": \"set-0\"\n    }\n  ],\n  \"entities\": [\n    {\n      \"id\": 1,\n      \"name\": \"lighthouse-2\"\n    },\n    {\n      \"behaviors\": [\n        {\n          \"LookAt\": {\n            \"target\": 1\n          }\n        }\n      ],\n      \"id\": 2,\n      \"name\": \"mill\",\n      \"parent\": 1\n    }\n  ],\n  \"meta\": {\n    \"name\": \"case-29\"\n  },\n  \"next_entity_id\": 3,\n  \"version\": 3\n}\n"
   }
 }

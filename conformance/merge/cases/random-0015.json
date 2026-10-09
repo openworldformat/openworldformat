@@ -141,6 +141,7 @@
               },
               "creations": [
                 {
+                  "id": 2,
                   "name": "set-1",
                   "entities": [
                     2,
@@ -256,6 +257,7 @@
                 },
                 "creations": [
                   {
+                    "id": 2,
                     "name": "set-1",
                     "entities": [
                       6,
@@ -289,6 +291,6 @@
         ]
       }
     ],
-    "head": "{\n  \"avatar\": {\n    \"model_entity\": 8\n  },\n  \"creations\": [\n    {\n      \"entities\": [6, 7, 8],\n      \"name\": \"set-1\"\n    }\n  ],\n  \"entities\": [\n    {\n      \"id\": 1,\n      \"name\": \"shared-1\"\n    },\n    {\n      \"id\": 2,\n      \"name\": \"gate\"\n    },\n    {\n      \"id\": 3,\n      \"name\": \"dock\"\n    },\n    {\n      \"id\": 4,\n      \"name\": \"tower\"\n    },\n    {\n      \"id\": 5,\n      \"name\": \"lighthouse-3\",\n      \"parent\": 8\n    },\n    {\n      \"id\": 6,\n      \"name\": \"renamed-2\"\n    },\n    {\n      \"id\": 7,\n      \"name\": \"lighthouse\",\n      \"parent\": 6\n    },\n    {\n      \"behaviors\": [\n        {\n          \"LookAt\": {\n            \"target\": 6\n          }\n        }\n      ],\n      \"id\": 8,\n      \"name\": \"lighthouse-2\"\n    }\n  ],\n  \"meta\": {\n    \"name\": \"case-15\"\n  },\n  \"next_entity_id\": 9,\n  \"version\": 3\n}\n"
+    "head": "{\n  \"avatar\": {\n    \"model_entity\": 8\n  },\n  \"creations\": [\n    {\n      \"entities\": [6, 7, 8],\n      \"id\": 2,\n      \"name\": \"set-1\"\n    }\n  ],\n  \"entities\": [\n    {\n      \"id\": 1,\n      \"name\": \"shared-1\"\n    },\n    {\n      \"id\": 2,\n      \"name\": \"gate\"\n    },\n    {\n      \"id\": 3,\n      \"name\": \"dock\"\n    },\n    {\n      \"id\": 4,\n      \"name\": \"tower\"\n    },\n    {\n      \"id\": 5,\n      \"name\": \"lighthouse-3\",\n      \"parent\": 8\n    },\n    {\n      \"id\": 6,\n      \"name\": \"renamed-2\"\n    },\n    {\n      \"id\": 7,\n      \"name\": \"lighthouse\",\n      \"parent\": 6\n    },\n    {\n      \"behaviors\": [\n        {\n          \"LookAt\": {\n            \"target\": 6\n          }\n        }\n      ],\n      \"id\": 8,\n      \"name\": \"lighthouse-2\"\n    }\n  ],\n  \"meta\": {\n    \"name\": \"case-15\"\n  },\n  \"next_entity_id\": 9,\n  \"version\": 3\n}\n"
   }
 }

@@ -145,6 +145,7 @@
               },
               "creations": [
                 {
+                  "id": 1,
                   "name": "set-0",
                   "entities": [
                     4
@@ -189,6 +190,7 @@
                 },
                 "creations": [
                   {
+                    "id": 1,
                     "name": "set-0",
                     "entities": [
                       9
@@ -201,6 +203,6 @@
         ]
       }
     ],
-    "head": "{\n  \"avatar\": {\n    \"model_entity\": 9\n  },\n  \"creations\": [\n    {\n      \"entities\": [9],\n      \"name\": \"set-0\"\n    }\n  ],\n  \"entities\": [\n    {\n      \"id\": 1,\n      \"name\": \"base-1\"\n    },\n    {\n      \"id\": 2,\n      \"name\": \"shared-2\"\n    },\n    {\n      \"id\": 3,\n      \"name\": \"shared-3\"\n    },\n    {\n      \"id\": 4,\n      \"name\": \"lighthouse\"\n    },\n    {\n      \"id\": 5,\n      \"name\": \"gate\"\n    },\n    {\n      \"id\": 7,\n      \"name\": \"dock-m7\"\n    },\n    {\n      \"id\": 8,\n      \"name\": \"dock-m8\"\n    },\n    {\n      \"id\": 9,\n      \"name\": \"tower\"\n    }\n  ],\n  \"meta\": {\n    \"name\": \"case-55\"\n  },\n  \"next_entity_id\": 10,\n  \"version\": 3\n}\n"
+    "head": "{\n  \"avatar\": {\n    \"model_entity\": 9\n  },\n  \"creations\": [\n    {\n      \"entities\": [9],\n      \"id\": 1,\n      \"name\": \"set-0\"\n    }\n  ],\n  \"entities\": [\n    {\n      \"id\": 1,\n      \"name\": \"base-1\"\n    },\n    {\n      \"id\": 2,\n      \"name\": \"shared-2\"\n    },\n    {\n      \"id\": 3,\n      \"name\": \"shared-3\"\n    },\n    {\n      \"id\": 4,\n      \"name\": \"lighthouse\"\n    },\n    {\n      \"id\": 5,\n      \"name\": \"gate\"\n    },\n    {\n      \"id\": 7,\n      \"name\": \"dock-m7\"\n    },\n    {\n      \"id\": 8,\n      \"name\": \"dock-m8\"\n    },\n    {\n      \"id\": 9,\n      \"name\": \"tower\"\n    }\n  ],\n  \"meta\": {\n    \"name\": \"case-55\"\n  },\n  \"next_entity_id\": 10,\n  \"version\": 3\n}\n"
   }
 }

@@ -98,7 +98,7 @@ const handwritten = [
       { revision: 1, ops: [
         { SpawnEntity: { entity: { id: 1, name: "branch-one" } } },
         { SpawnEntity: { entity: { id: 2, name: "branch-two" } } },
-        { ModifyWorld: { patch: { avatar: { model_entity: 1 }, creations: [{ name: "pair", entities: [1, 2] }] } } },
+        { ModifyWorld: { patch: { avatar: { model_entity: 1 }, creations: [{ id: 1, name: "pair", entities: [1, 2] }] } } },
       ] },
     ],
   },
@@ -254,7 +254,7 @@ function randomCase(seed) {
     if (branchSpawned.length > 0 && maybe(0.3)) {
       ops.push({ ModifyWorld: { patch: {
         avatar: { model_entity: pick(branchSpawned) },
-        creations: [{ name: `set-${b}`, entities: [...branchSpawned] }],
+        creations: [{ id: b + 1, name: `set-${b}`, entities: [...branchSpawned] }],
       } } });
     }
     if (maybe(0.25)) {
