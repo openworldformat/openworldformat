@@ -193,8 +193,8 @@ A merge appends the branch's entries to main, rewritten so they apply
 cleanly on main's head. The rewriting is deterministic — the same main
 head and the same branch entries always produce the same merged entries:
 
-1. **Fresh ids.** An id the branch spawned that the main line also
-   allocated is colliding. Colliding ids are reallocated in ascending
+1. **Fresh ids.** An id the branch spawned that the main line currently
+   holds is colliding. Colliding ids are reallocated in ascending
    order. Fresh ids start at main's **effective** `next_entity_id` — the
    fold already carries it: the larger of the declared value and one past
    every id main has ever held, deleted ones included — and count up,
