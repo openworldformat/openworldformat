@@ -1,6 +1,6 @@
 [package]
 name = "openworldformat"
-version = "0.3.3"
+version = "0.3.4"
 edition = "2024"
 license = "Apache-2.0"
 description = "The Open World Format Rust reference: the world document, the session fold (log, branches, state), and the ext-physics and ext-cinematography extensions — serde-only, no engine required."
