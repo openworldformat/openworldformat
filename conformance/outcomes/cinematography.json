@@ -1,0 +1,23 @@
+{
+  "comment": "Outcome assertions for conformance/cinematography.json — the ext-cinematography extension's conformance is math, not pixels: fold the world, derive, check predicates. Any implementation may run the same checks (js/src/cinematography.js runOutcomes does, in CI). Assertion kinds: fov {camera, hfov_degrees, vfov_degrees, aspect, tolerance} (the normative crop math of spec/extensions/cinematography.md, degrees); in_frame {camera, entity} (the entity's origin projects inside the frame, NDC |x|<=1 and |y|<=1, in front of the camera); out_of_frame {camera, entity} (it doesn't); shot_list [name, ...] (the cameras carrying a shot, ordered by shot.order then entity id).",
+  "world": "conformance/cinematography.json",
+  "expect": [
+    { "fov": { "camera": "1A", "hfov_degrees": 54.8172, "vfov_degrees": 24.4827, "aspect": 2.39, "tolerance": 0.001 } },
+    { "fov": { "camera": "2A", "hfov_degrees": 27.9538, "vfov_degrees": 21.1397, "aspect": 1.3339, "tolerance": 0.001 } },
+    { "fov": { "camera": "2B", "hfov_degrees": 27.9538, "vfov_degrees": 21.1397, "aspect": 1.3339, "tolerance": 0.001 } },
+    { "fov": { "camera": "3A", "hfov_degrees": 58.2765, "vfov_degrees": 26.259, "aspect": 2.39, "tolerance": 0.001 } },
+    { "fov": { "camera": "bts", "hfov_degrees": 39.1479, "vfov_degrees": 29.8526, "aspect": 1.3339, "tolerance": 0.001 } },
+    { "in_frame": { "camera": "1A", "entity": "maya" } },
+    { "in_frame": { "camera": "1A", "entity": "kai" } },
+    { "in_frame": { "camera": "2A", "entity": "maya" } },
+    { "in_frame": { "camera": "2B", "entity": "kai" } },
+    { "in_frame": { "camera": "3A", "entity": "maya" } },
+    { "in_frame": { "camera": "3A", "entity": "kai" } },
+    { "in_frame": { "camera": "bts", "entity": "counter" } },
+    { "out_of_frame": { "camera": "1A", "entity": "prop_bird" } },
+    { "out_of_frame": { "camera": "2A", "entity": "kai" } },
+    { "out_of_frame": { "camera": "2B", "entity": "maya" } },
+    { "out_of_frame": { "camera": "3A", "entity": "prop_bird" } },
+    { "shot_list": ["1A", "2A", "2B", "3A"] }
+  ]
+}

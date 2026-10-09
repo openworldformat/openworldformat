@@ -18,6 +18,7 @@ the same scene, within the tolerance the format's conventions allow
 | `triggers.json` | every trigger event and action |
 | `soundtrack.json` | soundtrack curves, modulations |
 | `physics.json` | the `ext-physics` extension, drawn at rest |
+| `cinematography.json` | a set with cameras and shots; the `ext-cinematography` extension's outcomes pair with it |
 
 `assets/textures/` holds the checker and grid textures `textures.json`
 references. Worlds referencing `assets/` are packages in miniature: the
@@ -29,7 +30,11 @@ that cannot be pixel-diffed. `outcomes/physics.json` pairs with
 rest (that is its conformance), while an engine claiming `ext-physics`
 passes the assertions — contact, rest, bounces — under simulation or
 scrubbed playback ([spec/extensions/physics.md](../spec/extensions/physics.md)).
-The reference solver runs them in CI (`npm test` in `js/`).
+`outcomes/cinematography.json` pairs with `cinematography.json` the
+same way: derived field of view, frame membership and the shot list,
+checked by math alone
+([spec/extensions/cinematography.md](../spec/extensions/cinematography.md)).
+The reference solvers run them in CI (`npm test` in `js/`).
 
 Each world is a complete `manifest.json` — also valid base worlds for
 session tests. License: Apache-2.0, from the LocalGPT conformance suite.
