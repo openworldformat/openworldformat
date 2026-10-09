@@ -437,20 +437,34 @@ pub struct MergedBranch {
     pub remapped: std::collections::BTreeMap<u64, u64>,
 }
 
-/// Merge a branch's entries into a main line: scan the incoming branch
-/// for entity ids allocated concurrently on the main branch, reallocate
-/// them, and rewrite every reference to them inside the incoming batch
-/// before appending (spec/session.md — "the merge authority must handle
-/// ID collisions").
+/// Merge a branch's entries into a main line, by the spec's exact rules
+/// (spec/session.md, "The merge rules, exactly"): scan the incoming
+/// branch for entity ids allocated concurrently on the main branch,
+/// reallocate them, and rewrite every reference to them inside the
+/// incoming batch before appending.
 ///
-/// An id the branch *spawns* that the main document already holds
-/// collides; references to ids the branch only *uses* (a modify of an
-/// entity both lines share) are left alone. New ids come from the main
-/// document's `next_id`, stepping past everything either line holds.
-/// Names are ids' problem here, not the merge's: two branches that
-/// spawn the same *name* still collide on apply, and the caller
-/// pre-renames — collision handling is the checklist's line, and this
-/// is where it's drawn.
+/// An id the branch *spawns* (a `SpawnEntity`, inside a `Batch`
+/// included) that the main document currently holds collides;
+/// references to ids the branch only *uses* (a modify of an entity both
+/// lines share) are left alone. Colliding ids are reallocated in
+/// ascending order onto fresh ids from the main document's effective
+/// `next_entity_id` — [`WorldDoc::next_id`], the floor that keeps spent
+/// ids spent — stepping past every id the branch spawns, never past the
+/// 2^53-1 ceiling. Every entity reference in the merged entries is
+/// rewritten through the remap: `SpawnEntity`'s `entity.id`,
+/// `entity.parent` and numeric behavior refs; `ModifyEntity`'s `id`,
+/// `patch.parent` and numeric behavior refs; `DeleteEntity`'s `id`;
+/// `Batch` recursively; `ModifyWorld`'s `patch.avatar.model_entity`
+/// (when numeric) and `patch.creations[].entities[]`.
+///
+/// Name collisions get the spec's suffix: a branch spawn whose name is
+/// taken — by main, or by an earlier spawn in the same merge — is
+/// renamed `<name>-<n>`, `n` from 2 up, first unused. Only the
+/// `SpawnEntity` changes; string references elsewhere are names, not
+/// ids, and are left alone.
+///
+/// The merged entries keep their `id`, `parent`, `author` and `message`
+/// — an entry's identity survives the merge.
 pub fn merge_branch(main: &WorldDoc, entries: &[OpLogEntry]) -> Result<MergedBranch, ApplyError> {
     // Pass 1: what the branch spawns, and which of those ids the main
     // line already holds.
@@ -490,8 +504,9 @@ pub fn merge_branch(main: &WorldDoc, entries: &[OpLogEntry]) -> Result<MergedBra
         next += 1;
     }
 
-    // Pass 3: rewrite every reference to a remapped id.
-    let rewritten = entries
+    // Pass 3: rewrite every reference to a remapped id, then rename the
+    // spawns whose names main (or an earlier spawn in this merge) took.
+    let mut rewritten: Vec<OpLogEntry> = entries
         .iter()
         .map(|entry| OpLogEntry {
             revision: entry.revision,
@@ -504,9 +519,10 @@ pub fn merge_branch(main: &WorldDoc, entries: &[OpLogEntry]) -> Result<MergedBra
             timestamp_ms: entry.timestamp_ms,
             id: entry.id.clone(),
             parent: entry.parent.clone(),
-            message: None,
+            message: entry.message.clone(),
         })
         .collect();
+    rename_colliding_spawns(main, &mut rewritten);
     Ok(MergedBranch {
         entries: rewritten,
         remapped,
@@ -590,7 +606,64 @@ fn rewrite_edit(op: EditOp, remapped: &std::collections::BTreeMap<u64, u64>) -> 
                 .map(|op| rewrite_edit(op, remapped))
                 .collect(),
         },
+        EditOp::ModifyWorld { mut patch } => {
+            if let Some(Some(avatar)) = &mut patch.avatar
+                && let Some(model) = &mut avatar.model_entity
+            {
+                map_ref(model);
+            }
+            if let Some(creations) = &mut patch.creations {
+                for creation in creations {
+                    for id in creation.entities.iter_mut() {
+                        map_id(id);
+                    }
+                }
+            }
+            EditOp::ModifyWorld { patch }
+        }
         other => other,
+    }
+}
+
+/// The spec's name rule: a spawned name that is taken — by main, or by
+/// an earlier spawn in the same merge — becomes `<name>-<n>`, `n` from
+/// 2 up, first unused. Only the `SpawnEntity` changes; string
+/// references elsewhere are names, not ids, and ride. In place on the
+/// merged entries.
+fn rename_colliding_spawns(main: &WorldDoc, entries: &mut [OpLogEntry]) {
+    let mut taken: std::collections::HashSet<String> = main
+        .entities()
+        .map(|e| e.name.0.clone())
+        .collect();
+    for entry in entries {
+        for op in &mut entry.ops {
+            if let SessionOp::Edit(edit) = op {
+                rename_spawn_ops(edit, &mut taken);
+            }
+        }
+    }
+}
+
+/// One edit's spawns renamed against `taken`, a `Batch` recursively.
+fn rename_spawn_ops(op: &mut EditOp, taken: &mut std::collections::HashSet<String>) {
+    match op {
+        EditOp::SpawnEntity { entity } => {
+            if taken.contains(entity.name.as_str()) {
+                let base = entity.name.0.clone();
+                let mut n = 2;
+                while taken.contains(&format!("{base}-{n}")) {
+                    n += 1;
+                }
+                entity.name = crate::identity::EntityName::new(format!("{base}-{n}"));
+            }
+            taken.insert(entity.name.0.clone());
+        }
+        EditOp::Batch { ops } => {
+            for op in ops {
+                rename_spawn_ops(op, taken);
+            }
+        }
+        _ => {}
     }
 }
 
@@ -922,6 +995,80 @@ mod tests {
             }
             other => panic!("unexpected behavior {other:?}"),
         }
+    }
+
+    #[test]
+    fn merging_keeps_entry_identity_rewrites_world_refs_and_renames_taken_names() {
+        // Main holds id 1 (a "lighthouse") and an id it deleted (2 —
+        // spent). The branch collides on the id, references it from a
+        // ModifyWorld, and mints the name again: the merge moves the id
+        // past the spent floor, rewrites the world refs, suffixes the
+        // name, and keeps the entry's message and author.
+        let mut main = WorldDoc::new("main");
+        main.apply(&wt::EditOp::spawn(entity(1, "lighthouse"))).unwrap();
+        main.apply(&wt::EditOp::spawn(entity(2, "gone"))).unwrap();
+        main.apply(&wt::EditOp::delete(wt::EntityId(2))).unwrap();
+        assert_eq!(main.next_id(), 3, "a deleted id stays spent");
+
+        let branch = vec![OpLogEntry {
+            revision: 1,
+            author: Author {
+                peer: None,
+                name: "branch".into(),
+            },
+            ops: vec![
+                SessionOp::Edit(Box::new(wt::EditOp::spawn(entity(1, "lighthouse")))),
+                SessionOp::Edit(Box::new(wt::EditOp::ModifyWorld {
+                    patch: Box::new(crate::world_patch::WorldPatch {
+                        avatar: Some(Some(crate::avatar::AvatarDef {
+                            model_entity: Some(crate::identity::EntityRef::id(1)),
+                            ..Default::default()
+                        })),
+                        creations: Some(vec![crate::creation::CreationDef {
+                            id: wt::CreationId(9),
+                            name: "pair".into(),
+                            semantic_category: None,
+                            bbox_half: [0.0; 3],
+                            entities: vec![wt::EntityId(1)],
+                            parts: Vec::new(),
+                        }]),
+                        ..Default::default()
+                    }),
+                })),
+            ],
+            timestamp_ms: 1,
+            id: Some("b1".into()),
+            parent: None,
+            message: Some("a second lighthouse".into()),
+        }];
+
+        let merged = merge_branch(&main, &branch).unwrap();
+        assert_eq!(
+            merged.remapped.iter().collect::<Vec<_>>(),
+            vec![(&1, &3)],
+            "the fresh id comes from the spent-aware floor"
+        );
+        let entry = &merged.entries[0];
+        assert_eq!(entry.message.as_deref(), Some("a second lighthouse"));
+        assert_eq!(entry.author.name, "branch");
+        assert_eq!(entry.id.as_deref(), Some("b1"));
+
+        let doc = fold_log(&main, &merged.entries).unwrap();
+        assert!(
+            doc.get_by_name("lighthouse-2").is_some(),
+            "the taken name is suffixed, first unused n"
+        );
+        let avatar = doc.avatar.as_ref().unwrap();
+        assert_eq!(
+            avatar.model_entity,
+            Some(crate::identity::EntityRef::id(3)),
+            "avatar.model_entity is an entity id: rewritten"
+        );
+        assert_eq!(
+            doc.creations[0].entities,
+            vec![wt::EntityId(3)],
+            "creations[].entities are entity ids: rewritten"
+        );
     }
 
     #[test]

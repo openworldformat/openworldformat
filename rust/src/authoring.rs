@@ -16,8 +16,12 @@
 //! 3. **Read strictly** — no key the format would drop.
 //! 4. **Apply** — to the trial.
 //!
-//! Then the world the batch makes must validate. Any failure refuses the
-//! whole batch. Asset files are the host's: the crate does no I/O.
+//! A structural failure at any step refuses the whole batch. The world
+//! the batch makes is then validated: budget limits (an entity's extent,
+//! a chunk's entity or triangle count, an entity's behavior or
+//! modulation count) are this authority's policy, not the format's, so
+//! they come back on the result as warnings and never refuse a batch.
+//! Asset files are the host's: the crate does no I/O.
 
 use std::collections::BTreeMap;
 
@@ -25,7 +29,7 @@ use serde_json::{Value, json};
 
 use crate::doc::WorldDoc;
 use crate::history::EditOp;
-use crate::validation::{Severity, WorldLimits, validate_manifest};
+use crate::validation::{WorldLimits, validate_manifest};
 
 /// A batch the world can take.
 #[derive(Debug, Clone)]
@@ -40,8 +44,7 @@ pub struct Ingested {
     pub warnings: Vec<String>,
 }
 
-/// A batch refused whole; one reason per failing op (`op 2: …`), then
-/// any reasons about the world it would have made.
+/// A batch refused whole; one reason per failing op (`op 2: …`).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Refused {
     pub errors: Vec<String>,
@@ -88,15 +91,11 @@ pub fn ingest(doc: &WorldDoc, batch: &Value) -> Result<Ingested, Refused> {
     }
     let mut warnings = Vec::new();
     for issue in validate_manifest(&state.trial.to_manifest(), &WorldLimits::default()) {
-        match issue.severity {
-            Severity::Error => {
-                errors.push(format!("the world after this batch: {}", issue.message))
-            }
-            Severity::Warning => warnings.push(issue.message),
-        }
-    }
-    if !errors.is_empty() {
-        return Err(Refused { errors });
+        // Budget limits are this authority's policy, not the format's:
+        // they are reported to the author, and never refuse a batch
+        // (spec/session.md, "Authoring"). Structural failures already
+        // refused above — at bind, at the strict read, or at apply.
+        warnings.push(issue.message);
     }
     Ok(Ingested {
         ops: committed,
@@ -388,16 +387,21 @@ mod tests {
     }
 
     #[test]
-    fn a_world_that_would_not_validate_is_refused() {
-        let refused = ingest(
+    fn a_world_over_budget_commits_with_warnings_never_a_refusal() {
+        // The 500 m slab breaks the extent limit, but budget limits are
+        // the authority's policy: the batch commits and the author hears
+        // about it as a warning (spec/session.md, "Authoring").
+        let done = ingest(
             &yard(),
             &json!([{"SpawnEntity": {"entity": {"name": "wall",
                 "shape": {"Cuboid": {"x": 1e6, "y": 1.0, "z": 1.0}}}}}]),
         )
-        .unwrap_err();
+        .unwrap();
+        assert!(done.doc.get_by_name("wall").is_some());
         assert!(
-            refused.errors[0].starts_with("the world after this batch:"),
-            "{refused}"
+            done.warnings.iter().any(|w| w.contains("exceeds limit")),
+            "{:?}",
+            done.warnings
         );
     }
 
