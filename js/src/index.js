@@ -1292,27 +1292,50 @@ function remapOp(op, remapped) {
     }
     case "Batch":
       return { Batch: { ops: (c.value.ops ?? []).map((/** @type {any} */ o) => remapOp(o, remapped)) } };
+    case "ModifyWorld": {
+      const value = structuredClone(c.value);
+      const patch = value.patch;
+      if (patch && typeof patch === "object") {
+        const modelEntity = patch.avatar?.model_entity;
+        if (typeof modelEntity === "number") patch.avatar.model_entity = remap(modelEntity);
+        if (Array.isArray(patch.creations)) {
+          for (const creation of patch.creations) {
+            if (creation === null || typeof creation !== "object") continue;
+            if (Array.isArray(creation.entities)) {
+              creation.entities = creation.entities.map((/** @type {any} */ id) => (typeof id === "number" ? remap(id) : id));
+            }
+          }
+        }
+      }
+      return { ModifyWorld: value };
+    }
     default:
-      return structuredClone(op); // the scene-wide edits carry no entity ids
+      return structuredClone(op); // the remaining scene-wide edits carry no entity ids
   }
 }
 
 /**
  * Merge a branch onto a head — the pass the merge authority runs
- * (spec/session.md): ids the branch spawned that the main branch
- * concurrently allocated MUST be reallocated and every reference to
- * them inside the merged batch rewritten. This scans the branch for
- * spawned ids, remaps the colliding ones onto fresh ids past the main
- * head (skipping what either branch already uses, never past the id
- * ceiling), and rewrites the entries through that map — new deep
- * copies, the inputs untouched: `SpawnEntity.entity.id` and `.parent`,
- * `ModifyEntity.id` and `patch.parent`, `DeleteEntity.id`, and the
- * numeric behavior refs (`Orbit.center`, `LookAt.target`). History ops
- * ride untouched.
+ * (spec/session.md "The merge rules, exactly"): ids the branch spawned
+ * that the main branch currently holds MUST be reallocated and every
+ * reference to them inside the merged batch rewritten. This scans the
+ * branch for spawned ids, remaps the colliding ones — in ascending
+ * order — onto fresh ids from the main fold's effective
+ * `next_entity_id` (the floor that keeps spent ids spent), skipping
+ * every id the branch spawns, and rewrites the entries through that
+ * map — new deep copies, the inputs untouched: `SpawnEntity.entity.id`
+ * and `.parent`, `ModifyEntity.id` and `patch.parent`, `DeleteEntity.id`,
+ * `ModifyWorld`'s `patch.avatar.model_entity` and
+ * `patch.creations[].entities[]`, and the numeric behavior refs
+ * (`Orbit.center`, `LookAt.target`). History ops ride untouched.
  *
- * Name collisions are NOT remapped — the merge contract scopes to ids —
- * so merged entries still refuse on apply when both branches spawned
- * the same name; the caller pre-renames.
+ * Name collisions get the spec's suffix: a branch spawn whose name is
+ * taken — by main, or by an earlier spawn in the same merge — is
+ * renamed `<name>-<n>`, `n` from 2 up, first unused. Only the
+ * `SpawnEntity` changes; references are ids by then.
+ *
+ * The returned entries are plain content — the parser's `classified`
+ * annotation is this reader's, not the log's, and never rides out.
  *
  * @param {FoldState} state the main branch's fold at its head
  * @param {LogEntry[]} entries the branch's parsed log entries, to append
@@ -1325,14 +1348,15 @@ export function mergeBranch(state, entries) {
   const spawned = new Set();
   for (const entry of entries) collectSpawned(entry.ops ?? [], spawned);
 
-  // Fresh ids for the collisions: past the main head, skipping what the
-  // main branch and the branch already use — and never past the ceiling.
+  // Fresh ids for the collisions, reallocated in ascending order: from
+  // the main fold's floor (an id main deleted stays spent), skipping
+  // what the branch spawns — and never past the ceiling.
   /** @type {Map<number, number>} */
   const remapped = new Map();
-  let next = state.byId.size ? Math.max(...state.byId.keys()) + 1 : 1;
-  for (const id of spawned) {
+  let next = state.scene.next_entity_id;
+  for (const id of [...spawned].sort((a, b) => a - b)) {
     if (!state.byId.has(id)) continue; // no collision, no remap
-    while (state.byId.has(next) || spawned.has(next)) next += 1;
+    while (spawned.has(next)) next += 1;
     if (next > MAX_ENTITY_ID) {
       throw invalid(`merge ran out of entity ids below the ceiling ${MAX_ENTITY_ID} (2^53-1)`);
     }
@@ -1343,11 +1367,42 @@ export function mergeBranch(state, entries) {
   const rewritten = entries.map((entry) => {
     const ops = (entry.ops ?? []).map((/** @type {any} */ op) => remapOp(op, remapped));
     const out = structuredClone({ ...entry });
+    delete out.classified; // this reader's annotation, not content
     out.ops = ops;
-    out.classified = ops.map(classifyOp);
     return out;
   });
+  renameCollidingSpawns(state, rewritten);
   return { entries: rewritten, remapped };
+}
+
+/** The spec's name rule: a spawned name that is taken — by main, or by
+ *  an earlier spawn in the same merge — becomes `<name>-<n>`, `n` from 2
+ *  up, first unused. In place on the rewritten entries.
+ *  @param {FoldState} state @param {LogEntry[]} entries */
+function renameCollidingSpawns(state, entries) {
+  /** @type {Set<string>} */
+  const taken = new Set(state.names);
+  const renameOps = (/** @type {any[]} */ ops) => {
+    for (const op of ops) {
+      const c = classifyOp(op);
+      if (c.kind !== "edit") continue;
+      if (c.edit === "Batch") {
+        renameOps(c.value.ops ?? []);
+      } else if (c.edit === "SpawnEntity") {
+        const entity = c.value.entity;
+        if (entity === null || typeof entity !== "object" || typeof entity.name !== "string") continue;
+        if (!taken.has(entity.name)) {
+          taken.add(entity.name);
+          continue;
+        }
+        let n = 2;
+        while (taken.has(`${entity.name}-${n}`)) n += 1;
+        entity.name = `${entity.name}-${n}`;
+        taken.add(entity.name);
+      }
+    }
+  };
+  for (const entry of entries) renameOps(entry.ops ?? []);
 }
 
 // ---------------------------------------------------------------------------

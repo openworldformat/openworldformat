@@ -263,6 +263,102 @@ test("mergeBranch never allocates past the id ceiling", () => {
   assert.throws(() => mergeBranch(state, branch), /ceiling/);
 });
 
+test("mergeBranch keeps spent ids spent — fresh ids come from the fold's floor", () => {
+  const manifest = { version: 3, meta: { name: "t" }, entities: [] };
+  // Main spawns 101 and 102, then deletes 102: the id is spent, and the
+  // effective next_entity_id is 103.
+  const main = [
+    line(1, [
+      { SpawnEntity: { entity: { id: 101, name: "a" } } },
+      { SpawnEntity: { entity: { id: 102, name: "b" } } },
+    ]),
+    line(2, [{ DeleteEntity: { id: 102 } }]),
+  ];
+  const state = foldLog(manifest, main);
+  const branch = [line(3, [{ SpawnEntity: { entity: { id: 101, name: "branch-a" } } }])];
+
+  const { entries: rewritten, remapped } = mergeBranch(state, branch);
+  assert.deepEqual([...remapped], [[101, 103]]);
+  assert.equal(rewritten[0].ops[0].SpawnEntity.entity.id, 103);
+
+  const merged = foldLog(manifest, [...main, ...rewritten]);
+  assert.ok(merged.entities.some((e) => e.id === 101 && e.name === "a"));
+  assert.ok(merged.entities.some((e) => e.id === 103 && e.name === "branch-a"));
+  assert.equal(merged.scene.next_entity_id, 104);
+});
+
+test("mergeBranch rewrites ModifyWorld's avatar and creations refs", () => {
+  const manifest = { version: 3, meta: { name: "t" }, entities: [] };
+  const main = [line(1, [{ SpawnEntity: { entity: { id: 1, name: "main-one" } } }])];
+  const state = foldLog(manifest, main);
+  const branch = [line(2, [
+    { SpawnEntity: { entity: { id: 1, name: "branch-one" } } },
+    { SpawnEntity: { entity: { id: 2, name: "branch-two" } } },
+    { ModifyWorld: { patch: { avatar: { model_entity: 1 }, creations: [{ name: "pair", entities: [1, 2, "main-one"] }] } } },
+  ])];
+
+  const { entries: rewritten, remapped } = mergeBranch(state, branch);
+  assert.deepEqual([...remapped], [[1, 3]]);
+  const patch = rewritten[0].ops[2].ModifyWorld.patch;
+  assert.equal(patch.avatar.model_entity, 3);
+  assert.deepEqual(patch.creations[0].entities, [3, 2, "main-one"]); // names ride
+
+  const merged = foldLog(manifest, [...main, ...rewritten]);
+  assert.equal(merged.scene.avatar.model_entity, 3);
+  assert.deepEqual(merged.scene.creations[0].entities, [3, 2, "main-one"]); // the fold carries names here
+});
+
+test("mergeBranch renames a spawn whose name is taken, `<name>-<n>` from 2 up", () => {
+  const manifest = { version: 3, meta: { name: "t" }, entities: [] };
+  const main = [line(1, [
+    { SpawnEntity: { entity: { id: 1, name: "lighthouse" } } },
+    { SpawnEntity: { entity: { id: 2, name: "lighthouse-2" } } },
+  ])];
+  const state = foldLog(manifest, main);
+  // Two branch spawns of one taken name: first unused suffix each time,
+  // and the id remap still applies.
+  const branch = [line(2, [
+    { SpawnEntity: { entity: { id: 1, name: "lighthouse" } } },
+    { SpawnEntity: { entity: { id: 3, name: "lighthouse" } } },
+    { SpawnEntity: { entity: { id: 4, name: "keeper" } } },
+  ])];
+
+  const { entries: rewritten, remapped } = mergeBranch(state, branch);
+  assert.deepEqual([...remapped], [[1, 5]]);
+  const [first, second, third] = rewritten[0].ops;
+  assert.equal(first.SpawnEntity.entity.name, "lighthouse-3"); // -2 is taken too
+  assert.equal(second.SpawnEntity.entity.name, "lighthouse-4");
+  assert.equal(third.SpawnEntity.entity.name, "keeper"); // free names keep
+
+  const merged = foldLog(manifest, [...main, ...rewritten]);
+  for (const name of ["lighthouse", "lighthouse-2", "lighthouse-3", "lighthouse-4", "keeper"]) {
+    assert.ok(merged.names.has(name), `merged world holds ${name}`);
+  }
+});
+
+test("mergeBranch remaps a spawn inside a Batch, and returns no classified", () => {
+  const manifest = { version: 3, meta: { name: "t" }, entities: [] };
+  const main = [line(1, [{ SpawnEntity: { entity: { id: 1, name: "main-one" } } }])];
+  const state = foldLog(manifest, main);
+  const branch = [line(2, [
+    { Batch: { ops: [
+      { SpawnEntity: { entity: { id: 1, name: "batched" } } },
+      { ModifyEntity: { id: 1, patch: { parent: null } } },
+    ] } },
+  ])];
+
+  const { entries: rewritten, remapped } = mergeBranch(state, branch);
+  assert.deepEqual([...remapped], [[1, 2]]);
+  const [spawn, modify] = rewritten[0].ops[0].Batch.ops;
+  assert.equal(spawn.SpawnEntity.entity.id, 2);
+  assert.equal(modify.ModifyEntity.id, 2);
+  assert.equal(rewritten[0].classified, undefined);
+  assert.ok(!("classified" in rewritten[0]));
+
+  const merged = foldLog(manifest, [...main, ...rewritten]);
+  assert.ok(merged.entities.some((e) => e.id === 2 && e.name === "batched"));
+});
+
 // ---------------------------------------------------------------------------
 // Strict mode (spec/profiles.md "Strict Mode for Authoring")
 // ---------------------------------------------------------------------------
