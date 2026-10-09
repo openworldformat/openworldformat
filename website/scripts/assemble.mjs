@@ -30,7 +30,8 @@ await cp(
   path.join(root, 'static/conformance/hello-world.json'),
 );
 
-// The reference renderer.
+// The reference renderer, and the extension module it imports.
 await cp(path.join(repo, 'js/src/render.js'), path.join(root, 'static/viewer/world-viewer.js'));
+await cp(path.join(repo, 'js/src/cinematography.js'), path.join(root, 'static/viewer/cinematography.js'));
 
 console.log(`assembled ${worlds.length} conformance worlds, the example manifest, and the renderer`);

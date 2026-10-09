@@ -41,6 +41,7 @@
       <option value="conformance/hierarchy_tours.json">Hierarchy &amp; tour</option>
       <option value="conformance/soundtrack.json">Soundtrack &amp; modulation</option>
       <option value="conformance/physics.json">Physics (at rest)</option>
+      <option value="conformance/cinematography.json">Cinematography (the set)</option>
       <option value="conformance/hello-world.json">hello-world (the example package)</option>
     </select>
     <span id="title"></span>
@@ -86,12 +87,14 @@
           tourButton: document.getElementById('tour-btn'),
           audioButton: document.getElementById('audio-btn'),
           tourCaption: document.getElementById('caption'),
+          shot: params.get('shot') || undefined, // world.html?shot=12A looks through that shot's camera
         });
         window.owfViewer = viewer; // for the headless render check
         const info = viewer.sceneInfo();
         document.getElementById('title').textContent = manifest.meta?.name ?? src;
         document.getElementById('meta').textContent =
-          `schema ${manifest.version} · ${info.entityCount} entities`;
+          `schema ${manifest.version} · ${info.entityCount} entities` +
+          (info.shot ? ` · through shot ${info.shot}` : (info.shots?.length ? ` · shots: ${info.shots.map((s) => s.name).join(', ')} (add ?shot=NAME)` : ''));
         document.getElementById('download').href = src;
         show(null);
       } catch (e) {

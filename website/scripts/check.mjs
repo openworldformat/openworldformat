@@ -70,6 +70,36 @@ for (const world of worlds) {
   for (const error of errors) console.log(`      ${error.slice(0, 300)}`);
 }
 
+// The shot view (ext-cinematography): world.html?shot= looks through
+// that camera, letterboxed to its frame — the render check covers the
+// renderer half of the extension.
+{
+  errors.length = 0;
+  await page.goto(`${base}/world.html?src=conformance/cinematography.json&shot=1A`, { waitUntil: 'load' });
+  let info = null;
+  try {
+    await page.waitForFunction(
+      () => window.owfViewer && window.owfViewer.sceneInfo().entityCount > 0,
+      null, { timeout: 15000 },
+    );
+    info = await page.evaluate(() => window.owfViewer.sceneInfo());
+  } catch {
+    // Reported through `info` below.
+  }
+  const canvas = await page.evaluate(() => {
+    const c = document.querySelector('#scene canvas');
+    // Letterboxed to 1A's 2.39 frame: narrower than the viewport's aspect.
+    return Boolean(c) && c.style.width.endsWith('px') && parseFloat(c.style.width) / parseFloat(c.style.height) > 2;
+  });
+  const ok = Boolean(info) && info?.shot === '1A' && canvas && errors.length === 0;
+  if (!ok) failed += 1;
+  console.log(
+    `${ok ? 'ok  ' : 'FAIL'} cinematography.json?shot=1A: shot=${info?.shot ?? 'none'}`
+    + ` letterboxed=${canvas} errors=${errors.length}`,
+  );
+  for (const error of errors) console.log(`      ${error.slice(0, 300)}`);
+}
+
 await browser.close();
 server.close();
 if (failed) {
