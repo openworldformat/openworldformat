@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "openworldformat"
-version = "0.4.1"
+version = "0.4.2"
 description = "The Open World Format research package: parse and fold a .world in pure Python, no engine required."
 readme = "README.md"
 requires-python = ">=3.10"
