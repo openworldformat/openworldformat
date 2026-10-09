@@ -17,6 +17,10 @@
     "./physics": {
       "types": "./dist/physics.d.ts",
       "default": "./src/physics.js"
+    },
+    "./cinematography": {
+      "types": "./dist/cinematography.d.ts",
+      "default": "./src/cinematography.js"
     }
   },
   "files": [
