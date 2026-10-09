@@ -226,6 +226,9 @@ notebooks.
 `openworldformat.physics` mirrors the npm package's
 `openworldformat/physics`: `collect_physics`, `simulate_physics`,
 `fold_trajectories`, `trajectory_op`, `run_outcomes`.
+`openworldformat.cinematography` mirrors
+`openworldformat/cinematography`: `camera_of`, `frame_of`, `view_of`,
+`project`, `shot_list`, `run_outcomes`.
 `openworldformat.soundtrack` holds the soundtrack curves — `curve_at`,
 `beat_at`, `section_at`, `modulation_factor` — as plain functions over
 plain numbers, for analysis rather than playback.
