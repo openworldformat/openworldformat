@@ -2,10 +2,12 @@
 // the branch spawned that main allocated concurrently are
 // reallocated, and every reference to them inside the merged batch is
 // rewritten — numeric behavior refs included, name refs left alone
-// (they bind at ingestion, against the merged fold-so-far). Spec:
-// spec/session.md "Entry identity, forks and branches", and
-// spec/rfcs/branching-histories.md. Name collisions are out of scope
-// here: the caller pre-renames.
+// (they bind at ingestion, against the merged fold-so-far). Name
+// collisions get the spec's suffix: a spawned name that is taken — by
+// main, or by an earlier spawn in the same merge — becomes
+// `<name>-<n>`. Spec: spec/session.md "Entry identity, forks and
+// branches" ("The merge rules, exactly"), and
+// spec/rfcs/branching-histories.md.
 
 package org.openworldformat
 
@@ -24,12 +26,19 @@ data class MergeBranchResult(
 
 /**
  * Rewrite a branch's entries for merging into [state]: spawn ids that
- * collide with the fold's are reallocated from `max(state ids) + 1`
- * (or 1), skipping main's ids, the branch's own spawned ids and
- * earlier remaps — never past [MAX_ENTITY_ID] — and every reference to
- * a remapped id is rewritten with them: `SpawnEntity.entity.id`,
- * `.parent`, `ModifyEntity.id`, `patch.parent`, `DeleteEntity.id` and
- * numeric behavior refs. String refs and history ops ride untouched.
+ * collide with the fold's are reallocated in ascending order from the
+ * fold's effective `next_entity_id` — the floor the fold carries so an
+ * id main deleted stays spent — skipping every id the branch spawns,
+ * never past [MAX_ENTITY_ID]; and every reference to a remapped id is
+ * rewritten with it: `SpawnEntity.entity.id`, `.parent`,
+ * `ModifyEntity.id`, `patch.parent`, `DeleteEntity.id`,
+ * `ModifyWorld.patch.avatar.model_entity` and
+ * `patch.creations[].entities[]`, `Batch` recursively, and the numeric
+ * behavior refs (`Orbit.center`, `LookAt.target`). String refs and
+ * history ops ride untouched. A spawned name already taken — by main,
+ * or by an earlier spawn in the same merge — is renamed `<name>-<n>`,
+ * `n` from 2 up, first unused. Merged entries keep their id, parent,
+ * author and message: an entry's identity survives the merge.
  *
  * @throws [WorldFormatException] when fresh ids run out below the
  *   ceiling.
@@ -47,17 +56,20 @@ fun mergeBranch(state: FoldState, entries: List<LogEntry>): MergeBranchResult {
     }
     entries.forEach { entry -> entry.ops.forEach(::scan) }
 
-    val mainIds = state.entities.mapTo(mutableSetOf()) { it.id }
-    val collisions = spawned.filter { it in mainIds }.sorted()
-
-    // Fresh ids, skipping everything already spoken for. (Held as
-    // Longs so the walk can run itself out past the ceiling.)
-    val taken = (mainIds.asSequence() + spawned.asSequence()).mapTo(mutableSetOf()) { it.toLong() }
-    val remappedIds = mutableSetOf<Long>()
-    var next = ((mainIds.maxOrNull() ?: 0).toLong()) + 1L
+    // Fresh ids for the collisions, reallocated in ascending order:
+    // from the main fold's floor (an id main deleted stays spent),
+    // skipping what the branch spawns — and never past the ceiling.
+    // The walk runs as a Long so the ceiling check can bite instead of
+    // overflowing; the floor itself is the scene's, with one past the
+    // largest live id as the guard for the Int edge.
+    val live = state.entities.mapTo(mutableSetOf()) { it.id }
+    val sceneFloor = plainInt(state.scene["next_entity_id"])?.toLong() ?: 1L
+    var next = maxOf(sceneFloor, (live.maxOrNull()?.toLong() ?: 0L) + 1L)
+    val spawnedLong = spawned.mapTo(HashSet()) { it.toLong() }
     val remap = LinkedHashMap<Int, Int>()
-    for (old in collisions) {
-        while (next in taken || next in remappedIds) next += 1L
+    for (old in spawned.sorted()) {
+        if (old !in live) continue  // no collision, no remap
+        while (next in spawnedLong) next += 1L
         // The ceiling the five references share; ids here are Int, so
         // the Int bound bites first in any world this surface reads.
         if (next > MAX_ENTITY_ID || next > Int.MAX_VALUE) {
@@ -65,15 +77,18 @@ fun mergeBranch(state: FoldState, entries: List<LogEntry>): MergeBranchResult {
                 "merge ran out of entity ids below the ceiling $MAX_ENTITY_ID (2^53-1)")
         }
         remap[old] = next.toInt()
-        remappedIds.add(next)
+        next += 1L
     }
 
+    // The name rule's ledger: main's names, plus every name the merged
+    // spawns mint as they mint it.
+    val takenNames = state.entities.mapTo(HashSet()) { it.name }
     val rewritten = entries.map { entry ->
         LogEntry(
             revision = entry.revision,
             author = entry.author,
             timestampMs = entry.timestampMs,
-            ops = entry.ops.map { rewriteMergeOp(it, remap) },
+            ops = entry.ops.map { renameCollidingSpawns(takenNames, rewriteMergeOp(it, remap)) },
             id = entry.id,
             parent = entry.parent,
             message = entry.message,
@@ -113,7 +128,67 @@ private fun rewriteMergeOp(op: JsonElement, remap: Map<Int, Int>): JsonElement {
             remappedId(obj["id"])?.let { fresh -> fields["id"] = JsonPrimitive(fresh) }
             return singleKey("DeleteEntity", fields)
         }
+        "Batch" -> {
+            val ops = obj["ops"]?.arr ?: return op
+            return singleKey("Batch", mapOf("ops" to JsonArray(ops.map { rewriteMergeOp(it, remap) })))
+        }
+        "ModifyWorld" -> {
+            val fields = obj.toMutableMap()
+            obj["patch"]?.obj?.let { patch ->
+                val rewritten = patch.toMutableMap()
+                // `patch.avatar.model_entity`, when it is an id — a
+                // string there is a name, and names ride.
+                patch["avatar"]?.obj?.let { avatar ->
+                    remappedId(avatar["model_entity"])?.let { fresh ->
+                        rewritten["avatar"] = JsonObject(avatar + ("model_entity" to JsonPrimitive(fresh)))
+                    }
+                }
+                // `patch.creations[].entities[]`: numeric elements are
+                // ids and rewrite; string elements are names and ride.
+                patch["creations"]?.arr?.let { creations ->
+                    rewritten["creations"] = JsonArray(creations.map { creation ->
+                        val c = creation.obj ?: return@map creation
+                        val entities = c["entities"]?.arr ?: return@map creation
+                        JsonObject(c + ("entities" to JsonArray(entities.map { id ->
+                            remappedId(id)?.let(::JsonPrimitive) ?: id
+                        })))
+                    })
+                }
+                fields["patch"] = JsonObject(rewritten)
+            }
+            return singleKey("ModifyWorld", fields)
+        }
         else -> return op
+    }
+}
+
+/**
+ * The spec's name rule, in place on the way out: a spawned name that
+ * is taken — by main, or by an earlier spawn in the same merge —
+ * becomes `<name>-<n>`, `n` from 2 up, first unused. Only the
+ * `SpawnEntity` changes; references are ids by then, so a rename
+ * breaks nothing in the log.
+ */
+private fun renameCollidingSpawns(taken: MutableSet<String>, op: JsonElement): JsonElement {
+    val classified = classifyOp(op)
+    if (classified !is ClassifiedOp.Edit) return op
+    val obj = classified.value.obj ?: return op
+    return when (classified.name) {
+        "SpawnEntity" -> {
+            val entity = obj["entity"]?.obj ?: return op
+            val name = entity["name"]?.str ?: return op
+            if (taken.add(name)) return op  // first use keeps its name
+            var n = 2
+            while ("$name-$n" in taken) n += 1
+            val fresh = "$name-$n"
+            taken.add(fresh)
+            singleKey("SpawnEntity", mapOf("entity" to JsonObject(entity + ("name" to JsonPrimitive(fresh)))))
+        }
+        "Batch" -> {
+            val ops = obj["ops"]?.arr ?: return op
+            singleKey("Batch", mapOf("ops" to JsonArray(ops.map { renameCollidingSpawns(taken, it) })))
+        }
+        else -> op
     }
 }
 

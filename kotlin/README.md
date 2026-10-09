@@ -83,7 +83,7 @@ then the same `loadWorldPackage(File)`.
 ## Build and test
 
 ```bash
-./gradlew jvmTest            # 18 tests over the repo's own examples
+./gradlew jvmTest            # 59 tests: examples, conformance worlds, the shared merge corpus
 ./gradlew compileAndroidMain # the Android target compiles
 ./gradlew publishToMavenLocal
 ```

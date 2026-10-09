@@ -1,9 +1,11 @@
-// Entry identity: canonical JSON plus SHA-256, both in common code —
-// no java.security, no platform digest, the same bytes everywhere the
-// package runs (JVM and Android). Spec: spec/session.md "Entry
-// identity, forks and branches" — implementations computing content
-// hashes MUST serialize the entry canonically (no whitespace, keys
-// sorted alphabetically).
+// Canonical writing, all in common code — no java.security, no
+// platform digest, the same bytes everywhere the package runs (JVM
+// and Android): the compact canonical JSON and SHA-256 that entry
+// identity builds on (spec/session.md "Entry identity, forks and
+// branches" — implementations computing content hashes MUST serialize
+// the entry canonically: no whitespace, keys sorted alphabetically),
+// and the pretty canonical text an authority writes to `manifest.json`
+// (spec/package.md "Canonical text").
 
 package org.openworldformat
 
@@ -108,6 +110,79 @@ private fun appendString(sb: StringBuilder, s: String) {
         }
     }
     sb.append('"')
+}
+
+// ---------------------------------------------------------------------------
+// The canonical text of a manifest (spec/package.md "Canonical text")
+// ---------------------------------------------------------------------------
+
+/**
+ * A manifest as its canonical text: what an authority writes to
+ * `manifest.json`, so that the same world is always the same bytes —
+ * small diffs, ordinary git merges, a `world_sha256` that means
+ * something. Members sorted, null members left out, entities in id
+ * order, two-space indentation, arrays of plain values on one line,
+ * numbers in their shortest form (integral values without a fraction),
+ * a trailing newline.
+ */
+fun manifestText(manifest: WorldManifest): String {
+    val sorted = manifest.copy(entities = manifest.entities.sortedBy { it.id })
+    val sb = StringBuilder()
+    appendCanonicalPretty(sb, sorted.toJson(), 0)
+    sb.append('\n')
+    return sb.toString()
+}
+
+/** The pretty half of [manifestText]: [appendCanonical] rules for
+ *  primitives (they are the same bytes either writer makes), objects
+ *  and arrays laid out over lines. */
+private fun appendCanonicalPretty(sb: StringBuilder, value: JsonElement, depth: Int) {
+    when (value) {
+        is JsonObject -> {
+            val keys = value.keys.filter { value.getValue(it) !is JsonNull }.sorted()
+            if (keys.isEmpty()) {
+                sb.append("{}")
+                return
+            }
+            val pad = "  ".repeat(depth)
+            val inner = "  ".repeat(depth + 1)
+            sb.append("{\n")
+            keys.forEachIndexed { index, key ->
+                sb.append(inner)
+                appendString(sb, key)
+                sb.append(": ")
+                appendCanonicalPretty(sb, value.getValue(key), depth + 1)
+                sb.append(if (index < keys.lastIndex) ",\n" else "\n")
+            }
+            sb.append(pad).append('}')
+        }
+        is JsonArray -> {
+            if (value.isEmpty()) {
+                sb.append("[]")
+                return
+            }
+            if (value.none { it is JsonObject || it is JsonArray }) {
+                sb.append('[')
+                value.forEachIndexed { index, element ->
+                    if (index > 0) sb.append(", ")
+                    appendCanonicalPretty(sb, element, depth)
+                }
+                sb.append(']')
+                return
+            }
+            val pad = "  ".repeat(depth)
+            val inner = "  ".repeat(depth + 1)
+            sb.append("[\n")
+            value.forEachIndexed { index, element ->
+                sb.append(inner)
+                appendCanonicalPretty(sb, element, depth + 1)
+                sb.append(if (index < value.lastIndex) ",\n" else "\n")
+            }
+            sb.append(pad).append(']')
+        }
+        is JsonNull -> sb.append("null")
+        is JsonPrimitive -> appendPrimitive(sb, value)
+    }
 }
 
 // ---------------------------------------------------------------------------
