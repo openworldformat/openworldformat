@@ -28,6 +28,7 @@ use std::collections::BTreeMap;
 use serde_json::{Value, json};
 
 use crate::doc::WorldDoc;
+use crate::entity_refs::{EntityRefKind, EntityRefScope, refs_of, refs_of_kind, walk_ref_path};
 use crate::history::EditOp;
 use crate::validation::{WorldLimits, validate_manifest};
 
@@ -158,11 +159,11 @@ impl State {
             "SpawnEntity" => {
                 let entity = body
                     .get_mut("entity")
-                    .and_then(Value::as_object_mut)
+                    .filter(|entity| entity.is_object())
                     .ok_or("SpawnEntity needs an \"entity\" object")?;
                 match entity.get("id") {
                     None | Some(Value::Null) => {
-                        entity.insert("id".into(), json!(self.next_id));
+                        entity["id"] = json!(self.next_id);
                     }
                     Some(Value::Number(_)) => {}
                     Some(_) => {
@@ -174,9 +175,7 @@ impl State {
                     .and_then(Value::as_u64)
                     .unwrap_or(self.next_id);
                 self.next_id = self.next_id.max(id.saturating_add(1));
-                if let Some(parent) = entity.get_mut("parent") {
-                    self.resolve(parent)?;
-                }
+                self.bind_top_level_refs(entity)?;
                 if let Some(name) = entity.get("name").and_then(Value::as_str) {
                     self.spawned.insert(name.to_string(), id);
                 }
@@ -191,12 +190,10 @@ impl State {
                     .trial
                     .get(id)
                     .and_then(|e| serde_json::to_value(e).ok());
-                if let Some(patch) = body.get_mut("patch").and_then(Value::as_object_mut) {
-                    if let Some(parent) = patch.get_mut("parent") {
-                        self.resolve(parent)?;
-                    }
-                    if let Some(current) = current {
-                        merge_fields(patch, &current, &["transform", "material", "light"]);
+                if let Some(patch) = body.get_mut("patch").filter(|patch| patch.is_object()) {
+                    self.bind_top_level_refs(patch)?;
+                    if let (Some(current), Some(slots)) = (current, patch.as_object_mut()) {
+                        merge_fields(slots, &current, &["transform", "material", "light"]);
                     }
                 }
             }
@@ -215,14 +212,30 @@ impl State {
                 }
             }
             "ModifyWorld" => {
-                if let Some(patch) = body.get_mut("patch").and_then(Value::as_object_mut) {
+                if let Some(patch) = body.get_mut("patch").filter(|patch| patch.is_object()) {
+                    // The avatar's marked refs (today: `model_entity`)
+                    // bind like any other — a name where an entity id
+                    // goes resolves at intake (spec/world.md,
+                    // "Identity": refs MUST resolve at ingestion).
+                    if let Some(avatar) = patch
+                        .get_mut("avatar")
+                        .filter(|avatar| avatar.is_object())
+                    {
+                        for field in refs_of(EntityRefScope::Avatar) {
+                            walk_ref_path(avatar, field.path, &mut |reference| {
+                                self.resolve(reference)
+                            })?;
+                        }
+                    }
                     let current =
                         serde_json::to_value(self.trial.to_manifest()).unwrap_or(Value::Null);
-                    merge_fields(
-                        patch,
-                        &current,
-                        &["meta", "environment", "camera", "avatar", "soundtrack"],
-                    );
+                    if let Some(slots) = patch.as_object_mut() {
+                        merge_fields(
+                            slots,
+                            &current,
+                            &["meta", "environment", "camera", "avatar", "soundtrack"],
+                        );
+                    }
                 }
             }
             "Batch" => {
@@ -241,6 +254,20 @@ impl State {
                     OP_KINDS.join(", ")
                 ));
             }
+        }
+        Ok(())
+    }
+
+    /// The entity scope's top-level bindable refs (today: `parent`)
+    /// bind here, at intake, before the op applies; the behavior refs
+    /// bind after apply, against the spawned world — the same marked
+    /// list, walked per pass (spec/world.md, "Identity").
+    fn bind_top_level_refs(&self, value: &mut Value) -> Result<(), String> {
+        for field in refs_of_kind(EntityRefScope::Entity, EntityRefKind::Bindable) {
+            if field.path.len() != 1 {
+                continue;
+            }
+            walk_ref_path(value, field.path, &mut |reference| self.resolve(reference))?;
         }
         Ok(())
     }

@@ -10,7 +10,7 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fmt;
 
 use crate as wt;
-use crate::behavior::BehaviorDef;
+use crate::entity_refs::{EntityRefKind, EntityRefScope, RefSlot, RefWalk, refs_of_kind};
 use crate::identity::{EntityId, EntityRef};
 use wt::{EditOp, WorldEntity};
 
@@ -421,8 +421,16 @@ impl WorldDoc {
             let Some(entity) = entities.get_mut(&id) else {
                 continue;
             };
-            for behavior in entity.behaviors.iter_mut() {
-                resolve_behavior_refs(behavior, names)?;
+            // The schema's marked entity refs (spec/world.md, "Identity"),
+            // except the top-level ones (`parent`): those bind at op
+            // intake, before the op applies — a string there never
+            // reaches the typed model — so only the deeper refs (the
+            // behavior refs) resolve here.
+            for field in refs_of_kind(EntityRefScope::Entity, EntityRefKind::Bindable) {
+                if field.path.len() == 1 {
+                    continue;
+                }
+                entity.walk(field.path, &mut |slot| bind_slot(slot, names))?;
             }
         }
         Ok(())
@@ -436,14 +444,10 @@ impl WorldDoc {
         let ids: Vec<u64> = self.entities.keys().copied().collect();
         self.resolve_refs(&ids)?;
         let names = &self.names;
-        if let Some(avatar) = &mut self.avatar
-            && let Some(EntityRef::Name(name)) = &avatar.model_entity
-        {
-            let id = names
-                .get(name.as_str())
-                .copied()
-                .ok_or_else(|| ApplyError::MissingName(name.clone()))?;
-            avatar.model_entity = Some(EntityRef::Id(EntityId(id)));
+        if let Some(avatar) = &mut self.avatar {
+            for field in refs_of_kind(EntityRefScope::Avatar, EntityRefKind::Bindable) {
+                avatar.walk(field.path, &mut |slot| bind_slot(slot, names))?;
+            }
         }
         Ok(())
     }
@@ -614,32 +618,19 @@ fn touched_ids(ops: &[EditOp]) -> Vec<u64> {
     out
 }
 
-/// Resolve the name references one behavior carries (`Orbit.center`,
-/// `LookAt.target`) against the fold-so-far's names.
-fn resolve_behavior_refs(
-    behavior: &mut BehaviorDef,
-    names: &HashMap<String, u64>,
-) -> Result<(), ApplyError> {
-    match behavior {
-        BehaviorDef::Orbit { center, .. } => {
-            if let Some(EntityRef::Name(name)) = center {
-                let id = names
-                    .get(name.as_str())
-                    .copied()
-                    .ok_or_else(|| ApplyError::MissingName(name.clone()))?;
-                *center = Some(EntityRef::Id(EntityId(id)));
-            }
-        }
-        BehaviorDef::LookAt { target } => {
-            if let EntityRef::Name(name) = target {
-                let id = names
-                    .get(name.as_str())
-                    .copied()
-                    .ok_or_else(|| ApplyError::MissingName(name.clone()))?;
-                *target = EntityRef::Id(EntityId(id));
-            }
-        }
-        _ => {}
+/// Bind a marked slot's name to the id it names now, against the
+/// fold-so-far's names — the ingestion rule (spec/world.md, "Identity").
+/// An id slot can't hold a name; a reference already holding an id is
+/// left alone.
+fn bind_slot(slot: RefSlot<'_>, names: &HashMap<String, u64>) -> Result<(), ApplyError> {
+    if let RefSlot::Ref(reference) = slot
+        && let EntityRef::Name(name) = &*reference
+    {
+        let id = names
+            .get(name.as_str())
+            .copied()
+            .ok_or_else(|| ApplyError::MissingName(name.clone()))?;
+        *reference = EntityRef::Id(EntityId(id));
     }
     Ok(())
 }

@@ -15,6 +15,7 @@ use std::collections::BTreeMap;
 use serde::{Deserialize, Serialize};
 
 use crate::doc::{ApplyError, WorldDoc};
+use crate::entity_refs::each_ref;
 use crate::history::EditOp;
 use crate::oplog::OpLogEntry;
 
@@ -451,11 +452,12 @@ pub struct MergedBranch {
 /// `next_entity_id` — [`WorldDoc::next_id`], the floor that keeps spent
 /// ids spent — stepping past every id the branch spawns, never past the
 /// 2^53-1 ceiling. Every entity reference in the merged entries is
-/// rewritten through the remap: `SpawnEntity`'s `entity.id`,
-/// `entity.parent` and numeric behavior refs; `ModifyEntity`'s `id`,
-/// `patch.parent` and numeric behavior refs; `DeleteEntity`'s `id`;
-/// `Batch` recursively; `ModifyWorld`'s `patch.avatar.model_entity`
-/// (when numeric) and `patch.creations[].entities[]`.
+/// rewritten through the remap — the schema's marked entity refs
+/// (schema/entity-refs.json): `entity` scope on spawn entities and
+/// modify patches, `avatar` and `creation` scopes on ModifyWorld's
+/// patch — plus the identity fields `SpawnEntity`'s `entity.id`,
+/// `ModifyEntity`'s `id` and `DeleteEntity`'s `id`, which are op
+/// addresses, not schema refs. `Batch` recurses.
 ///
 /// Name collisions get the spec's suffix: a branch spawn whose name is
 /// taken — by main, or by an earlier spawn in the same merge — is
@@ -549,34 +551,22 @@ fn rewrite_session_op(op: SessionOp, remapped: &std::collections::BTreeMap<u64, 
     }
 }
 
-/// Rewrite one edit's entity references through the remap.
+/// Rewrite one edit's entity references through the remap: the schema's
+/// marked entity refs (spec/world.md, "Identity") — `entity` scope on
+/// spawn entities and modify patches, `avatar` and `creation` scopes on
+/// ModifyWorld's patch, walked off the list. The identity fields
+/// (`entity.id`, `ModifyEntity.id`, `DeleteEntity.id`) are op
+/// addresses, not schema refs — they stay explicit.
 fn rewrite_edit(op: EditOp, remapped: &std::collections::BTreeMap<u64, u64>) -> EditOp {
     let map_id = |id: &mut crate::identity::EntityId| {
         if let Some(&to) = remapped.get(&id.0) {
             *id = crate::identity::EntityId(to);
         }
     };
-    let map_ref = |class_ref: &mut crate::identity::EntityRef| {
-        if let crate::identity::EntityRef::Id(id) = class_ref {
-            map_id(id);
-        }
-    };
     match op {
         EditOp::SpawnEntity { mut entity } => {
             map_id(&mut entity.id);
-            if let Some(parent) = &mut entity.parent {
-                map_id(parent);
-            }
-            for behavior in entity.behaviors.iter_mut() {
-                match behavior {
-                    crate::behavior::BehaviorDef::Orbit {
-                        center: Some(class_ref),
-                        ..
-                    } => map_ref(class_ref),
-                    crate::behavior::BehaviorDef::LookAt { target } => map_ref(target),
-                    _ => {}
-                }
-            }
+            each_ref(&mut entity, |slot| slot.remap(remapped));
             EditOp::spawn(entity)
         }
         EditOp::DeleteEntity { mut id } => {
@@ -585,19 +575,7 @@ fn rewrite_edit(op: EditOp, remapped: &std::collections::BTreeMap<u64, u64>) -> 
         }
         EditOp::ModifyEntity { mut id, mut patch } => {
             map_id(&mut id);
-            if let Some(Some(parent)) = &mut patch.parent {
-                map_id(parent);
-            }
-            for behavior in patch.behaviors.iter_mut().flatten() {
-                match behavior {
-                    crate::behavior::BehaviorDef::Orbit {
-                        center: Some(class_ref),
-                        ..
-                    } => map_ref(class_ref),
-                    crate::behavior::BehaviorDef::LookAt { target } => map_ref(target),
-                    _ => {}
-                }
-            }
+            each_ref(&mut patch, |slot| slot.remap(remapped));
             EditOp::modify(id, patch)
         }
         EditOp::Batch { ops } => EditOp::Batch {
@@ -607,16 +585,12 @@ fn rewrite_edit(op: EditOp, remapped: &std::collections::BTreeMap<u64, u64>) -> 
                 .collect(),
         },
         EditOp::ModifyWorld { mut patch } => {
-            if let Some(Some(avatar)) = &mut patch.avatar
-                && let Some(model) = &mut avatar.model_entity
-            {
-                map_ref(model);
+            if let Some(Some(avatar)) = &mut patch.avatar {
+                each_ref(avatar, |slot| slot.remap(remapped));
             }
             if let Some(creations) = &mut patch.creations {
                 for creation in creations {
-                    for id in creation.entities.iter_mut() {
-                        map_id(id);
-                    }
+                    each_ref(creation, |slot| slot.remap(remapped));
                 }
             }
             EditOp::ModifyWorld { patch }
