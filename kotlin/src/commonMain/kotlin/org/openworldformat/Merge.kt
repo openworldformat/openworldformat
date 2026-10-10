@@ -30,15 +30,17 @@ data class MergeBranchResult(
  * fold's effective `next_entity_id` — the floor the fold carries so an
  * id main deleted stays spent — skipping every id the branch spawns,
  * never past [MAX_ENTITY_ID]; and every reference to a remapped id is
- * rewritten with it: `SpawnEntity.entity.id`, `.parent`,
- * `ModifyEntity.id`, `patch.parent`, `DeleteEntity.id`,
- * `ModifyWorld.patch.avatar.model_entity` and
- * `patch.creations[].entities[]`, `Batch` recursively, and the numeric
- * behavior refs (`Orbit.center`, `LookAt.target`). String refs and
- * history ops ride untouched. A spawned name already taken — by main,
- * or by an earlier spawn in the same merge — is renamed `<name>-<n>`,
- * `n` from 2 up, first unused. Merged entries keep their id, parent,
- * author and message: an entry's identity survives the merge.
+ * rewritten with it: every field schema/entity-refs.json marks — the
+ * entity scope on `SpawnEntity.entity` and `ModifyEntity.patch`, the
+ * avatar scope on `ModifyWorld.patch.avatar`, the creation scope on
+ * each of `patch.creations[]` — plus the op addresses
+ * `SpawnEntity.entity.id`, `ModifyEntity.id` and `DeleteEntity.id`
+ * (addresses, not schema refs, so explicit), `Batch` recursively.
+ * String refs and history ops ride untouched. A spawned name already
+ * taken — by main, or by an earlier spawn in the same merge — is
+ * renamed `<name>-<n>`, `n` from 2 up, first unused. Merged entries
+ * keep their id, parent, author and message: an entry's identity
+ * survives the merge.
  *
  * @throws [WorldFormatException] when fresh ids run out below the
  *   ceiling.
@@ -113,13 +115,7 @@ private fun rewriteMergeOp(op: JsonElement, remap: Map<Int, Int>): JsonElement {
             val fields = obj.toMutableMap()
             remappedId(obj["id"])?.let { fresh -> fields["id"] = JsonPrimitive(fresh) }
             obj["patch"]?.obj?.let { patch ->
-                val rewritten = patch.toMutableMap()
-                remappedId(patch["parent"])?.let { fresh -> rewritten["parent"] = JsonPrimitive(fresh) }
-                patch["behaviors"]?.let { b ->
-                    val fresh = rewriteBehaviorRefs(b, remap)
-                    if (fresh !== b) rewritten["behaviors"] = fresh
-                }
-                fields["patch"] = JsonObject(rewritten)
+                fields["patch"] = remapMarkedRefs("entity", patch, remap)
             }
             return singleKey("ModifyEntity", fields)
         }
@@ -136,22 +132,12 @@ private fun rewriteMergeOp(op: JsonElement, remap: Map<Int, Int>): JsonElement {
             val fields = obj.toMutableMap()
             obj["patch"]?.obj?.let { patch ->
                 val rewritten = patch.toMutableMap()
-                // `patch.avatar.model_entity`, when it is an id — a
-                // string there is a name, and names ride.
                 patch["avatar"]?.obj?.let { avatar ->
-                    remappedId(avatar["model_entity"])?.let { fresh ->
-                        rewritten["avatar"] = JsonObject(avatar + ("model_entity" to JsonPrimitive(fresh)))
-                    }
+                    rewritten["avatar"] = remapMarkedRefs("avatar", avatar, remap)
                 }
-                // `patch.creations[].entities[]`: numeric elements are
-                // ids and rewrite; string elements are names and ride.
                 patch["creations"]?.arr?.let { creations ->
                     rewritten["creations"] = JsonArray(creations.map { creation ->
-                        val c = creation.obj ?: return@map creation
-                        val entities = c["entities"]?.arr ?: return@map creation
-                        JsonObject(c + ("entities" to JsonArray(entities.map { id ->
-                            remappedId(id)?.let(::JsonPrimitive) ?: id
-                        })))
+                        creation.obj?.let { remapMarkedRefs("creation", it, remap) } ?: creation
                     })
                 }
                 fields["patch"] = JsonObject(rewritten)
@@ -161,6 +147,14 @@ private fun rewriteMergeOp(op: JsonElement, remap: Map<Int, Int>): JsonElement {
         else -> return op
     }
 }
+
+/** Every marked ref of [scope] against the remap: numeric values are
+ *  ids and rewrite; string values are names and ride — they bind at
+ *  ingestion, against the merged fold-so-far. */
+private fun remapMarkedRefs(scope: String, value: JsonElement, remap: Map<Int, Int>): JsonElement =
+    eachRef(scope, value) { current ->
+        plainInt(current)?.let(remap::get)?.let(::JsonPrimitive) ?: current
+    }
 
 /**
  * The spec's name rule, in place on the way out: a spawned name that
@@ -192,45 +186,13 @@ private fun renameCollidingSpawns(taken: MutableSet<String>, op: JsonElement): J
     }
 }
 
-/** A spawned entity against the remap: its id, its parent, and its
- *  numeric behavior refs. */
+/** A spawned entity against the remap: its id — the op's address, not
+ *  a schema ref, so explicit — and every marked entity-scope ref. */
 private fun rewriteMergedEntity(entity: JsonElement, remap: Map<Int, Int>): JsonElement {
     val o = entity.obj ?: return entity
     val fields = o.toMutableMap()
-    fun remappedId(id: JsonElement?): Int? = plainInt(id)?.let(remap::get)
-    remappedId(o["id"])?.let { fresh -> fields["id"] = JsonPrimitive(fresh) }
-    remappedId(o["parent"])?.let { fresh -> fields["parent"] = JsonPrimitive(fresh) }
-    o["behaviors"]?.let { b ->
-        val fresh = rewriteBehaviorRefs(b, remap)
-        if (fresh !== b) fields["behaviors"] = fresh
-    }
-    return JsonObject(fields)
-}
-
-/**
- * Numeric `Orbit.center` / `LookAt.target` refs against the remap;
- * name refs (and every other behavior shape) ride untouched.
- */
-internal fun rewriteBehaviorRefs(behaviors: JsonElement, remap: Map<Int, Int>): JsonElement {
-    val arr = behaviors.arr ?: return behaviors
-    if (remap.isEmpty()) return behaviors
-    var changed = false
-    val out = arr.map { behavior ->
-        val o = behavior.obj
-        if (o == null || o.size != 1) return@map behavior
-        val (kind, params) = o.entries.first()
-        val refKey = when (kind) {
-            "Orbit" -> "center"
-            "LookAt" -> "target"
-            else -> null
-        } ?: return@map behavior
-        val paramsObj = params.obj ?: return@map behavior
-        val fresh = plainInt(paramsObj[refKey])?.let(remap::get) ?: return@map behavior
-        changed = true
-        singleKey(kind, paramsObj.toMutableMap().apply { put(refKey, JsonPrimitive(fresh)) })
-    }
-    if (!changed) return behaviors
-    return JsonArray(out)
+    plainInt(o["id"])?.let(remap::get)?.let { fresh -> fields["id"] = JsonPrimitive(fresh) }
+    return remapMarkedRefs("entity", JsonObject(fields), remap)
 }
 
 /** A number that isn't a string-written name — `.int` alone would read

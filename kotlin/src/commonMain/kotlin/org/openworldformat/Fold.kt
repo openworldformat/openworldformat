@@ -108,50 +108,47 @@ fun foldLog(manifest: WorldManifest, entries: List<LogEntry>): FoldState {
 // Immediate name binding (spec/world.md "Identity")
 // ---------------------------------------------------------------------------
 
-/** The ref field of a behavior that names another entity, if it has
- *  one: `Orbit.center` and `LookAt.target`. (`modulations[].target`
- *  names a *property*, not an entity — never touched.) */
-private fun behaviorRefKey(behaviorKind: String): String? = when (behaviorKind) {
-    "Orbit" -> "center"
-    "LookAt" -> "target"
-    else -> null
-}
-
 /**
- * Resolve one entity's name-written behavior refs to ids, against the
+ * Resolve one entity's name-written refs to ids, against the
  * fold-so-far held in [state] — value semantics, an updated copy back.
+ * The fields are the schema's marked refs (`entity` scope, `bindable`)
+ * except the top-level one (`parent`): the fold's apply validates it,
+ * so a string there is already a refusal — it binds at op intake.
  * Saved worlds always contain ids; this is the ingestion half.
+ * (`modulations[].target` names a *property*, not an entity — the
+ * list doesn't mark it, so it is never touched.)
  *
  * @throws [WorldFormatException] when a ref names no entity.
  */
 internal fun resolveNames(state: FoldState, index: Int): FoldState {
     val entity = state.entities.getOrNull(index) ?: return state
-    val behaviors = entity.fields["behaviors"]?.arr ?: return state
-    val idByName = HashMap<String, Int>(state.entities.size)
-    for (e in state.entities) idByName[e.name] = e.id
-    var changed = false
-    val resolved = behaviors.map { behavior ->
-        val o = behavior.obj
-        if (o == null || o.size != 1) return@map behavior
-        val (kind, params) = o.entries.first()
-        val refKey = behaviorRefKey(kind) ?: return@map behavior
-        val paramsObj = params.obj ?: return@map behavior
-        val name = paramsObj[refKey]?.str ?: return@map behavior
-        val id = idByName[name]
-            ?: throw WorldFormatException.invalid("no entity named '$name'")
-        changed = true
-        buildJsonObject {
-            put(kind, buildJsonObject {
-                paramsObj.forEach { (k, v) -> put(k, v) }
-                put(refKey, id)
-            })
+    // The name ledger builds on the first name ref found: most
+    // entities hold none, and hashing every entity per call is what
+    // makes folding a long log quadratic.
+    var idByName: HashMap<String, Int>? = null
+    fun idFor(name: String): Int {
+        var map = idByName
+        if (map == null) {
+            map = HashMap(state.entities.size)
+            for (e in state.entities) map[e.name] = e.id
+            idByName = map
         }
+        return map[name]
+            ?: throw WorldFormatException.invalid("no entity named '$name'")
     }
-    if (!changed) return state
-    val fields = entity.fields.toMutableMap()
-    fields["behaviors"] = JsonArray(resolved)
+    var fields = entity.fields
+    for (ref in refsOf("entity", EntityRefKind.BINDABLE)) {
+        if (ref.path.size == 1) continue  // bound at op intake
+        // Paths here start with a named key over the entity's fields,
+        // so the walk hands a JsonObject back.
+        fields = walkRefPath(fields, ref.path, 0) { current ->
+            val name = current.str ?: return@walkRefPath current
+            JsonPrimitive(idFor(name))
+        } as JsonObject
+    }
+    if (fields === entity.fields) return state
     val entities = state.entities.toMutableList()
-    entities[index] = entity.copy(fields = JsonObject(fields))
+    entities[index] = entity.copy(fields = fields)
     return state.copy(entities = entities)
 }
 
