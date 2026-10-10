@@ -27,6 +27,8 @@ import re
 from pathlib import Path
 from typing import Any
 
+from .entity_refs import ENTITY_REFS
+
 __all__ = [
     "SUPPORTED_SCHEMA_VERSION",
     "SUPPORTED_FORMAT_VERSION",
@@ -35,6 +37,7 @@ __all__ = [
     "MAX_ENTITY_ID",
     "REGISTERED_EXTENSIONS",
     "EXT_PROVENANCE_FIELDS",
+    "ENTITY_REFS",
     "WorldFormatError",
     "parse_manifest",
     "classify_op",
@@ -158,12 +161,6 @@ _ENVIRONMENT_KEYS = frozenset({
 })
 _CAMERA_KEYS = frozenset({"fov_degrees", "look_at", "position"})
 
-#: Behavior fields that reference another entity, by behavior kind:
-#: ``Orbit`` circles one, ``LookAt`` watches one. ``modulations[]``
-#: has a ``target`` too, but it names a *property* of the modulated
-#: entity, never an entity — never touched by name binding.
-_BEHAVIOR_REF_KEYS = {"Orbit": "center", "LookAt": "target"}
-
 _EXT_KEY = re.compile(r"ext-[a-z0-9-]+")
 
 
@@ -175,6 +172,56 @@ def _is_num(v: Any) -> bool:
 def _coalesce(v: Any, default: Any) -> Any:
     """JavaScript's ``??``: null/undefined fall back, everything else passes."""
     return default if v is None else v
+
+
+# ---------------------------------------------------------------------------
+# Entity-reference fields (schema/entity-refs.json, spec/world.md
+# "Identity") — name binding, merge rewriting and ingestion validation
+# read the schema's one marked list (the embedded copy,
+# openworldformat/entity_refs.py) instead of hand-written ones.
+# ---------------------------------------------------------------------------
+
+
+def _refs_of(scope: str, kind: str | None = None) -> list:
+    """The marked refs of one scope (and optionally one kind)."""
+    return [
+        ref for ref in ENTITY_REFS
+        if ref["scope"] == scope and (kind is None or ref["kind"] == kind)
+    ]
+
+
+def _walk_ref_path(node: Any, path: list, i: int, fn) -> None:
+    """Walk a marked path, calling ``fn(current, set)`` at the leaf;
+    ``*`` walks every array element. Missing keys walk to nothing."""
+    if not isinstance(node, (dict, list)):
+        return
+    key = path[i]
+    last = i == len(path) - 1
+    if key == "*":
+        if not isinstance(node, list):
+            return
+        for j, element in enumerate(node):
+            if last:
+                fn(element, lambda v, j=j: node.__setitem__(j, v))
+            else:
+                _walk_ref_path(element, path, i + 1, fn)
+        return
+    if not isinstance(node, dict) or key not in node:
+        return
+    if last:
+        fn(node[key], lambda v: node.__setitem__(key, v))
+    else:
+        _walk_ref_path(node[key], path, i + 1, fn)
+
+
+def _each_ref(scope: str, value: Any, fn) -> None:
+    """Every marked entity-reference field of ``value`` — an entity or
+    patch ("entity"), the manifest's avatar ("avatar"), one creation
+    ("creation") — calling ``fn(current, set)`` on each, in place."""
+    if not isinstance(value, (dict, list)):
+        return
+    for ref in _refs_of(scope):
+        _walk_ref_path(value, ref["path"], 0, fn)
 
 
 # ---------------------------------------------------------------------------
@@ -571,34 +618,33 @@ def _invalid(message: str) -> WorldFormatError:
 
 
 def _resolve_names(state: dict, entity: dict) -> None:
-    """Bind one entity's by-name behavior references to ids, in place
+    """Bind one entity's by-name references to ids, in place
     (spec/world.md "Identity"): cross-entity references may be written
     by name — what authors and models produce — and MUST resolve to id
     at ingestion against the fold-so-far. Delaying resolution until
     fold time is strictly forbidden: it breaks log determinism the
-    moment an entity is renamed. An id (or ``Orbit``'s point-valued
-    ``center_point``) passes through untouched; ``modulations[]``
-    targets name properties, not entities, and are never touched.
+    moment an entity is renamed. The fields are the schema's marked
+    entity refs (``entity`` scope, ``bindable``) except the top-level
+    ones (``parent``), which op intake binds *before* apply — the
+    fold's apply step validates them, so a raw string there is already
+    a refusal. ``modulations[]`` targets name properties, not entities,
+    and are never touched.
 
     :raises WorldFormatError: when a named entity isn't in the fold
     """
-    behaviors = entity.get("behaviors")
-    if not isinstance(behaviors, list):
-        return
-    for behavior in behaviors:
-        if not isinstance(behavior, dict) or len(behavior) != 1:
-            continue
-        kind, cfg = next(iter(behavior.items()))
-        field = _BEHAVIOR_REF_KEYS.get(kind)
-        if field is None or not isinstance(cfg, dict):
-            continue
-        name = cfg.get(field)
-        if not isinstance(name, str):
-            continue  # already an id — saved worlds always contain ids
-        id_ = state["name_to_id"].get(name)
+
+    def bind(current, set_):
+        if not isinstance(current, str):
+            return  # already an id — saved worlds always contain ids
+        id_ = state["name_to_id"].get(current)
         if id_ is None:
-            raise _invalid(f"no entity named '{name}'")
-        cfg[field] = id_
+            raise _invalid(f"no entity named '{current}'")
+        set_(id_)
+
+    for ref in _refs_of("entity", "bindable"):
+        if len(ref["path"]) == 1:
+            continue  # bound at op intake (_bind_op)
+        _walk_ref_path(entity, ref["path"], 0, bind)
 
 
 def _touched_ids(edits: list) -> list:
@@ -990,6 +1036,16 @@ def _bind_op(trial: dict, op: dict, spawned: dict) -> None:
             raise WorldFormatError(f'no entity is named "{ref}"')
         return id_
 
+    def bind_top_level_refs(value):
+        # Top-level bindable entity refs (today: ``parent``) bind at op
+        # intake, before the op applies; behavior refs bind after,
+        # against the spawned world (_resolve_names) — the same list,
+        # walked per pass.
+        for ref in _refs_of("entity", "bindable"):
+            if len(ref["path"]) == 1:
+                _walk_ref_path(value, ref["path"], 0,
+                               lambda current, set_: set_(resolve(current)))
+
     if kind == "SpawnEntity":
         entity = body.get("entity") if isinstance(body, dict) else None
         if not isinstance(entity, dict):
@@ -1000,8 +1056,7 @@ def _bind_op(trial: dict, op: dict, spawned: dict) -> None:
             )
         elif not _is_num(entity["id"]):
             raise WorldFormatError("a new entity's id is a number, or left out to get one")
-        if "parent" in entity:
-            entity["parent"] = resolve(entity["parent"])
+        bind_top_level_refs(entity)
         if isinstance(entity.get("name"), str):
             spawned[entity["name"]] = entity["id"]
     elif kind == "ModifyEntity":
@@ -1011,8 +1066,7 @@ def _bind_op(trial: dict, op: dict, spawned: dict) -> None:
         current = trial["by_id"].get(body["id"])
         patch = body.get("patch")
         if isinstance(patch, dict):
-            if "parent" in patch:
-                patch["parent"] = resolve(patch["parent"])
+            bind_top_level_refs(patch)
             if current is not None:
                 for field in ("transform", "material", "light"):
                     change, held = patch.get(field), current.get(field)
@@ -1029,6 +1083,13 @@ def _bind_op(trial: dict, op: dict, spawned: dict) -> None:
     elif kind == "ModifyWorld":
         patch = body.get("patch") if isinstance(body, dict) else None
         if isinstance(patch, dict):
+            # The avatar's marked refs (today: ``model_entity``) bind
+            # like any other — a name where an entity id goes resolves
+            # at intake (spec/world.md "Identity").
+            avatar = patch.get("avatar")
+            if isinstance(avatar, dict):
+                _each_ref("avatar", avatar,
+                          lambda current, set_: set_(resolve(current)))
             now = to_manifest(trial)
             for field in ("meta", "environment", "camera", "avatar", "soundtrack"):
                 change, held = patch.get(field), now.get(field)
@@ -1325,12 +1386,15 @@ def _spawned_ids(ops: list) -> list:
 
 def _merge_rewrite_op(op: dict, remapped: dict) -> dict:
     """One op rewritten through a merge's id remapping — a new, deep
-    copied op. Numeric references (spawned ids, parents, behavior
-    centers and targets, ``ModifyWorld``'s avatar model and creation
-    entity lists) follow their entities to fresh ids; by-name
-    references don't (they bind at ingestion, after the merge); history
-    ops pass through untouched, because they fold to nothing and their
-    contents are nobody's to rewrite."""
+    copied op. The reference fields are the schema's marked entity
+    refs: ``entity`` scope on spawn entities and modify patches,
+    ``avatar`` and ``creation`` scopes on ``ModifyWorld``'s patch;
+    numeric references follow their entities to fresh ids, by-name
+    references don't (they bind at ingestion, after the merge).
+    Identity fields (``entity.id``, ``ModifyEntity.id``,
+    ``DeleteEntity.id``) are op addresses, not schema refs — they stay
+    explicit. History ops pass through untouched, because they fold to
+    nothing and their contents are nobody's to rewrite."""
     rewritten = copy.deepcopy(op)
     if not remapped:
         return rewritten
@@ -1346,37 +1410,21 @@ def _merge_rewrite_op(op: dict, remapped: dict) -> dict:
             return remapped[ref]
         return ref
 
-    def remap_behavior_refs(holder: dict) -> None:
-        behaviors = holder.get("behaviors")
-        if not isinstance(behaviors, list):
-            return
-        for behavior in behaviors:
-            if not isinstance(behavior, dict) or len(behavior) != 1:
-                continue
-            kind, cfg = next(iter(behavior.items()))
-            field = _BEHAVIOR_REF_KEYS.get(kind)
-            if field is None or not isinstance(cfg, dict):
-                continue
-            ref = cfg.get(field)
-            if isinstance(ref, int) and not isinstance(ref, bool) and ref in remapped:
-                cfg[field] = remapped[ref]
+    def remap_refs(scope, node):
+        _each_ref(scope, node, lambda current, set_: set_(remap(current)))
 
     if edit == "SpawnEntity":
         entity = value.get("entity")
         if isinstance(entity, dict):
             if "id" in entity:
                 entity["id"] = remap(entity["id"])
-            if entity.get("parent") is not None:
-                entity["parent"] = remap(entity["parent"])
-            remap_behavior_refs(entity)
+            remap_refs("entity", entity)
     elif edit == "ModifyEntity":
         if "id" in value:
             value["id"] = remap(value["id"])
         patch = value.get("patch")
         if isinstance(patch, dict):
-            if patch.get("parent") is not None:
-                patch["parent"] = remap(patch["parent"])
-            remap_behavior_refs(patch)
+            remap_refs("entity", patch)
     elif edit == "DeleteEntity":
         if "id" in value:
             value["id"] = remap(value["id"])
@@ -1387,19 +1435,11 @@ def _merge_rewrite_op(op: dict, remapped: dict) -> dict:
     elif edit == "ModifyWorld":
         patch = value.get("patch")
         if isinstance(patch, dict):
-            avatar = patch.get("avatar")
-            if isinstance(avatar, dict) and "model_entity" in avatar:
-                avatar["model_entity"] = remap(avatar["model_entity"])
+            remap_refs("avatar", patch.get("avatar"))
             creations = patch.get("creations")
             if isinstance(creations, list):
                 for creation in creations:
-                    if not isinstance(creation, dict):
-                        continue
-                    refs = creation.get("entities")
-                    if isinstance(refs, list):
-                        # Numeric elements are ids and follow the remap;
-                        # string elements are names and ride.
-                        creation["entities"] = [remap(ref) for ref in refs]
+                    remap_refs("creation", creation)
     return rewritten
 
 
