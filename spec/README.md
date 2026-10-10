@@ -63,11 +63,12 @@ engine's.
    experimental: cameras as entities with a filmback and a lens, shots
    as ordered setups on the clock, outcome assertions in three
    references, and the JS renderer's letterboxed shot view.
-3. **A schema marker on entity-reference fields**, so name binding, merge
-   rewriting and validation read one list instead of five hand-written
-   ones. The marker (`x-entity-ref`) and the generated list
-   ([`schema/entity-refs.json`](../schema/entity-refs.json)) are in; the
-   references are moving their passes onto it, JS first.
+3. ~~A schema marker on entity-reference fields~~ — **done**
+   (2026-10-09): `x-entity-ref` marks the reference fields in the
+   schema, [`schema/entity-refs.json`](../schema/entity-refs.json) is
+   the generated list, and name binding, merge rewriting and ingestion
+   validation in all five references read it (each embeds a copy and
+   drift-tests it against the canonical file).
 
 **Deferred until a producer needs them:** collision-free ids, an `id` and
 `parent` on every entry, and timed input samples (a breaking bundle, for git
