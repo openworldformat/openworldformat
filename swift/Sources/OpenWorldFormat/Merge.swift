@@ -23,11 +23,15 @@ import Foundation
 /// branch id keeps its id); nothing past `MAX_ENTITY_ID` is ever handed
 /// out.
 ///
-/// Rewritten, per edit op (batches recursed): `SpawnEntity`'s entity
-/// `id` and `parent`, `ModifyEntity`'s `id` and `patch.parent`,
-/// `DeleteEntity`'s `id`, `ModifyWorld`'s `patch.avatar.model_entity`
-/// and the numeric elements of `patch.creations[].entities[]`, and the
-/// numeric behavior refs (`Orbit.center`, `LookAt.target`). Then the
+/// Rewritten, per edit op (batches recursed): the op addresses —
+/// `SpawnEntity`'s entity `id`, `ModifyEntity`'s and `DeleteEntity`'s
+/// `id` — and every reference the schema marks
+/// (schema/entity-refs.json): the `entity`-scope refs on spawn entities
+/// and modify patches (`parent`, `Orbit.center`, `LookAt.target`
+/// today), the `avatar`-scope refs on `ModifyWorld`'s `patch.avatar`
+/// (`model_entity`), and the `creation`-scope refs on its
+/// `patch.creations[]` (`entities[]`, numeric elements; string elements
+/// are names, not ids, and ride). Then the
 /// name rule: a spawn whose name is taken — by main, or by an earlier
 /// spawn in the same merge — is renamed `<name>-<n>`, `n` from 2 up,
 /// first unused; only the `SpawnEntity` changes. A rewritten entry is
@@ -167,9 +171,26 @@ private func renameCollidingOps(_ ops: inout [JSONValue], taken: inout Set<Strin
 
 /// Rewrite one op's remapped ids. Returns the op (unchanged when
 /// nothing it references was remapped) and whether it changed.
+///
+/// The reference fields are the schema's marked entity refs
+/// (schema/entity-refs.json): `entity` scope on spawn entities and
+/// modify patches, `avatar` and `creation` scopes on ModifyWorld's
+/// patch. Identity fields (`entity.id`, `ModifyEntity.id`,
+/// `DeleteEntity.id`) are op addresses, not schema refs — they stay
+/// explicit.
 private func rewriteOp(_ op: JSONValue, remapped: [Int: Int]) -> (JSONValue, Bool) {
     guard case let .edit(name, value) = classifyOp(op) else {
         return (op, false)   // history ops carry no entity ids
+    }
+    /// The marked refs of one scope, remapped in place; numeric leaves
+    /// only — string refs are names, resolved when the merged log folds.
+    func remapRefs(_ scope: String, _ value: inout JSONValue, changed: inout Bool) {
+        eachRef(scope, &value) { leaf in
+            if let id = leaf.int, let fresh = remapped[id] {
+                leaf = .number(Double(fresh))
+                changed = true
+            }
+        }
     }
     switch name {
     case "SpawnEntity":
@@ -179,17 +200,9 @@ private func rewriteOp(_ op: JSONValue, remapped: [Int: Int]) -> (JSONValue, Boo
             entity["id"] = .number(Double(fresh))
             changed = true
         }
-        if let parent = entity["parent"]?.int, let fresh = remapped[parent] {
-            entity["parent"] = .number(Double(fresh))
-            changed = true
-        }
-        if let behaviors = entity["behaviors"]?.array {
-            let (rewrittenBehaviors, behaviorsChanged) = rewriteBehaviors(behaviors, remapped: remapped)
-            if behaviorsChanged {
-                entity["behaviors"] = .array(rewrittenBehaviors)
-                changed = true
-            }
-        }
+        var entityValue = JSONValue.object(entity)
+        remapRefs("entity", &entityValue, changed: &changed)
+        if case let .object(o) = entityValue { entity = o }
         guard changed else { return (op, false) }
         return (.object(["SpawnEntity": .object(["entity": .object(entity)])]), true)
 
@@ -200,23 +213,9 @@ private func rewriteOp(_ op: JSONValue, remapped: [Int: Int]) -> (JSONValue, Boo
             o["id"] = .number(Double(fresh))
             changed = true
         }
-        if var patch = o["patch"]?.object {
-            var patchChanged = false
-            if let parent = patch["parent"]?.int, let fresh = remapped[parent] {
-                patch["parent"] = .number(Double(fresh))
-                patchChanged = true
-            }
-            if let behaviors = patch["behaviors"]?.array {
-                let (rewrittenBehaviors, behaviorsChanged) = rewriteBehaviors(behaviors, remapped: remapped)
-                if behaviorsChanged {
-                    patch["behaviors"] = .array(rewrittenBehaviors)
-                    patchChanged = true
-                }
-            }
-            if patchChanged {
-                o["patch"] = .object(patch)
-                changed = true
-            }
+        if var patch = o["patch"] {
+            remapRefs("entity", &patch, changed: &changed)
+            o["patch"] = patch
         }
         guard changed else { return (op, false) }
         return (.object(["ModifyEntity": .object(o)]), true)
@@ -242,39 +241,19 @@ private func rewriteOp(_ op: JSONValue, remapped: [Int: Int]) -> (JSONValue, Boo
         return (.object(["Batch": .object(["ops": .array(ops)])]), true)
 
     case "ModifyWorld":
-        // The world patch holds entity ids too: the avatar's model
-        // entity, and every creation's entity list (numeric elements;
-        // string elements are names, not ids, and ride).
+        // The world patch holds entity ids too: the avatar's marked
+        // refs and every creation's marked entity list.
         guard var o = value.object, var patch = o["patch"]?.object else { return (op, false) }
         var changed = false
-        if var avatar = patch["avatar"]?.object,
-           let modelEntity = avatar["model_entity"]?.int,
-           let fresh = remapped[modelEntity] {
-            avatar["model_entity"] = .number(Double(fresh))
-            patch["avatar"] = .object(avatar)
-            changed = true
+        if var avatar = patch["avatar"] {
+            remapRefs("avatar", &avatar, changed: &changed)
+            patch["avatar"] = avatar
         }
-        if let creations = patch["creations"]?.array {
-            var rewrittenCreations = creations
-            var creationsChanged = false
-            for index in rewrittenCreations.indices {
-                guard var creation = rewrittenCreations[index].object,
-                      let ids = creation["entities"]?.array
-                else { continue }
-                let rewrittenIds = ids.map { element -> JSONValue in
-                    guard let id = element.int, let fresh = remapped[id] else { return element }
-                    return .number(Double(fresh))
-                }
-                if rewrittenIds != ids {
-                    creation["entities"] = .array(rewrittenIds)
-                    rewrittenCreations[index] = .object(creation)
-                    creationsChanged = true
-                }
+        if var creations = patch["creations"]?.array {
+            for index in creations.indices {
+                remapRefs("creation", &creations[index], changed: &changed)
             }
-            if creationsChanged {
-                patch["creations"] = .array(rewrittenCreations)
-                changed = true
-            }
+            patch["creations"] = .array(creations)
         }
         guard changed else { return (op, false) }
         o["patch"] = .object(patch)
@@ -284,36 +263,4 @@ private func rewriteOp(_ op: JSONValue, remapped: [Int: Int]) -> (JSONValue, Boo
         // The scene-wide setters and audio emitters carry no entity ids.
         return (op, false)
     }
-}
-
-/// Remap numeric behavior refs; string refs stay for name binding to
-/// resolve at fold time.
-private func rewriteBehaviors(
-    _ behaviors: [JSONValue],
-    remapped: [Int: Int]
-) -> ([JSONValue], Bool) {
-    var changed = false
-    var out: [JSONValue] = []
-    for behavior in behaviors {
-        guard let b = behavior.object, b.count == 1, let (kind, params) = b.first,
-              var p = params.object
-        else {
-            out.append(behavior)
-            continue
-        }
-        let refKey: String
-        switch kind {
-        case "Orbit": refKey = "center"
-        case "LookAt": refKey = "target"
-        default: refKey = ""
-        }
-        if !refKey.isEmpty, let id = p[refKey]?.int, let fresh = remapped[id] {
-            p[refKey] = .number(Double(fresh))
-            changed = true
-            out.append(.object([kind: .object(p)]))
-        } else {
-            out.append(behavior)
-        }
-    }
-    return (out, changed)
 }

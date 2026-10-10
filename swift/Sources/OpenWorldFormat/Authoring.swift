@@ -141,6 +141,18 @@ func bindOp(_ trial: FoldState, _ op: inout JSONValue, _ spawned: inout [String:
         return .number(Double(id))
     }
 
+    /// The top-level bindable entity refs (today: `parent`) bind at op
+    /// intake, before the op applies; the behavior refs bind after,
+    /// against the spawned world (`resolveNames`) — the same list,
+    /// walked per pass.
+    func bindTopLevelRefs(_ value: inout JSONValue) throws {
+        for ref in refsOf("entity", kind: "bindable") where ref.path.count == 1 {
+            try walkRefPath(&value, ref.path, 0) { leaf in
+                leaf = try resolve(leaf)
+            }
+        }
+    }
+
     switch kind {
     case "SpawnEntity":
         guard var entity = bodyO["entity"]?.object else {
@@ -158,9 +170,9 @@ func bindOp(_ trial: FoldState, _ op: inout JSONValue, _ spawned: inout [String:
                 "a new entity's id is a number, or left out to get one")
         }
         let id = entity["id"]!.int!
-        if let parent = entity["parent"] {
-            entity["parent"] = try resolve(parent)
-        }
+        var entityValue = JSONValue.object(entity)
+        try bindTopLevelRefs(&entityValue)
+        if case let .object(o) = entityValue { entity = o }
         if let name = entity["name"]?.string {
             spawned[name] = id
         }
@@ -173,9 +185,9 @@ func bindOp(_ trial: FoldState, _ op: inout JSONValue, _ spawned: inout [String:
         bodyO["id"] = try resolve(reference)
         let current = trial.entities.first(where: { $0.id == bodyO["id"]?.int })?.fields
         if var patch = bodyO["patch"]?.object {
-            if let parent = patch["parent"] {
-                patch["parent"] = try resolve(parent)
-            }
+            var patchValue = JSONValue.object(patch)
+            try bindTopLevelRefs(&patchValue)
+            if case let .object(o) = patchValue { patch = o }
             if let current {
                 for field in ["transform", "material", "light"] {
                     if case .object(let change)? = patch[field],
@@ -200,6 +212,15 @@ func bindOp(_ trial: FoldState, _ op: inout JSONValue, _ spawned: inout [String:
 
     case "ModifyWorld":
         if var patch = bodyO["patch"]?.object {
+            // The avatar's marked refs (today: `model_entity`) bind
+            // like any other — a name where an entity id goes resolves
+            // at intake (spec/world.md: refs MUST resolve at ingestion).
+            if var avatar = patch["avatar"], avatar.object != nil {
+                try eachRef("avatar", &avatar) { leaf in
+                    leaf = try resolve(leaf)
+                }
+                patch["avatar"] = avatar
+            }
             let now = (try? toManifest(trial))?.json.object ?? [:]
             for field in ["meta", "environment", "camera", "avatar", "soundtrack"] {
                 if case .object(let change)? = patch[field],

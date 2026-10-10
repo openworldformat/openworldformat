@@ -190,38 +190,27 @@ func touchedEntities(_ edits: [ClassifiedOp]) -> [Int] {
     return ids
 }
 
-/// Resolve one entity's behavior refs written by name to ids, against
-/// the fold-so-far (`state.entities`): `Orbit.center` and
-/// `LookAt.target` when the ref is a string. Refs already numeric stay;
-/// `modulations[].target` is a property name, not an entity ref, and is
-/// never touched.
+/// Resolve one entity's by-name references to ids, in place —
+/// spec/world.md "Identity": cross-entity references may be written by
+/// name and MUST be resolved to id at ingestion against the
+/// fold-so-far; saved worlds always contain ids. The fields are the
+/// schema's marked entity refs (`entity` scope, `bindable`) except the
+/// top-level ones (`parent`), which op intake binds *before* apply —
+/// the fold's apply step validates them, so a raw string there is
+/// already a refusal. `modulations[].target` is a property name
+/// (emissive, scale…), never an entity ref — untouched.
 func resolveNames(_ state: inout FoldState, _ entityIndex: Int) throws {
-    guard let behaviors = state.entities[entityIndex].fields["behaviors"]?.array else { return }
-    var resolved: [JSONValue] = []
+    var fields = JSONValue.object(state.entities[entityIndex].fields)
     var changed = false
-    for behavior in behaviors {
-        guard let b = behavior.object, b.count == 1, let (kind, params) = b.first,
-              var p = params.object
-        else {
-            resolved.append(behavior)
-            continue
-        }
-        let refKey: String
-        switch kind {
-        case "Orbit": refKey = "center"
-        case "LookAt": refKey = "target"
-        default: refKey = ""
-        }
-        if !refKey.isEmpty, let name = p[refKey]?.string {
-            p[refKey] = .number(Double(try entityId(named: name, in: state)))
+    for ref in refsOf("entity", kind: "bindable") where ref.path.count > 1 {
+        try walkRefPath(&fields, ref.path, 0) { leaf in
+            guard let name = leaf.string else { return }
+            leaf = .number(Double(try entityId(named: name, in: state)))
             changed = true
-            resolved.append(.object([kind: .object(p)]))
-        } else {
-            resolved.append(behavior)
         }
     }
-    if changed {
-        state.entities[entityIndex].fields["behaviors"] = .array(resolved)
+    if changed, case let .object(o) = fields {
+        state.entities[entityIndex].fields = o
     }
 }
 
@@ -268,6 +257,13 @@ func applyEdit(_ state: inout FoldState, _ edit: String, _ value: JSONValue) thr
         }
         if state.nameToId[entity.name] != nil {
             throw OpenWorldFormatError.invalid("an entity named '\(entity.name)' already exists")
+        }
+        // A parent that isn't an id — a name, say — was never bound:
+        // op intake binds names before an op commits, so a string here
+        // is a refusal, not a field to drop.
+        if let parentValue = raw["parent"], parentValue != .null, parentValue.int == nil {
+            throw OpenWorldFormatError.invalid(
+                "entity \(entity.id)'s parent \(parentValue.string ?? "?") isn't in the document")
         }
         if let parent = entity.parent, state.idToIndex[parent] == nil {
             throw OpenWorldFormatError.invalid("entity \(entity.id)'s parent \(parent) isn't in the document")
@@ -331,6 +327,12 @@ func applyEdit(_ state: inout FoldState, _ edit: String, _ value: JSONValue) thr
         }
         if let parentJSON = patch["parent"] {
             let newParent = parentJSON == .null ? nil : parentJSON.int
+            // A string parent was never bound at intake — a refusal,
+            // not a silent clear.
+            if parentJSON != .null && newParent == nil {
+                throw OpenWorldFormatError.invalid(
+                    "parent \(parentJSON.string ?? "?") isn't in the document")
+            }
             if let p = newParent, !state.entities.contains(where: { $0.id == p }) {
                 throw OpenWorldFormatError.invalid("parent \(p) isn't in the document")
             }
