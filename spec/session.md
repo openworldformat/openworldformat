@@ -211,6 +211,11 @@ head and the same branch entries always produce the same merged entries:
    | `Batch` | every inner op, recursively |
    | `ModifyWorld` | `patch.avatar.model_entity` (numeric), `patch.creations[].entities[]` |
 
+   These are the schema's marked entity-reference fields
+   (`x-entity-ref`, [the world document](world.md) "Identity");
+   `schema/entity-refs.json` is the generated list every reference
+   reads.
+
 3. **Names.** Two branches that each mint a `lighthouse` merge into one
    world with two of them, and the authority MUST rename the merged side.
    When a branch spawn's name is already taken — by main, or by an

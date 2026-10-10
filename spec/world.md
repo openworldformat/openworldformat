@@ -37,6 +37,18 @@ effective value is the larger of what the manifest declares and one past
 its largest id, and it never goes down: deleting the newest entity does
 not free its id.
 
+**The reference fields are marked in the schema.** Every field that
+holds an entity reference carries an `x-entity-ref` annotation in
+[`schema/world.schema.json`](../schema/world.schema.json) —
+`"bindable"` where a name is accepted at intake (it MUST bind to an id
+at ingestion), `"id"` where only the numeric form is valid — and
+[`schema/entity-refs.json`](../schema/entity-refs.json) is that list,
+generated. Name binding, merge rewriting ([the session log](session.md),
+"The merge rules, exactly") and ingestion validation MUST read every
+field the list names: when the format gains a reference field, the
+marker is how the five references all see it, instead of five
+hand-written lists drifting apart.
+
 ## Entities
 
 An entity is a transform, and any of: a shape, a material, a light,

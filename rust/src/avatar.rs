@@ -38,6 +38,7 @@ pub struct AvatarDef {
     /// Entity reference of the 3D model representing the avatar (3rd-person).
     /// When `None`, the world has no visible avatar model.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "schema", schemars(extend("x-entity-ref" = "bindable")))]
     pub model_entity: Option<EntityRef>,
 }
 

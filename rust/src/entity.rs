@@ -68,6 +68,7 @@ pub struct WorldEntity {
     #[cfg_attr(feature = "schema", schemars(default))]
     pub transform: WorldTransform,
     /// Parent entity (for hierarchy).
+    #[cfg_attr(feature = "schema", schemars(extend("x-entity-ref" = "bindable")))]
     pub parent: Option<EntityId>,
     /// Spatial chunk assignment (for large worlds).
     pub chunk: Option<ChunkCoord>,
@@ -392,6 +393,7 @@ impl WorldEntity {
 pub struct EntityPatch {
     pub name: Option<EntityName>,
     pub transform: Option<WorldTransform>,
+    #[cfg_attr(feature = "schema", schemars(extend("x-entity-ref" = "bindable")))]
     pub parent: Option<Option<EntityId>>,
     pub shape: Option<Option<Shape>>,
     pub material: Option<Option<MaterialDef>>,

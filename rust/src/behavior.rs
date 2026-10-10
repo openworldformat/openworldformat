@@ -17,6 +17,7 @@ pub enum BehaviorDef {
     Orbit {
         /// Entity to orbit around (mutually exclusive with `center_point`).
         #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[cfg_attr(feature = "schema", schemars(extend("x-entity-ref" = "bindable")))]
         center: Option<EntityRef>,
         /// Fixed point to orbit around [x,y,z] (used if `center` is None).
         #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -64,6 +65,7 @@ pub enum BehaviorDef {
     /// Continuously look at / follow another entity.
     LookAt {
         /// Entity to look at.
+        #[cfg_attr(feature = "schema", schemars(extend("x-entity-ref" = "bindable")))]
         target: EntityRef,
     },
     /// Scale pulsation (breathing effect).

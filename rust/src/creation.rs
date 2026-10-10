@@ -41,6 +41,7 @@ pub struct CreationDef {
     pub bbox_half: [f32; 3],
     /// Entity IDs that make up this creation.
     #[serde(default)]
+    #[cfg_attr(feature = "schema", schemars(extend("x-entity-ref" = "id")))]
     pub entities: Vec<EntityId>,
     /// The definition, when the creation is reusable: a tree of entities in
     /// the creation's own coordinates, with ids and parents local to it.

@@ -16,6 +16,7 @@
 // render.js is the browser-facing entry and pulls nothing from here at
 // runtime (its imports of these types are JSDoc-only, erased at build).
 import { createHash } from "node:crypto";
+import { ENTITY_REFS } from "./entity-refs.mjs";
 
 /** The manifest schema version this fold reads. */
 export const SUPPORTED_SCHEMA_VERSION = 3;
@@ -49,6 +50,50 @@ export const REGISTERED_EXTENSIONS = [
   "ext-cinematography",
   "ext-provenance",
 ];
+
+// ---------------------------------------------------------------------------
+// Entity-reference fields (schema/entity-refs.json, spec/world.md
+// "Identity") — name binding, merge rewriting and validation read this
+// one list instead of hand-written ones.
+// ---------------------------------------------------------------------------
+
+/** The marked refs of one scope (and optionally one kind).
+ *  @param {string} scope @param {string} [kind]
+ *  @returns {{scope: string, path: string[], kind: string}[]} */
+function refsOf(scope, kind) {
+  return ENTITY_REFS.filter((r) => r.scope === scope && (kind === undefined || r.kind === kind));
+}
+
+/** Walk a marked path, calling `fn(current, set)` at the leaf; `*`
+ *  walks every array element. Missing keys walk to nothing.
+ *  @param {any} node @param {string[]} path @param {number} i
+ *  @param {(current: any, set: (v: any) => void) => void} fn */
+function walkRefPath(node, path, i, fn) {
+  if (node === null || typeof node !== "object") return;
+  const key = path[i];
+  const last = i === path.length - 1;
+  if (key === "*") {
+    if (!Array.isArray(node)) return;
+    node.forEach((element, j) => {
+      if (last) fn(element, (v) => { node[j] = v; });
+      else walkRefPath(element, path, i + 1, fn);
+    });
+    return;
+  }
+  if (!(key in node)) return;
+  if (last) fn(node[key], (v) => { node[key] = v; });
+  else walkRefPath(node[key], path, i + 1, fn);
+}
+
+/** Every marked entity-reference field of `value` — an entity or patch
+ *  ("entity"), the manifest's avatar ("avatar"), one creation
+ *  ("creation") — calling `fn(current, set)` on each, in place.
+ *  @param {string} scope @param {any} value
+ *  @param {(current: any, set: (v: any) => void) => void} fn */
+function eachRef(scope, value, fn) {
+  if (value === null || typeof value !== "object") return;
+  for (const ref of refsOf(scope)) walkRefPath(value, ref.path, 0, fn);
+}
 
 // ---------------------------------------------------------------------------
 // Document types (the schema's $defs, as far as the fold reads them)
@@ -908,30 +953,26 @@ function requireNamed(state, name) {
 }
 
 /**
- * Resolve an entity's by-name behavior references to ids, in place —
+ * Resolve an entity's by-name references to ids, in place —
  * spec/world.md "Identity": cross-entity references may be written by
  * name (what authors and models produce) and MUST be resolved to id at
  * ingestion against the fold-so-far; saved worlds always contain ids.
  * Delayed resolution is strictly forbidden: a rename would otherwise
- * re-bind a logged ref and break log determinism. `modulations[]`
- * `.target` is a property name (emissive, scale…), never an entity
- * ref — untouched.
+ * re-bind a logged ref and break log determinism. The fields are the
+ * schema's marked entity refs (`entity` scope, `bindable`) except the
+ * top-level ones (`parent`), which op intake binds *before* apply —
+ * the fold's apply step validates them, so a raw string there is
+ * already a refusal. `modulations[]` `.target` is a property name
+ * (emissive, scale…), never an entity ref — untouched.
  * @param {FoldState} state the fold the names resolve against
  * @param {WorldEntity} entity mutated: string refs become ids
  */
 function resolveNames(state, entity) {
-  if (!Array.isArray(entity.behaviors)) return;
-  for (const behavior of entity.behaviors) {
-    if (behavior === null || typeof behavior !== "object") continue;
-    const keys = Object.keys(behavior);
-    if (keys.length !== 1) continue; // externally tagged: one kind per object
-    const def = behavior[keys[0]];
-    if (def === null || typeof def !== "object") continue;
-    if (keys[0] === "Orbit" && typeof def.center === "string") {
-      def.center = requireNamed(state, def.center);
-    } else if (keys[0] === "LookAt" && typeof def.target === "string") {
-      def.target = requireNamed(state, def.target);
-    }
+  for (const ref of refsOf("entity", "bindable")) {
+    if (ref.path.length === 1) continue; // bound at op intake (bindOp)
+    walkRefPath(entity, ref.path, 0, (current, set) => {
+      if (typeof current === "string") set(requireNamed(state, current));
+    });
   }
 }
 
@@ -1237,28 +1278,13 @@ function collectSpawned(ops, into) {
   }
 }
 
-/** Remap numeric behavior refs (`Orbit.center`, `LookAt.target`) inside
- *  a behaviors array, in place on the copy being built. String refs are
- *  names, not ids — left alone.
- *  @param {any} behaviors
- *  @param {Map<number, number>} remapped */
-function remapBehaviorRefs(behaviors, remapped) {
-  if (!Array.isArray(behaviors)) return;
-  for (const behavior of behaviors) {
-    if (behavior === null || typeof behavior !== "object") continue;
-    const [kind] = Object.keys(behavior);
-    const def = behavior[kind];
-    if (def === null || typeof def !== "object") continue;
-    if (kind === "Orbit" && typeof def.center === "number" && remapped.has(def.center)) {
-      def.center = remapped.get(def.center);
-    } else if (kind === "LookAt" && typeof def.target === "number" && remapped.has(def.target)) {
-      def.target = remapped.get(def.target);
-    }
-  }
-}
-
 /** One op rewritten through an id remap: new objects throughout, the
  *  inputs never mutated. History and extension ops deep-copy unchanged.
+ *  The reference fields are the schema's marked entity refs: `entity`
+ *  scope on spawn entities and modify patches, `avatar` and `creation`
+ *  scopes on ModifyWorld's patch. Identity fields (`entity.id`,
+ *  `ModifyEntity.id`, `DeleteEntity.id`) are op addresses, not schema
+ *  refs — they stay explicit.
  *  @param {Record<string, any>} op
  *  @param {Map<number, number>} remapped
  *  @returns {Record<string, any>} */
@@ -1268,21 +1294,21 @@ function remapOp(op, remapped) {
   if (c.kind !== "edit") return structuredClone(op);
   /** @param {number} id */
   const remap = (id) => (remapped.has(id) ? remapped.get(id) : id);
+  /** @param {string} scope @param {any} value */
+  const remapRefs = (scope, value) => eachRef(scope, value, (current, set) => {
+    if (typeof current === "number") set(remap(current));
+  });
   switch (c.edit) {
     case "SpawnEntity": {
       const entity = structuredClone(c.value.entity);
       entity.id = remap(entity.id);
-      if (entity.parent !== undefined && entity.parent !== null) entity.parent = remap(entity.parent);
-      remapBehaviorRefs(entity.behaviors, remapped);
+      remapRefs("entity", entity);
       return { SpawnEntity: { entity } };
     }
     case "ModifyEntity": {
       const value = structuredClone(c.value);
       value.id = remap(value.id);
-      if (value.patch && value.patch.parent !== undefined && value.patch.parent !== null) {
-        value.patch.parent = remap(value.patch.parent);
-      }
-      remapBehaviorRefs(value.patch?.behaviors, remapped);
+      if (value.patch && typeof value.patch === "object") remapRefs("entity", value.patch);
       return { ModifyEntity: value };
     }
     case "DeleteEntity": {
@@ -1296,15 +1322,9 @@ function remapOp(op, remapped) {
       const value = structuredClone(c.value);
       const patch = value.patch;
       if (patch && typeof patch === "object") {
-        const modelEntity = patch.avatar?.model_entity;
-        if (typeof modelEntity === "number") patch.avatar.model_entity = remap(modelEntity);
+        remapRefs("avatar", patch.avatar);
         if (Array.isArray(patch.creations)) {
-          for (const creation of patch.creations) {
-            if (creation === null || typeof creation !== "object") continue;
-            if (Array.isArray(creation.entities)) {
-              creation.entities = creation.entities.map((/** @type {any} */ id) => (typeof id === "number" ? remap(id) : id));
-            }
-          }
+          for (const creation of patch.creations) remapRefs("creation", creation);
         }
       }
       return { ModifyWorld: value };
@@ -1560,6 +1580,15 @@ function bindOp(trial, op, spawned) {
     if (id === undefined) throw new Error(`no entity is named "${ref}"`);
     return id;
   };
+  // Top-level bindable entity refs (today: `parent`) bind at op intake,
+  // before the op applies; behavior refs bind after, against the spawned
+  // world (resolveNames) — the same list, walked per pass.
+  /** @param {any} value */
+  const bindTopLevelRefs = (value) => {
+    for (const ref of refsOf("entity", "bindable")) {
+      if (ref.path.length === 1) walkRefPath(value, ref.path, 0, (current, set) => set(resolve(current)));
+    }
+  };
   switch (kind) {
     case "SpawnEntity": {
       const entity = body?.entity;
@@ -1570,7 +1599,7 @@ function bindOp(trial, op, spawned) {
       } else if (typeof entity.id !== "number") {
         throw new Error("a new entity's id is a number, or left out to get one");
       }
-      if ("parent" in entity) entity.parent = resolve(entity.parent);
+      bindTopLevelRefs(entity);
       if (typeof entity.name === "string") spawned[entity.name] = entity.id;
       return;
     }
@@ -1579,7 +1608,7 @@ function bindOp(trial, op, spawned) {
       const current = trial.byId.get(body.id);
       const patch = body.patch;
       if (patch && typeof patch === "object") {
-        if ("parent" in patch) patch.parent = resolve(patch.parent);
+        bindTopLevelRefs(patch);
         if (current) {
           for (const field of ["transform", "material", "light"]) {
             if (patch[field] && typeof patch[field] === "object" && current[field] && typeof current[field] === "object") {
@@ -1601,6 +1630,11 @@ function bindOp(trial, op, spawned) {
     case "ModifyWorld": {
       const patch = body?.patch;
       if (patch && typeof patch === "object") {
+        // The avatar's marked refs (today: `model_entity`) bind like any
+        // other — a name where an entity id goes resolves at intake.
+        if (patch.avatar && typeof patch.avatar === "object") {
+          eachRef("avatar", patch.avatar, (current, set) => set(resolve(current)));
+        }
         const now = toManifest(trial);
         for (const field of ["meta", "environment", "camera", "avatar", "soundtrack"]) {
           if (patch[field] && typeof patch[field] === "object" && now[field] && typeof now[field] === "object") {

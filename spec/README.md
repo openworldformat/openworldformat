@@ -65,7 +65,9 @@ engine's.
    references, and the JS renderer's letterboxed shot view.
 3. **A schema marker on entity-reference fields**, so name binding, merge
    rewriting and validation read one list instead of five hand-written
-   ones.
+   ones. The marker (`x-entity-ref`) and the generated list
+   ([`schema/entity-refs.json`](../schema/entity-refs.json)) are in; the
+   references are moving their passes onto it, JS first.
 
 **Deferred until a producer needs them:** collision-free ids, an `id` and
 `parent` on every entry, and timed input samples (a breaking bundle, for git
