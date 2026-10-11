@@ -1,6 +1,6 @@
 # RFC: The cinematography extension (`ext-cinematography`)
 
-**Status:** proposed (version 0.2). The normative text is
+**Status:** proposed (version 0.3). The normative text is
 [`spec/extensions/cinematography.md`](../extensions/cinematography.md);
 this note states the problem, the alternatives and the cost, per
 [CONTRIBUTING](../../CONTRIBUTING.md).
@@ -47,6 +47,20 @@ come back when a producer needs animatics.
    would smuggle renderer differences into a camera contract. Outcome
    assertions — the physics pattern — check FOV, frame membership and
    the shot list by math alone.
+4. **Aiming at an actor by name, as a soft reference** (0.3). The
+   second pass of a previs — "move Maya a step left" — is where a
+   camera aimed at a world point goes stale: every single aimed at her
+   head now looks at air. A string naming the actor would fix the
+   draft and break on the first rename, and a merge could not see it
+   to rewrite. The core already has the answer: reference fields are
+   marked in the schema, and name binding, merge rewriting and
+   ingestion validation read the one generated list. So `aim_entity`
+   and `focus_entity` are marked in the extension's schema, the
+   generator reads extension schemas too, and the five references
+   treat the two fields exactly as they treat `parent` — the first
+   extension fields with the core's reference guarantees, at the cost
+   of one generator pass and, in the typed reference, one walk arm
+   over the entity's extension JSON.
 
 ## The cost
 

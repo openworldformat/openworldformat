@@ -36,7 +36,7 @@
       "notes": "Allows authors to conditionally hide entities (e.g. traps, GM secrets) from specific profiles until revealed."
     },
     "ext-cinematography": {
-      "version": "0.2.0",
+      "version": "0.3.0",
       "status": "experimental",
       "spec": "spec/extensions/cinematography.md",
       "rfc": "spec/rfcs/ext-cinematography.md",
@@ -44,13 +44,14 @@
       "implementations": [
         "js/src/cinematography.js (npm openworldformat/cinematography)",
         "rust/src/cinematography.rs (crates.io openworldformat::cinematography)",
-        "python/openworldformat/cinematography.py (PyPI openworldformat)"
+        "python/openworldformat/cinematography.py (PyPI openworldformat)",
+        "swift/Sources/OpenWorldFormat/Cinematography.swift (SwiftPM OpenWorldFormat)"
       ],
       "conformance": [
         "conformance/cinematography.json",
         "conformance/outcomes/cinematography.json"
       ],
-      "notes": "Cameras as entities with a filmback and a lens; shots as ordered setups on the clock. Three implementations, all running the same outcome assertions — derived FOV, frame membership, the shot list — in their own CI; the JS renderer looks through a shot letterboxed to its frame (world.html?shot=). Version 0.1 promised splines and keyframed tracks and implemented nothing; 0.2 scoped to cameras and shots — tracks return as ext-cinematography.track when a producer needs animatics. Still experimental until a producer outside this repository ships a package using it."
+      "notes": "Cameras as entities with a filmback and a lens; shots as ordered setups on the clock; 0.3 adds aim_entity and focus_entity — a camera that aims and focuses on an actor by entity reference, marked x-entity-ref in the extension's schema so the one generated list carries them and every reference binds, rewrites and validates them like parent. Four implementations, all running the same outcome assertions — derived FOV, frame membership, centring and focus by entity through parents, the shot list — in their own CI; the JS renderer looks through a shot letterboxed to its frame (world.html?shot=). Version 0.1 promised splines and keyframed tracks and implemented nothing; 0.2 scoped to cameras and shots — tracks return as ext-cinematography.track when a producer needs animatics. Still experimental until a producer outside this repository ships a package using it."
     },
     "ext-provenance": {
       "version": "0.1.0",

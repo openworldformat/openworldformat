@@ -10,9 +10,13 @@
 //! - [`CameraComponent::of`] / [`frame_of`] — the camera declaration,
 //!   and the normative crop math (Unreal's crop-to-aspect rule written
 //!   out: cropping never widens the frame past the sensor, it trims);
-//! - [`view_of`] / [`project`] — the aim look-at (+Y up, else the
-//!   entity's local −Z) and a pinhole projection, so "is it in frame"
-//!   is a predicate;
+//! - [`view_of`] / [`view_in`] / [`project`] — the aim look-at (+Y up,
+//!   else the entity's local −Z) and a pinhole projection, so "is it in
+//!   frame" is a predicate; `view_in` resolves `aim_entity` in a world;
+//! - [`world_origin`] — an entity's origin composed through its
+//!   parents, the point every assertion projects and the point
+//!   `aim_entity` and `focus_entity` resolve to ([`aim_point_of`],
+//!   [`focus_distance_of`]);
 //! - [`shot_list`] — the setups, ordered for the clock;
 //! - [`run_outcomes`] — the conformance outcome runner: one assertion
 //!   file, any implementation, the same predicates.
@@ -28,7 +32,7 @@ use crate as wt;
 pub const EXTENSION_NAME: &str = "ext-cinematography";
 
 /// The extension version this module implements.
-pub const EXTENSION_VERSION: &str = "0.2.0";
+pub const EXTENSION_VERSION: &str = "0.3.0";
 
 /// The default sensor (filmback): Super 35, `[w, h]` in mm.
 pub const DEFAULT_SENSOR: [f64; 2] = [24.89, 18.66];
@@ -56,8 +60,15 @@ pub struct CameraComponent {
     /// Look at this world point, +Y up; absent looks down the entity's
     /// local −Z (the glTF / three.js / Bevy convention).
     pub aim: Option<[f64; 3]>,
+    /// Look at this entity's origin, over `aim`, while it exists — an
+    /// entity reference: the id in a document, a name at intake (bound
+    /// at ingestion, rewritten at merge, like `parent`).
+    pub aim_entity: Option<wt::EntityRef>,
     /// Focus distance, m.
     pub focus_distance_m: Option<f64>,
+    /// Focus on this entity: the focus distance is the distance to its
+    /// origin, over `focus_distance_m`, while it exists.
+    pub focus_entity: Option<wt::EntityRef>,
     /// The f-stop.
     pub f_stop: Option<f64>,
 }
@@ -88,13 +99,18 @@ impl CameraComponent {
                 .collect();
             (a.len() == 3).then_some([a[0], a[1], a[2]])
         };
+        let reference = |k: &str| -> Option<wt::EntityRef> {
+            serde_json::from_value(camera.get(k)?.clone()).ok()
+        };
         Some(CameraComponent {
             sensor_mm: vec2("sensor_mm").unwrap_or(DEFAULT_SENSOR),
             focal_length_mm: num("focal_length_mm", DEFAULT_FOCAL_LENGTH),
             aspect_ratio: opt("aspect_ratio"),
             squeeze: num("squeeze", 1.0),
             aim: vec3("aim"),
+            aim_entity: reference("aim_entity"),
             focus_distance_m: opt("focus_distance_m"),
+            focus_entity: reference("focus_entity"),
             f_stop: opt("f_stop"),
         })
     }
@@ -161,6 +177,10 @@ fn sub(a: [f64; 3], b: [f64; 3]) -> [f64; 3] {
     [a[0] - b[0], a[1] - b[1], a[2] - b[2]]
 }
 
+fn add(a: [f64; 3], b: [f64; 3]) -> [f64; 3] {
+    [a[0] + b[0], a[1] + b[1], a[2] + b[2]]
+}
+
 fn cross(a: [f64; 3], b: [f64; 3]) -> [f64; 3] {
     [
         a[1] * b[2] - a[2] * b[1],
@@ -194,12 +214,102 @@ fn rotate_intrinsic_xyz(v: [f64; 3], degrees: [f64; 3]) -> [f64; 3] {
     [x, y, z]
 }
 
-/// A camera's view: with `aim`, the camera looks at the world point, +Y
-/// up; without it, it looks down the entity's local −Z, its frame
-/// carried by the entity's rotation.
+/// The entity a reference names, in a world: by id (a bound reference,
+/// what a document holds) or by name (an authoring-time one, before
+/// ingestion binds it). `None` when nothing answers.
+pub fn entity_of<'a>(
+    reference: &wt::EntityRef,
+    manifest: &'a wt::WorldManifest,
+) -> Option<&'a wt::WorldEntity> {
+    manifest.entities.iter().find(|entity| match reference {
+        wt::EntityRef::Id(id) => entity.id == *id,
+        wt::EntityRef::Name(name) => entity.name.as_str() == name.as_str(),
+    })
+}
+
+/// An entity's origin in world space: its `transform.position` composed
+/// through its parents — the document's TRS hierarchy, `p = P + R·(S ⊙ p)`
+/// up the chain (spec/world.md "Conventions"). An unparented entity's
+/// origin is its position as written; a parent the world doesn't hold
+/// ends the chain. This is the point every outcome assertion projects
+/// and the point `aim_entity` and `focus_entity` resolve to.
+pub fn world_origin(entity: &wt::WorldEntity, manifest: &wt::WorldManifest) -> [f64; 3] {
+    let mut point: [f64; 3] = entity.transform.position.map(|p| p as f64);
+    let mut current = entity;
+    for _ in 0..4096 {
+        let Some(parent_id) = current.parent else {
+            break;
+        };
+        let Some(parent) = manifest.entities.iter().find(|e| e.id == parent_id) else {
+            break;
+        };
+        let p: [f64; 3] = parent.transform.position.map(|v| v as f64);
+        let r: [f64; 3] = parent.transform.rotation_degrees.map(|v| v as f64);
+        let s: [f64; 3] = parent.transform.scale.map(|v| v as f64);
+        point = add(
+            p,
+            rotate_intrinsic_xyz([point[0] * s[0], point[1] * s[1], point[2] * s[2]], r),
+        );
+        current = parent;
+    }
+    point
+}
+
+/// The point a camera aims at: `aim_entity`'s world origin while that
+/// entity exists in the world, else `aim`, else `None` (the camera
+/// looks down its local −Z).
+pub fn aim_point_of(camera: &CameraComponent, manifest: &wt::WorldManifest) -> Option<[f64; 3]> {
+    if let Some(target) = camera
+        .aim_entity
+        .as_ref()
+        .and_then(|reference| entity_of(reference, manifest))
+    {
+        return Some(world_origin(target, manifest));
+    }
+    camera.aim
+}
+
+/// A camera's focus distance, metres: the distance from the camera
+/// entity's world origin to `focus_entity`'s while that entity exists,
+/// else `focus_distance_m`, else `None`.
+pub fn focus_distance_of(
+    entity: &wt::WorldEntity,
+    camera: &CameraComponent,
+    manifest: &wt::WorldManifest,
+) -> Option<f64> {
+    if let Some(target) = camera
+        .focus_entity
+        .as_ref()
+        .and_then(|reference| entity_of(reference, manifest))
+    {
+        let d = sub(world_origin(target, manifest), world_origin(entity, manifest));
+        return Some(dot(d, d).sqrt());
+    }
+    camera.focus_distance_m
+}
+
+/// A camera's view from its own transform alone: with `aim`, the camera
+/// looks at the world point, +Y up; without it, it looks down the
+/// entity's local −Z, its frame carried by the entity's rotation. An
+/// `aim_entity` needs the world to resolve — see [`view_in`].
 pub fn view_of(entity: &wt::WorldEntity, camera: &CameraComponent) -> CameraView {
     let position: [f64; 3] = entity.transform.position.map(|p| p as f64);
-    if let Some(aim) = camera.aim {
+    view_from(entity, position, camera.aim)
+}
+
+/// A camera's view in a world: the camera stands at its world origin
+/// and looks at its aim point — `aim_entity`'s origin while that entity
+/// exists, else `aim` — +Y up; with neither, down its local −Z.
+pub fn view_in(
+    entity: &wt::WorldEntity,
+    camera: &CameraComponent,
+    manifest: &wt::WorldManifest,
+) -> CameraView {
+    view_from(entity, world_origin(entity, manifest), aim_point_of(camera, manifest))
+}
+
+fn view_from(entity: &wt::WorldEntity, position: [f64; 3], aim: Option<[f64; 3]>) -> CameraView {
+    if let Some(aim) = aim {
         let forward = norm(sub(aim, position));
         let right = norm(cross(forward, [0.0, 1.0, 0.0]));
         let up = cross(right, forward);
@@ -312,7 +422,7 @@ pub struct OutcomesDoc {
 }
 
 /// One assertion. The shapes match the conformance JSON: `fov`,
-/// `in_frame`, `out_of_frame`, `shot_list`.
+/// `in_frame`, `out_of_frame`, `centred`, `focus`, `shot_list`.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(untagged)]
 pub enum Assertion {
@@ -330,6 +440,17 @@ pub enum Assertion {
     OutOfFrame {
         /// The out_of_frame assertion.
         out_of_frame: FrameAssertion,
+    },
+    /// An entity's origin projects at the frame's centre — what
+    /// `aim_entity` promises.
+    Centred {
+        /// The centred assertion.
+        centred: CentredAssertion,
+    },
+    /// A camera's derived focus distance.
+    Focus {
+        /// The focus assertion.
+        focus: FocusAssertion,
     },
     /// The cameras with a `shot`, in order.
     ShotList {
@@ -366,6 +487,30 @@ pub struct FrameAssertion {
     pub entity: String,
 }
 
+/// The `centred` assertion's payload.
+#[derive(Debug, Clone, Deserialize)]
+pub struct CentredAssertion {
+    /// The camera entity's name.
+    pub camera: String,
+    /// The entity whose origin projects at the centre.
+    pub entity: String,
+    /// The tolerance, frame-half units (default 0.001).
+    #[serde(default)]
+    pub tolerance: Option<f64>,
+}
+
+/// The `focus` assertion's payload.
+#[derive(Debug, Clone, Deserialize)]
+pub struct FocusAssertion {
+    /// The camera entity's name.
+    pub camera: String,
+    /// Expected focus distance, metres.
+    pub distance_m: f64,
+    /// The tolerance, metres (default 0.001).
+    #[serde(default)]
+    pub tolerance: Option<f64>,
+}
+
 /// An outcomes run's verdict.
 #[derive(Debug, Clone, PartialEq)]
 pub struct OutcomeResult {
@@ -383,7 +528,8 @@ pub fn run_outcomes(manifest: &wt::WorldManifest, outcomes: &OutcomesDoc) -> Out
     for assertion in &outcomes.expect {
         match assertion {
             Assertion::Fov { fov } => {
-                let Some((_, frame, _)) = camera_setup(manifest, &fov.camera, &mut failures) else {
+                let Some((_, _, frame, _)) = camera_setup(manifest, &fov.camera, &mut failures)
+                else {
                     continue;
                 };
                 let tolerance = fov.tolerance.unwrap_or(0.001);
@@ -411,7 +557,7 @@ pub fn run_outcomes(manifest: &wt::WorldManifest, outcomes: &OutcomesDoc) -> Out
                 out_of_frame: target,
             } => {
                 let expect_inside = matches!(assertion, Assertion::InFrame { .. });
-                let Some((camera, frame, view)) =
+                let Some((_, camera, frame, view)) =
                     camera_setup(manifest, &target.camera, &mut failures)
                 else {
                     continue;
@@ -430,6 +576,40 @@ pub fn run_outcomes(manifest: &wt::WorldManifest, outcomes: &OutcomesDoc) -> Out
                         "{}: {} projects inside the frame ({:.3}, {:.3})",
                         target.camera, target.entity, p.x, p.y
                     ));
+                }
+            }
+            Assertion::Centred { centred } => {
+                let Some((_, camera, frame, view)) =
+                    camera_setup(manifest, &centred.camera, &mut failures)
+                else {
+                    continue;
+                };
+                let tolerance = centred.tolerance.unwrap_or(0.001);
+                let origin = origin_of(manifest, &centred.entity, &mut failures);
+                let p = project(&view, &frame, &camera, origin);
+                if !(p.z > 0.0 && p.x.abs() <= tolerance && p.y.abs() <= tolerance) {
+                    failures.push(format!(
+                        "{}: {} projects at ({:.4}, {:.4}), z {:.3} — not the frame's centre (tolerance {tolerance})",
+                        centred.camera, centred.entity, p.x, p.y, p.z
+                    ));
+                }
+            }
+            Assertion::Focus { focus } => {
+                let Some((entity, camera, _, _)) =
+                    camera_setup(manifest, &focus.camera, &mut failures)
+                else {
+                    continue;
+                };
+                let tolerance = focus.tolerance.unwrap_or(0.001);
+                match focus_distance_of(entity, &camera, manifest) {
+                    None => failures.push(format!("{}: no focus distance", focus.camera)),
+                    Some(actual) if (actual - focus.distance_m).abs() > tolerance => {
+                        failures.push(format!(
+                            "{}: focus distance {} != {} (tolerance {tolerance})",
+                            focus.camera, actual, focus.distance_m
+                        ));
+                    }
+                    Some(_) => {}
                 }
             }
             Assertion::ShotList { shot_list: expected } => {
@@ -451,13 +631,13 @@ pub fn run_outcomes(manifest: &wt::WorldManifest, outcomes: &OutcomesDoc) -> Out
     }
 }
 
-/// The named camera entity's component, frame and view — or a failure
-/// line and `None`.
-fn camera_setup(
-    manifest: &wt::WorldManifest,
+/// The named camera entity, its component, frame and view in the world
+/// — or a failure line and `None`.
+fn camera_setup<'a>(
+    manifest: &'a wt::WorldManifest,
     name: &str,
     failures: &mut Vec<String>,
-) -> Option<(CameraComponent, CameraFrame, CameraView)> {
+) -> Option<(&'a wt::WorldEntity, CameraComponent, CameraFrame, CameraView)> {
     let entity = manifest.entities.iter().find(|e| e.name.as_str() == name);
     let camera = entity.and_then(CameraComponent::of);
     let (Some(entity), Some(camera)) = (entity, camera) else {
@@ -465,15 +645,15 @@ fn camera_setup(
         return None;
     };
     let frame = frame_of(&camera);
-    let view = view_of(entity, &camera);
-    Some((camera, frame, view))
+    let view = view_in(entity, &camera, manifest);
+    Some((entity, camera, frame, view))
 }
 
-/// An entity's origin — or a failure line and the world origin (the JS
-/// reference's fallback).
+/// An entity's world origin — or a failure line and the world origin
+/// (the JS reference's fallback).
 fn origin_of(manifest: &wt::WorldManifest, name: &str, failures: &mut Vec<String>) -> [f64; 3] {
     match manifest.entities.iter().find(|e| e.name.as_str() == name) {
-        Some(entity) => entity.transform.position.map(|p| p as f64),
+        Some(entity) => world_origin(entity, manifest),
         None => {
             failures.push(format!("no entity named {name}"));
             [0.0, 0.0, 0.0]
@@ -522,8 +702,22 @@ mod tests {
         assert_eq!(bare.focal_length_mm, DEFAULT_FOCAL_LENGTH);
         assert_eq!(bare.squeeze, 1.0);
         assert_eq!(bare.aspect_ratio, None);
+        assert_eq!(bare.aim_entity, None);
+        assert_eq!(bare.focus_entity, None);
+        // The references read as the document holds them: an id, or a
+        // name before ingestion binds it.
+        let tracked = CameraComponent::of(by_name(&manifest, "4A")).unwrap();
+        assert_eq!(tracked.aim_entity, Some(wt::EntityRef::id(4)));
+        assert_eq!(tracked.focus_entity, Some(wt::EntityRef::id(4)));
+        let named = CameraComponent::of(&entity(
+            2,
+            "n",
+            serde_json::json!({"camera": {"aim_entity": "maya"}}),
+        ))
+        .unwrap();
+        assert!(matches!(named.aim_entity, Some(wt::EntityRef::Name(_))));
         // The extension version the module implements.
-        assert_eq!(EXTENSION_VERSION, "0.2.0");
+        assert_eq!(EXTENSION_VERSION, "0.3.0");
     }
 
     #[test]
@@ -584,11 +778,67 @@ mod tests {
     }
 
     #[test]
+    fn world_origin_composes_the_position_through_the_parents() {
+        let manifest = cinema_world();
+        // The mug sits on a tray turned 30° on the counter: its origin
+        // is its local position rotated and carried, not as written.
+        let mug = world_origin(by_name(&manifest, "mug"), &manifest);
+        let expected = [0.8 + 0.3 * 30f64.to_radians().cos(), 1.05, -1.0 - 0.3 * 30f64.to_radians().sin()];
+        for i in 0..3 {
+            assert!((mug[i] - expected[i]).abs() < 1e-5, "axis {i}: {} vs {}", mug[i], expected[i]);
+        }
+        // An unparented entity's origin is its position.
+        let maya = world_origin(by_name(&manifest, "maya"), &manifest);
+        assert!((maya[0] + 1.5).abs() < 1e-6 && (maya[1] - 0.85).abs() < 1e-6);
+    }
+
+    #[test]
+    fn aim_entity_centres_the_target_and_focus_entity_measures_to_it() {
+        let manifest = cinema_world();
+        let tracked = by_name(&manifest, "4A");
+        let camera = CameraComponent::of(tracked).unwrap();
+        let view = view_in(tracked, &camera, &manifest);
+        let frame = frame_of(&camera);
+        let maya = world_origin(by_name(&manifest, "maya"), &manifest);
+        let p = project(&view, &frame, &camera, maya);
+        assert!(p.x.abs() < 1e-6 && p.y.abs() < 1e-6 && p.z > 0.0);
+        assert_eq!(aim_point_of(&camera, &manifest), Some(maya));
+        let focus = focus_distance_of(tracked, &camera, &manifest).unwrap();
+        assert!((focus - 4.3843).abs() < 1e-3, "{focus}");
+        // Through the parents: the insert centres the mug's world
+        // origin, and focuses on it from there.
+        let insert = by_name(&manifest, "insert");
+        let camera = CameraComponent::of(insert).unwrap();
+        let view = view_in(insert, &camera, &manifest);
+        let p = project(&view, &frame_of(&camera), &camera, world_origin(by_name(&manifest, "mug"), &manifest));
+        assert!(p.x.abs() < 1e-6 && p.y.abs() < 1e-6 && p.z > 0.0);
+        let focus = focus_distance_of(insert, &camera, &manifest).unwrap();
+        assert!((focus - 1.4956).abs() < 1e-3, "{focus}");
+    }
+
+    #[test]
+    fn a_gone_target_leaves_aim_then_the_rotation_and_focus_distance_m() {
+        let manifest = cinema_world();
+        let mut orphan = entity(
+            40,
+            "orphan",
+            serde_json::json!({"camera": {"aim_entity": 999, "aim": [0.0, 1.0, 0.0],
+                "focus_entity": 999, "focus_distance_m": 2.5}}),
+        );
+        orphan.transform.position = [0.0, 1.0, 5.0];
+        let camera = CameraComponent::of(&orphan).unwrap();
+        assert_eq!(aim_point_of(&camera, &manifest), Some([0.0, 1.0, 0.0]));
+        assert_eq!(focus_distance_of(&orphan, &camera, &manifest), Some(2.5));
+        let view = view_in(&orphan, &camera, &manifest);
+        assert!((view.forward[2] + 1.0).abs() < 1e-9, "looks down −Z at the aim point");
+    }
+
+    #[test]
     fn shot_list_orders_by_shot_order_ties_by_entity_id_and_skips_shot_less_cameras() {
         let manifest = cinema_world();
         let shots = shot_list(&manifest);
         let names: Vec<&str> = shots.iter().map(|s| s.name.as_str()).collect();
-        assert_eq!(names, ["1A", "2A", "2B", "3A"]); // bts carries no shot
+        assert_eq!(names, ["1A", "2A", "2B", "3A", "4A"]); // bts and insert carry no shot
         // Absent orders sort last; ties break by id.
         let mut world = WorldManifest::new("t");
         world.entities.push(entity(7, "b", serde_json::json!({"shot": {}})));

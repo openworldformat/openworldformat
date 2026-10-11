@@ -1,6 +1,7 @@
 """The ext-cinematography reference, in Python — mirrors js/test/cinematography.test.mjs."""
 
 import json
+import math
 import unittest
 from pathlib import Path
 
@@ -9,12 +10,15 @@ from openworldformat.cinematography import (
     DEFAULT_SENSOR,
     EXTENSION_NAME,
     EXTENSION_VERSION,
+    aim_point_of,
     camera_of,
+    focus_distance_of,
     frame_of,
     project,
     run_outcomes,
     shot_list,
     view_of,
+    world_origin,
 )
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -37,8 +41,62 @@ class CameraTest(unittest.TestCase):
         self.assertEqual(bare["focal_length_mm"], 35)
         self.assertEqual(bare["squeeze"], 1)
         self.assertIsNone(bare["aspect_ratio"])
+        self.assertIsNone(bare["aim_entity"])
+        self.assertIsNone(bare["focus_entity"])
+        # The references read as the document holds them.
+        self.assertEqual(camera_of(by_name(manifest, "4A"))["aim_entity"], 4)
+        self.assertEqual(camera_of(by_name(manifest, "4A"))["focus_entity"], 4)
         # The extension version the module implements.
-        self.assertEqual(EXTENSION_VERSION, "0.2.0")
+        self.assertEqual(EXTENSION_VERSION, "0.3.0")
+
+
+class OriginTest(unittest.TestCase):
+    def test_world_origin_composes_the_position_through_the_parents(self):
+        manifest = cinema_world()
+        # The mug sits on a tray turned 30° on the counter: its origin is
+        # its local position rotated and carried, not as written.
+        mug = world_origin(by_name(manifest, "mug"), manifest)
+        rad = math.radians(30)
+        expected = [0.8 + 0.3 * math.cos(rad), 1.05, -1 - 0.3 * math.sin(rad)]
+        for i in range(3):
+            self.assertLess(abs(mug[i] - expected[i]), 1e-9)
+        # An unparented entity's origin is its position.
+        self.assertEqual(world_origin(by_name(manifest, "maya"), manifest), [-1.5, 0.85, 0])
+
+    def test_aim_entity_centres_the_target_and_focus_entity_measures_to_it(self):
+        manifest = cinema_world()
+        tracked = by_name(manifest, "4A")
+        camera = camera_of(tracked)
+        maya = world_origin(by_name(manifest, "maya"), manifest)
+        self.assertEqual(aim_point_of(camera, manifest), maya)
+        p = project(view_of(tracked, camera, manifest), frame_of(camera), camera, maya)
+        self.assertLess(abs(p["x"]), 1e-9)
+        self.assertLess(abs(p["y"]), 1e-9)
+        self.assertGreater(p["z"], 0)
+        self.assertLess(abs(focus_distance_of(tracked, camera, manifest) - 4.3843), 1e-3)
+        # The insert centres the parented mug's world origin and focuses on it.
+        insert = by_name(manifest, "insert")
+        macro = camera_of(insert)
+        q = project(view_of(insert, macro, manifest), frame_of(macro), macro,
+                    world_origin(by_name(manifest, "mug"), manifest))
+        self.assertLess(abs(q["x"]), 1e-9)
+        self.assertLess(abs(q["y"]), 1e-9)
+        self.assertGreater(q["z"], 0)
+        self.assertLess(abs(focus_distance_of(insert, macro, manifest) - 1.4956), 1e-3)
+        # Without the world only ``aim`` can answer: the tracked camera has none.
+        self.assertIsNone(aim_point_of(camera))
+
+    def test_a_gone_target_leaves_aim_then_the_rotation_and_focus_distance_m(self):
+        manifest = cinema_world()
+        orphan = {
+            "id": 40, "name": "orphan", "transform": {"position": [0, 1, 5]},
+            EXTENSION_NAME: {"camera": {"aim_entity": 999, "aim": [0, 1, 0],
+                                        "focus_entity": 999, "focus_distance_m": 2.5}},
+        }
+        camera = camera_of(orphan)
+        self.assertEqual(aim_point_of(camera, manifest), [0, 1, 0])
+        self.assertEqual(focus_distance_of(orphan, camera, manifest), 2.5)
+        self.assertLess(abs(view_of(orphan, camera, manifest)["forward"][2] + 1), 1e-9)
 
 
 class FrameTest(unittest.TestCase):
@@ -99,7 +157,7 @@ class ProjectTest(unittest.TestCase):
 class ShotListTest(unittest.TestCase):
     def test_shot_list_orders_by_shot_order_ties_by_entity_id_and_skips_shot_less_cameras(self):
         names = [s["name"] for s in shot_list(cinema_world())]
-        self.assertEqual(names, ["1A", "2A", "2B", "3A"])  # bts carries no shot
+        self.assertEqual(names, ["1A", "2A", "2B", "3A", "4A"])  # bts and insert carry no shot
         # Absent orders sort last; ties break by id.
         world = {"entities": [
             {"id": 7, "name": "b", EXTENSION_NAME: {"shot": {}}},

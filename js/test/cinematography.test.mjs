@@ -12,6 +12,7 @@ import path from "node:path";
 import { parseManifest } from "../src/index.js";
 import {
   cameraOf, frameOf, viewOf, project, shotList, runOutcomes,
+  worldOrigin, aimPointOf, focusDistanceOf,
   EXTENSION_NAME, EXTENSION_VERSION, DEFAULT_SENSOR,
 } from "../src/cinematography.js";
 
@@ -28,8 +29,53 @@ test("cameraOf applies the defaults per absent field, and null for non-cameras",
   assert.equal(bare.focal_length_mm, 35);
   assert.equal(bare.squeeze, 1);
   assert.equal(bare.aspect_ratio, undefined);
+  assert.equal(bare.aim_entity, undefined);
+  assert.equal(bare.focus_entity, undefined);
+  // The references read as the document holds them.
+  assert.equal(cameraOf(byName.get("4A")).aim_entity, 4);
+  assert.equal(cameraOf(byName.get("4A")).focus_entity, 4);
   // The extension version the module implements.
-  assert.equal(EXTENSION_VERSION, "0.2.0");
+  assert.equal(EXTENSION_VERSION, "0.3.0");
+});
+
+test("worldOrigin composes the position through the parents", () => {
+  // The mug sits on a tray turned 30° on the counter: its origin is its
+  // local position rotated and carried, not as written.
+  const mug = worldOrigin(byName.get("mug"), manifest);
+  const rad = Math.PI / 6;
+  const expected = [0.8 + 0.3 * Math.cos(rad), 1.05, -1 - 0.3 * Math.sin(rad)];
+  for (let i = 0; i < 3; i++) assert.ok(Math.abs(mug[i] - expected[i]) < 1e-9, `axis ${i}: ${mug[i]} vs ${expected[i]}`);
+  // An unparented entity's origin is its position.
+  assert.deepEqual(worldOrigin(byName.get("maya"), manifest), [-1.5, 0.85, 0]);
+});
+
+test("aim_entity centres the target and focus_entity measures to it, through parents", () => {
+  const tracked = byName.get("4A");
+  const camera = cameraOf(tracked);
+  const maya = worldOrigin(byName.get("maya"), manifest);
+  assert.deepEqual(aimPointOf(camera, manifest), maya);
+  const p = project(viewOf(tracked, camera, manifest), frameOf(camera), camera, maya);
+  assert.ok(Math.abs(p.x) < 1e-9 && Math.abs(p.y) < 1e-9 && p.z > 0);
+  assert.ok(Math.abs(focusDistanceOf(tracked, camera, manifest) - 4.3843) < 1e-3);
+  // The insert centres the parented mug's world origin and focuses on it.
+  const insert = byName.get("insert");
+  const macro = cameraOf(insert);
+  const q = project(viewOf(insert, macro, manifest), frameOf(macro), macro, worldOrigin(byName.get("mug"), manifest));
+  assert.ok(Math.abs(q.x) < 1e-9 && Math.abs(q.y) < 1e-9 && q.z > 0);
+  assert.ok(Math.abs(focusDistanceOf(insert, macro, manifest) - 1.4956) < 1e-3);
+  // Without the world only `aim` can answer: the tracked camera has none.
+  assert.equal(aimPointOf(camera), null);
+});
+
+test("a gone target leaves aim, then the rotation, and focus_distance_m", () => {
+  const orphan = {
+    id: 40, name: "orphan", transform: { position: [0, 1, 5] },
+    [EXTENSION_NAME]: { camera: { aim_entity: 999, aim: [0, 1, 0], focus_entity: 999, focus_distance_m: 2.5 } },
+  };
+  const camera = cameraOf(orphan);
+  assert.deepEqual(aimPointOf(camera, manifest), [0, 1, 0]);
+  assert.equal(focusDistanceOf(orphan, camera, manifest), 2.5);
+  assert.ok(Math.abs(viewOf(orphan, camera, manifest).forward[2] + 1) < 1e-9);
 });
 
 test("frameOf is the normative crop math: cropping trims, never widens", () => {
@@ -76,7 +122,7 @@ test("project puts the aim point at the frame's center", () => {
 
 test("shotList orders by shot.order, ties by entity id, and skips shot-less cameras", () => {
   const names = shotList(manifest).map((s) => s.name);
-  assert.deepEqual(names, ["1A", "2A", "2B", "3A"]); // bts carries no shot
+  assert.deepEqual(names, ["1A", "2A", "2B", "3A", "4A"]); // bts and insert carry no shot
   // Absent orders sort last; ties break by id.
   const world = { entities: [
     { id: 7, name: "b", [EXTENSION_NAME]: { shot: {} } },

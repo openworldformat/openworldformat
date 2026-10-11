@@ -2,7 +2,7 @@
   "version": 3,
   "meta": {
     "name": "conformance-cinematography",
-    "description": "The ext-cinematography extension: a small set (two actors at a counter) shot by four cameras — a Super 35 wide cropped to 2.39, two 50 mm singles, and a 40 mm anamorphic — plus a witness camera with no shot. Renderers without the extension draw the set; conformance for the extension itself is the outcome assertions in outcomes/cinematography.json (derived FOV, frame membership, the shot list)."
+    "description": "The ext-cinematography extension: a small set (two actors at a counter, a mug on a turned tray on the counter) shot by five cameras — a Super 35 wide cropped to 2.39, two 50 mm singles, a 40 mm anamorphic, and a 50 mm that aims and focuses on Maya by entity — plus two shot-less cameras: a witness, and a 100 mm insert aimed by entity at the parented mug. Renderers without the extension draw the set; conformance for the extension itself is the outcome assertions in outcomes/cinematography.json (derived FOV, frame membership, centring and focus by entity through parents, the shot list)."
   },
   "environment": {
     "background_color": [0.12, 0.13, 0.16, 1.0],
@@ -98,7 +98,40 @@
       "ext-cinematography": {
         "camera": { "focal_length_mm": 35.0, "aim": [0.0, 1.0, 0.0] }
       }
+    },
+    {
+      "id": 7,
+      "name": "tray",
+      "parent": 3,
+      "transform": { "position": [0.8, 0.5, 0.0], "rotation_degrees": [0.0, 30.0, 0.0] },
+      "shape": { "Cuboid": { "x": 0.5, "y": 0.02, "z": 0.35 } },
+      "material": { "color": [0.2, 0.2, 0.22, 1.0], "roughness": 0.5 }
+    },
+    {
+      "id": 8,
+      "name": "mug",
+      "parent": 7,
+      "transform": { "position": [0.3, 0.05, 0.0] },
+      "shape": { "Cylinder": { "radius": 0.04, "height": 0.1 } },
+      "material": { "color": [0.9, 0.9, 0.85, 1.0], "roughness": 0.4 }
+    },
+    {
+      "id": 35,
+      "name": "4A",
+      "transform": { "position": [1.0, 1.7, 3.5], "rotation_degrees": [0.0, 0.0, 0.0] },
+      "ext-cinematography": {
+        "camera": { "focal_length_mm": 50.0, "aspect_ratio": 2.39, "aim_entity": 4, "focus_entity": 4, "f_stop": 2.8 },
+        "shot": { "scene": "4", "order": 5, "in_s": 18.0, "out_s": 22.5, "size": "MCU", "description": "Maya, tracked: the camera aims and focuses on her by entity, so it stays on her when she moves" }
+      }
+    },
+    {
+      "id": 36,
+      "name": "insert",
+      "transform": { "position": [1.6, 1.4, 0.2], "rotation_degrees": [0.0, 0.0, 0.0] },
+      "ext-cinematography": {
+        "camera": { "focal_length_mm": 100.0, "aim_entity": 8, "focus_entity": 8, "f_stop": 4.0 }
+      }
     }
   ],
-  "next_entity_id": 35
+  "next_entity_id": 37
 }

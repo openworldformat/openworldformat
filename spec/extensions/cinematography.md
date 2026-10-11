@@ -1,8 +1,8 @@
-# The cinematography extension (`ext-cinematography`), version 0.2
+# The cinematography extension (`ext-cinematography`), version 0.3
 
-**Status: experimental.** Three reference implementations — JS
-(`openworldformat/cinematography`), Rust and Python — all running the
-same conformance outcome assertions, and the JS reference renderer
+**Status: experimental.** Four reference implementations — JS
+(`openworldformat/cinematography`), Rust, Python and Swift — all running
+the same conformance outcome assertions, and the JS reference renderer
 looking through a shot letterboxed to its frame. It leaves experimental
 when a producer ships a package using it
 ([CONTRIBUTING](../../CONTRIBUTING.md),
@@ -12,8 +12,12 @@ when a producer ships a package using it
 > animation tracks and a `focus_target` — the whole NLE at once, and
 > none of it implemented. Version 0.2 scopes to what previs checks
 > first: cameras with a real filmback and lens, and shots as ordered
-> setups on the clock. Keyframed tracks return as
-> `ext-cinematography.track` when a producer needs animatics.
+> setups on the clock. Version 0.3 adds the two references a second
+> pass needs — `aim_entity` and `focus_entity`, a camera that aims and
+> focuses on an actor and stays on them when they move — as entity
+> references in the core sense, bound at intake and rewritten at merge
+> like `parent`. Keyframed tracks return as `ext-cinematography.track`
+> when a producer needs animatics.
 
 The core format has one scene-wide `CameraDef` (`position`, `look_at`,
 `fov_degrees`) — where a visitor starts. Previs needs the other kind of
@@ -53,7 +57,9 @@ entity's name is the shot's name ("12A") — names are already unique.
 | `aspect_ratio` | w/h | the desqueezed sensor's | > 0; the frame is the largest rectangle of this aspect inside the sensor, centred |
 | `squeeze` | × | `1` | > 0; anamorphic desqueeze |
 | `aim` | world point `[x, y, z]` | none | when present the camera looks at it, +Y up; else it looks down the entity's local −Z (the glTF / three.js / Bevy convention) |
+| `aim_entity` | entity reference (a name at intake, an id in the document) | none | while the entity exists the camera looks at its origin, +Y up — over `aim`; an entity that is gone leaves `aim`, then the rotation |
 | `focus_distance_m` | m | none | > 0 |
+| `focus_entity` | entity reference | none | while the entity exists the focus distance is the distance from the camera to its origin — over `focus_distance_m` |
 | `f_stop` | | none | > 0 |
 | `shot.scene` | text | none | free text |
 | `shot.order` | integer | none | shot list sort key; ties break by entity id |
@@ -63,6 +69,33 @@ entity's name is the shot's name ("12A") — names are already unique.
 
 Defaults apply per absent field, so `"camera": {}` is a 35 mm lens on
 Super 35 looking down the entity's local −Z.
+
+### The entity references
+
+`aim_entity` and `focus_entity` are entity references in the core
+sense ([the world document](../world.md), "Identity"): the extension's
+schema marks them `x-entity-ref` (`bindable`), so they appear in the
+generated [`schema/entity-refs.json`](../../schema/entity-refs.json)
+and every reference binds a name at intake, rewrites the id at merge
+([the session log](../session.md), "The merge rules, exactly") and
+refuses an unresolvable one at ingestion — an extension field with the
+core's reference guarantees, through the one list, not a second
+mechanism. An author writes the name; the document holds the id:
+
+```json
+{"id": 35, "name": "4A",
+ "transform": {"position": [1, 1.7, 3.5]},
+ "ext-cinematography": {
+   "camera": {"focal_length_mm": 50, "aspect_ratio": 2.39,
+              "aim_entity": 4, "focus_entity": 4, "f_stop": 2.8},
+   "shot": {"scene": "4", "order": 5, "in_s": 18, "out_s": 22.5,
+            "size": "MCU", "description": "Maya, tracked"}}}
+```
+
+A target that no longer exists — deleted after the camera was placed —
+is not an error in the document: the camera falls back to `aim`, then
+to its rotation, and to `focus_distance_m`. A renderer that wants to
+flag the stale reference may; the format does not.
 
 ## Derived values (normative)
 
@@ -78,6 +111,19 @@ This is the crop-to-aspect rule film cameras and engines actually use
 (Unreal's `CineCameraComponent`), written out: cropping never widens
 the frame past the sensor, it only trims. Anamorphic is a squeeze and a
 crop, nothing special.
+
+An entity's **origin** is its `transform.position` composed through its
+parents — the document's TRS hierarchy, `p = P + R·(S ⊙ p)` for each
+parent up the chain, with the core's intrinsic XYZ rotation — so a mug
+on a turned tray is where the renderer draws it, not where its local
+position says. Every assertion below projects origins, and the
+references resolve to them:
+
+- the **aim point**: `aim_entity`'s origin while that entity exists,
+  else `aim`, else none (the camera looks down its local −Z); the
+  camera itself stands at its own origin
+- the **focus distance**: `|origin(focus_entity) − origin(camera)|`
+  while that entity exists, else `focus_distance_m`
 
 ## The contract, in three rules
 
@@ -111,20 +157,32 @@ claims this extension by passing the outcomes; the assertion kinds are:
 | `fov` | a camera's derived horizontal and vertical FOV and frame aspect, within `tolerance` (degrees) |
 | `in_frame` | an entity's origin projects inside a camera's frame |
 | `out_of_frame` | it doesn't |
+| `centred` | an entity's origin projects at the frame's centre, within `tolerance` (frame-half units) — what `aim_entity` promises |
+| `focus` | a camera's derived focus distance, within `tolerance` (metres) |
 | `shot_list` | the cameras with a `shot`, in order |
+
+The conformance world's `4A` aims and focuses on an actor by entity,
+and its `insert` on a mug parented to a turned tray on the counter: an
+implementation that reads a target's local position instead of its
+origin, or ignores `aim_entity`, fails the `centred` and `focus` cases.
 
 ## Reference implementations
 
-Three, running the same conformance outcome assertions in their own CI:
+Four, running the same conformance outcome assertions in their own CI:
 
 - **JS** — `openworldformat/cinematography` (in this repository,
   `js/src/cinematography.js`): `cameraOf`, `frameOf`, `viewOf`,
-  `project`, `shotList`, and the outcome runner. The reference renderer
-  looks through a shot (`opts.shot`, an entity name): vertical FOV and
-  frame aspect from the math above, the canvas letterboxed to it.
-- **Rust** — `rust/src/cinematography.rs`, the same surface.
+  `project`, `worldOrigin`, `aimPointOf`, `focusDistanceOf`,
+  `shotList`, and the outcome runner. The reference renderer looks
+  through a shot (`opts.shot`, an entity name): vertical FOV and frame
+  aspect from the math above, the canvas letterboxed to it, the aim
+  resolved through the world.
+- **Rust** — `rust/src/cinematography.rs`, the same surface (`view_in`
+  is the view resolved in a world; `view_of` stands alone).
 - **Python** — `python/openworldformat/cinematography.py`, the same
   surface.
+- **Swift** — `swift/Sources/OpenWorldFormat/Cinematography.swift`,
+  the same surface, for the Apple viewer.
 
 They are deliberately minimal — the crop math, a look-at view matrix, a
 pinhole projection — so the conformance cases are executable by anyone.
