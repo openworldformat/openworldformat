@@ -25,11 +25,52 @@ test("the canonical list holds every field the merge table rewrites", () => {
     "entity:parent",
     "entity:behaviors/*/Orbit/center",
     "entity:behaviors/*/LookAt/target",
+    "entity:ext-cinematography/camera/aim_entity",
+    "entity:ext-cinematography/camera/focus_entity",
     "avatar:model_entity",
     "creation:entities/*",
   ]) {
     assert.ok(paths.includes(expected), `missing ${expected}`);
   }
+});
+
+test("an extension's marked refs bind at ingestion by name, in a spawn and in a patch", () => {
+  const manifest = { version: 3, meta: { name: "t" }, entities: [{ id: 1, name: "maya" }] };
+  const state = foldLog(manifest, []);
+  const result = ingest(state, [
+    { SpawnEntity: { entity: { id: 2, name: "4A", "ext-cinematography": { camera: { aim_entity: "maya" } } } } },
+    // An `ext-*` patch replaces the block, so the patch carries the whole camera.
+    { ModifyEntity: { id: "4A", patch: { "ext-cinematography": { camera: { aim_entity: "maya", focus_entity: "maya" } } } } },
+  ]);
+  assert.ok(result.ok, JSON.stringify(result));
+  const camera = result.state.byId.get(2)["ext-cinematography"].camera;
+  assert.equal(camera.aim_entity, 1, "the document holds the id");
+  assert.equal(camera.focus_entity, 1, "a patch's references bind too");
+  // Committed ops always carry ids (spec/session.md): the spawn's and
+  // the patch's own JSON are bound, not only the document.
+  assert.equal(result.ops[0].SpawnEntity.entity["ext-cinematography"].camera.aim_entity, 1);
+  assert.equal(result.ops[1].ModifyEntity.patch["ext-cinematography"].camera.focus_entity, 1);
+  // A name nothing answers to is refused, like any marked ref.
+  const refused = ingest(state, [
+    { SpawnEntity: { entity: { id: 3, name: "4B", "ext-cinematography": { camera: { aim_entity: "nobody" } } } } },
+  ]);
+  assert.ok(!refused.ok);
+});
+
+test("merge rewriting walks the extension's marked refs", () => {
+  const manifest = { version: 3, meta: { name: "t" }, entities: [] };
+  const state = foldLog(manifest, [line(1, [{ SpawnEntity: { entity: { id: 1, name: "maya" } } }])]);
+  const branch = [line(2, [
+    { SpawnEntity: { entity: { id: 1, name: "kai" } } },
+    { SpawnEntity: { entity: { id: 2, name: "4A", "ext-cinematography": { camera: { aim_entity: 1, focus_entity: 1 } } } } },
+    { ModifyEntity: { id: 2, patch: { "ext-cinematography": { camera: { aim_entity: 1 } } } } },
+  ])];
+  const { entries, remapped } = mergeBranch(state, branch);
+  assert.deepEqual([...remapped], [[1, 3]]);
+  const [, spawn, patch] = entries[0].ops;
+  assert.equal(spawn.SpawnEntity.entity["ext-cinematography"].camera.aim_entity, 3);
+  assert.equal(spawn.SpawnEntity.entity["ext-cinematography"].camera.focus_entity, 3);
+  assert.equal(patch.ModifyEntity.patch["ext-cinematography"].camera.aim_entity, 3);
 });
 
 const line = (/** @type {number} */ revision, /** @type {any[]} */ ops) => ({ revision, ops });

@@ -214,6 +214,40 @@ func resolveNames(_ state: inout FoldState, _ entityIndex: Int) throws {
     }
 }
 
+/// Bind the deeper marked refs in a committed op's own JSON — the
+/// spawn's entity, the patch, a batch's inner ops — against the state
+/// the op just applied to, so the log carries ids in every marked field
+/// (spec/session.md: committed ops always carry ids), not only the
+/// document. The top-level ones bound at intake.
+func bindCommittedRefs(_ op: inout JSONValue, in state: FoldState) throws {
+    guard case let .edit(kind, _) = classifyOp(op) else { return }
+    let prefix: [String]
+    switch kind {
+    case "SpawnEntity":
+        prefix = ["SpawnEntity", "entity"]
+    case "ModifyEntity":
+        prefix = ["ModifyEntity", "patch"]
+    case "Batch":
+        guard case var .object(o) = op, case var .array(inner)? = o["Batch"]?["ops"] else { return }
+        for i in inner.indices {
+            try bindCommittedRefs(&inner[i], in: state)
+        }
+        var batch = o["Batch"]?.object ?? [:]
+        batch["ops"] = .array(inner)
+        o["Batch"] = .object(batch)
+        op = .object(o)
+        return
+    default:
+        return
+    }
+    for ref in refsOf("entity", kind: "bindable") where ref.path.count > 1 {
+        try walkRefPath(&op, prefix + ref.path, 0) { leaf in
+            guard let name = leaf.string else { return }
+            leaf = .number(Double(try entityId(named: name, in: state)))
+        }
+    }
+}
+
 /// The id an entity name answers to, among the state's entities.
 private func entityId(named name: String, in state: FoldState) throws -> Int {
     guard let id = state.nameToId[name] else {

@@ -34,11 +34,77 @@ final class EntityRefsTests: XCTestCase {
             "entity:parent",
             "entity:behaviors/*/Orbit/center",
             "entity:behaviors/*/LookAt/target",
+            "entity:ext-cinematography/camera/aim_entity",
+            "entity:ext-cinematography/camera/focus_entity",
             "avatar:model_entity",
             "creation:entities/*",
         ] {
             XCTAssertTrue(paths.contains(expected), "missing \(expected)")
         }
+    }
+
+    /// An extension's marked refs bind at ingestion like a behavior's:
+    /// a camera spawned aiming at "maya" by name holds her id once the
+    /// batch applies, a patch's reference binds the same way, and a
+    /// name nothing answers to is refused.
+    func testAnExtensionsMarkedRefsBindAtIngestionByName() throws {
+        let manifest = try parseManifest(
+            #"{"version": 3, "meta": {"name": "t"}, "entities": [{"id": 1, "name": "maya"}]}"#)
+        let batch = try JSONValue(parsing: #"""
+            [
+              {"SpawnEntity": {"entity": {"id": 2, "name": "4A",
+                "ext-cinematography": {"camera": {"aim_entity": "maya"}}}}},
+              {"ModifyEntity": {"id": "4A", "patch":
+                {"ext-cinematography": {"camera": {"aim_entity": "maya", "focus_entity": "maya"}}}}}
+            ]
+            """#)
+        // An `ext-*` patch replaces the block, so the patch carries the whole camera.
+        guard case let .ingested(done) = ingest(try foldLog(manifest, []), batch) else {
+            return XCTFail("the batch should have been taken")
+        }
+        let camera = done.state.entities.first { $0.name == "4A" }?
+            .fields["ext-cinematography"]?["camera"]
+        XCTAssertEqual(camera?["aim_entity"]?.int, 1, "the document holds the id")
+        XCTAssertEqual(camera?["focus_entity"]?.int, 1, "a patch's references bind too")
+        // Committed ops always carry ids (spec/session.md): the spawn's
+        // and the patch's own JSON are bound, not only the document.
+        XCTAssertEqual(done.ops[0]["SpawnEntity"]?["entity"]?["ext-cinematography"]?["camera"]?["aim_entity"]?.int, 1)
+        XCTAssertEqual(done.ops[1]["ModifyEntity"]?["patch"]?["ext-cinematography"]?["camera"]?["focus_entity"]?.int, 1)
+        let dangling = try JSONValue(parsing: #"""
+            [{"SpawnEntity": {"entity": {"id": 3, "name": "4B",
+              "ext-cinematography": {"camera": {"aim_entity": "nobody"}}}}}]
+            """#)
+        if case .ingested = ingest(try foldLog(manifest, []), dangling) {
+            XCTFail("a name nothing answers to is refused")
+        }
+    }
+
+    /// Merge rewriting walks the extension's marked refs: the camera's
+    /// aim and focus follow the actor's fresh id, in the spawn and in a
+    /// later patch.
+    func testMergeRewritingWalksTheExtensionsMarkedRefs() throws {
+        let manifest = try parseManifest(#"{"version": 3, "meta": {"name": "t"}, "entities": []}"#)
+        let state = try foldLog(manifest, [
+            entryOf(#"[{"SpawnEntity": {"entity": {"id": 1, "name": "maya"}}}]"#),
+        ])
+        let branch = [
+            try entryOf(#"""
+                [
+                  {"SpawnEntity": {"entity": {"id": 1, "name": "kai"}}},
+                  {"SpawnEntity": {"entity": {"id": 2, "name": "4A",
+                    "ext-cinematography": {"camera": {"aim_entity": 1, "focus_entity": 1}}}}},
+                  {"ModifyEntity": {"id": 2, "patch":
+                    {"ext-cinematography": {"camera": {"aim_entity": 1}}}}}
+                ]
+                """#, revision: 2),
+        ]
+        let (entries, remapped) = try mergeBranch(state, branch)
+        XCTAssertEqual(remapped, [1: 3])
+        let camera = entries[0].ops[1]["SpawnEntity"]?["entity"]?["ext-cinematography"]?["camera"]
+        XCTAssertEqual(camera?["aim_entity"]?.int, 3)
+        XCTAssertEqual(camera?["focus_entity"]?.int, 3)
+        let patched = entries[0].ops[2]["ModifyEntity"]?["patch"]?["ext-cinematography"]?["camera"]
+        XCTAssertEqual(patched?["aim_entity"]?.int, 3)
     }
 
     func testNameBindingWalksTheListAStringParentBindsAtIntake() throws {

@@ -976,6 +976,25 @@ function resolveNames(state, entity) {
   }
 }
 
+/** Bind the deeper marked refs in a committed op's own JSON — the
+ *  spawn's entity, the patch, a batch's inner ops — against the state
+ *  the op just applied to, so the log carries ids in every marked field
+ *  (spec/session.md: committed ops always carry ids), not only the
+ *  document — and not by accident of the fold aliasing the op's objects.
+ *  The top-level ones bound at intake.
+ *  @param {FoldState} state @param {ClassifiedEdit} c */
+function bindCommittedRefs(state, c) {
+  if (c.edit === "SpawnEntity") {
+    const entity = c.value?.entity;
+    if (entity && typeof entity === "object") resolveNames(state, entity);
+  } else if (c.edit === "ModifyEntity") {
+    const patch = c.value?.patch;
+    if (patch && typeof patch === "object") resolveNames(state, patch);
+  } else if (c.edit === "Batch") {
+    for (const inner of (c.value?.ops ?? []).map(classifyOp).filter(isEdit)) bindCommittedRefs(state, inner);
+  }
+}
+
 /** The entity ids an entry's edit ops touch — spawn and modify targets,
  *  recursing into batches — the entities whose by-name refs bind at
  *  this entry.
@@ -1552,6 +1571,7 @@ export function ingest(state, batch) {
         const entity = step.state.byId.get(id);
         if (entity) resolveNames(step.state, entity);
       }
+      bindCommittedRefs(step.state, c);
       commitTrial(trial, step);
       committed.push(op);
     } catch (e) {

@@ -121,7 +121,7 @@ struct State {
 impl State {
     fn op(&mut self, mut raw: Value) -> Result<EditOp, String> {
         self.bind(&mut raw)?;
-        let op: EditOp = serde_json::from_value(raw.clone()).map_err(|e| e.to_string())?;
+        let mut op: EditOp = serde_json::from_value(raw.clone()).map_err(|e| e.to_string())?;
         let mut unknown = Vec::new();
         dropped_keys(
             &raw,
@@ -139,6 +139,12 @@ impl State {
         self.trial
             .apply_entry(std::slice::from_ref(&op))
             .map_err(|e| format!("doesn't apply: {e}"))?;
+        // The committed op carries ids in every marked field, like the
+        // document it just changed — the deeper refs bind here, against
+        // the world the op applied to (the top-level ones bound at intake).
+        self.trial
+            .bind_committed_refs(&mut op)
+            .map_err(|e| format!("doesn't bind: {e}"))?;
         Ok(op)
     }
 

@@ -671,6 +671,29 @@ def _touched_ids(edits: list) -> list:
     return ids
 
 
+def _bind_committed_refs(state: dict, c: dict) -> None:
+    """Bind the deeper marked refs in a committed op's own JSON — the
+    spawn's entity, the patch, a batch's inner ops — against the state
+    the op just applied to, so the log carries ids in every marked field
+    (spec/session.md: committed ops always carry ids), not only the
+    document. The top-level ones bound at intake."""
+    edit, value = c["edit"], c["value"]
+    if edit == "SpawnEntity":
+        entity = value.get("entity") if isinstance(value, dict) else None
+        if isinstance(entity, dict):
+            _resolve_names(state, entity)
+    elif edit == "ModifyEntity":
+        patch = value.get("patch") if isinstance(value, dict) else None
+        if isinstance(patch, dict):
+            _resolve_names(state, patch)
+    elif edit == "Batch":
+        inner = value.get("ops") if isinstance(value, dict) else None
+        for op in inner or []:
+            classified = classify_op(op)
+            if classified["kind"] == "edit":
+                _bind_committed_refs(state, classified)
+
+
 def _apply_edit(state: dict, edit: str, value: dict) -> None:
     """Apply one edit op to a fold state, all-or-nothing. Throws on refusal."""
     if edit == "SpawnEntity":
@@ -1217,6 +1240,7 @@ def ingest(state: dict, batch) -> dict:
                 entity = step["state"]["by_id"].get(id_)
                 if entity is not None:
                     _resolve_names(step["state"], entity)
+            _bind_committed_refs(step["state"], c)
             _commit_trial(trial, step)
             committed.append(op)
         except WorldFormatError as e:

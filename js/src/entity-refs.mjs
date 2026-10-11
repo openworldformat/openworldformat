@@ -27,6 +27,24 @@ export const ENTITY_REFS = [
   {
     "scope": "entity",
     "path": [
+      "ext-cinematography",
+      "camera",
+      "aim_entity"
+    ],
+    "kind": "bindable"
+  },
+  {
+    "scope": "entity",
+    "path": [
+      "ext-cinematography",
+      "camera",
+      "focus_entity"
+    ],
+    "kind": "bindable"
+  },
+  {
+    "scope": "entity",
+    "path": [
       "parent"
     ],
     "kind": "bindable"

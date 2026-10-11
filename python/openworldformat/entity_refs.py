@@ -17,6 +17,8 @@ from __future__ import annotations
 ENTITY_REFS = [
     {"scope": "entity", "path": ["behaviors", "*", "LookAt", "target"], "kind": "bindable"},
     {"scope": "entity", "path": ["behaviors", "*", "Orbit", "center"], "kind": "bindable"},
+    {"scope": "entity", "path": ["ext-cinematography", "camera", "aim_entity"], "kind": "bindable"},
+    {"scope": "entity", "path": ["ext-cinematography", "camera", "focus_entity"], "kind": "bindable"},
     {"scope": "entity", "path": ["parent"], "kind": "bindable"},
     {"scope": "avatar", "path": ["model_entity"], "kind": "bindable"},
     {"scope": "creation", "path": ["entities", "*"], "kind": "id"},

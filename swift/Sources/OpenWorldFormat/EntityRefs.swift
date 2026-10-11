@@ -39,6 +39,8 @@ public struct EntityRef: Equatable, Sendable {
 public let ENTITY_REFS: [EntityRef] = [
     EntityRef(scope: "entity", path: ["behaviors", "*", "LookAt", "target"], kind: "bindable"),
     EntityRef(scope: "entity", path: ["behaviors", "*", "Orbit", "center"], kind: "bindable"),
+    EntityRef(scope: "entity", path: ["ext-cinematography", "camera", "aim_entity"], kind: "bindable"),
+    EntityRef(scope: "entity", path: ["ext-cinematography", "camera", "focus_entity"], kind: "bindable"),
     EntityRef(scope: "entity", path: ["parent"], kind: "bindable"),
     EntityRef(scope: "avatar", path: ["model_entity"], kind: "bindable"),
     EntityRef(scope: "creation", path: ["entities", "*"], kind: "id"),

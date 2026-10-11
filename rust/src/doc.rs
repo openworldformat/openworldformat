@@ -421,19 +421,28 @@ impl WorldDoc {
             let Some(entity) = entities.get_mut(&id) else {
                 continue;
             };
-            // The schema's marked entity refs (spec/world.md, "Identity"),
-            // except the top-level ones (`parent`): those bind at op
-            // intake, before the op applies — a string there never
-            // reaches the typed model — so only the deeper refs (the
-            // behavior refs) resolve here.
-            for field in refs_of_kind(EntityRefScope::Entity, EntityRefKind::Bindable) {
-                if field.path.len() == 1 {
-                    continue;
-                }
-                entity.walk(field.path, &mut |slot| bind_slot(slot, names))?;
-            }
+            bind_deep_refs(entity, names)?;
         }
         Ok(())
+    }
+
+    /// Bind the deeper marked refs in a committed op — the spawn's
+    /// entity, the patch, a batch's inner ops — against this document,
+    /// so the log carries ids in every marked field (spec/session.md:
+    /// committed ops always carry ids), not only the document. The
+    /// top-level ones bind at intake, before the op is read.
+    pub fn bind_committed_refs(&self, op: &mut EditOp) -> Result<(), ApplyError> {
+        match op {
+            EditOp::SpawnEntity { entity } => bind_deep_refs(entity, &self.names),
+            EditOp::ModifyEntity { patch, .. } => bind_deep_refs(patch, &self.names),
+            EditOp::Batch { ops } => {
+                for op in ops.iter_mut() {
+                    self.bind_committed_refs(op)?;
+                }
+                Ok(())
+            }
+            _ => Ok(()),
+        }
     }
 
     /// Resolve every name reference in the document against the
@@ -618,19 +627,48 @@ fn touched_ids(ops: &[EditOp]) -> Vec<u64> {
     out
 }
 
+/// Bind the deeper marked refs of one typed root — an entity, or a
+/// patch (the same paths) — against `names`: the schema's marked entity
+/// refs (spec/world.md, "Identity") except the top-level ones
+/// (`parent`), which bind at op intake before the op applies — a string
+/// there never reaches the typed model — so only the deeper refs (the
+/// behavior refs, the extension refs) resolve here.
+fn bind_deep_refs<R: RefWalk>(root: &mut R, names: &HashMap<String, u64>) -> Result<(), ApplyError> {
+    for field in refs_of_kind(EntityRefScope::Entity, EntityRefKind::Bindable) {
+        if field.path.len() == 1 {
+            continue;
+        }
+        root.walk(field.path, &mut |slot| bind_slot(slot, names))?;
+    }
+    Ok(())
+}
+
 /// Bind a marked slot's name to the id it names now, against the
 /// fold-so-far's names — the ingestion rule (spec/world.md, "Identity").
 /// An id slot can't hold a name; a reference already holding an id is
-/// left alone.
+/// left alone. An extension's leaf binds the same way: a JSON string
+/// becomes the id it names, a number stays.
 fn bind_slot(slot: RefSlot<'_>, names: &HashMap<String, u64>) -> Result<(), ApplyError> {
-    if let RefSlot::Ref(reference) = slot
-        && let EntityRef::Name(name) = &*reference
-    {
-        let id = names
-            .get(name.as_str())
-            .copied()
-            .ok_or_else(|| ApplyError::MissingName(name.clone()))?;
-        *reference = EntityRef::Id(EntityId(id));
+    match slot {
+        RefSlot::Ref(reference) => {
+            if let EntityRef::Name(name) = &*reference {
+                let id = names
+                    .get(name.as_str())
+                    .copied()
+                    .ok_or_else(|| ApplyError::MissingName(name.clone()))?;
+                *reference = EntityRef::Id(EntityId(id));
+            }
+        }
+        RefSlot::Json(value) => {
+            if let Some(name) = value.as_str() {
+                let id = names
+                    .get(name)
+                    .copied()
+                    .ok_or_else(|| ApplyError::MissingName(name.to_string()))?;
+                *value = serde_json::Value::from(id);
+            }
+        }
+        RefSlot::Id(_) => {}
     }
     Ok(())
 }

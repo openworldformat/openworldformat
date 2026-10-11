@@ -39,6 +39,8 @@ data class EntityRef(
 val ENTITY_REFS: List<EntityRef> = listOf(
     EntityRef("entity", listOf("behaviors", "*", "LookAt", "target"), EntityRefKind.BINDABLE),
     EntityRef("entity", listOf("behaviors", "*", "Orbit", "center"), EntityRefKind.BINDABLE),
+    EntityRef("entity", listOf("ext-cinematography", "camera", "aim_entity"), EntityRefKind.BINDABLE),
+    EntityRef("entity", listOf("ext-cinematography", "camera", "focus_entity"), EntityRefKind.BINDABLE),
     EntityRef("entity", listOf("parent"), EntityRefKind.BINDABLE),
     EntityRef("avatar", listOf("model_entity"), EntityRefKind.BINDABLE),
     EntityRef("creation", listOf("entities", "*"), EntityRefKind.ID),

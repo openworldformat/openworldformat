@@ -38,11 +38,66 @@ class EntityRefsTests {
             "entity:parent",
             "entity:behaviors/*/Orbit/center",
             "entity:behaviors/*/LookAt/target",
+            "entity:ext-cinematography/camera/aim_entity",
+            "entity:ext-cinematography/camera/focus_entity",
             "avatar:model_entity",
             "creation:entities/*",
         )) {
             assertTrue(expected in paths, "missing $expected")
         }
+    }
+
+    /** An extension's marked refs bind at the fold like a behavior's:
+     *  a camera spawned aiming at "maya" by name holds her id once the
+     *  entry applies, and a patch's reference binds the same way. */
+    @Test
+    fun anExtensionsMarkedRefsBindAtTheFoldByName() {
+        val manifest = parseManifest(
+            """{"version": 3, "meta": {"name": "t"}, "entities": [{"id": 1, "name": "maya"}]}""",
+        )
+        val state = foldLog(manifest, listOf(
+            entryOf(
+                """[{"SpawnEntity": {"entity": {"id": 2, "name": "4A", """ +
+                    """"ext-cinematography": {"camera": {"aim_entity": "maya"}}}}}, """ +
+                    // An `ext-*` patch replaces the block, so the patch carries the whole camera.
+                    """{"ModifyEntity": {"id": 2, "patch": """ +
+                    """{"ext-cinematography": {"camera": {"aim_entity": "maya", "focus_entity": "maya"}}}}}]""",
+            ),
+        ))
+        val camera = state.entities.first { it.name == "4A" }
+            .fields["ext-cinematography"]!!.obj!!["camera"]!!.obj!!
+        assertEquals(json("1"), camera["aim_entity"])
+        assertEquals(json("1"), camera["focus_entity"])
+    }
+
+    /** Merge rewriting walks the extension's marked refs: the camera's
+     *  aim and focus follow the actor's fresh id, in the spawn and in a
+     *  later patch. */
+    @Test
+    fun mergeRewritingWalksTheExtensionsMarkedRefs() {
+        val manifest = parseManifest("""{"version": 3, "meta": {"name": "t"}, "entities": []}""")
+        val main = listOf(entryOf("""[{"SpawnEntity": {"entity": {"id": 1, "name": "maya"}}}]"""))
+        val state = foldLog(manifest, main)
+        val branch = listOf(
+            entryOf(
+                """[{"SpawnEntity": {"entity": {"id": 1, "name": "kai"}}}, """ +
+                    """{"SpawnEntity": {"entity": {"id": 2, "name": "4A", """ +
+                    """"ext-cinematography": {"camera": {"aim_entity": 1, "focus_entity": 1}}}}}, """ +
+                    """{"ModifyEntity": {"id": 2, "patch": """ +
+                    """{"ext-cinematography": {"camera": {"aim_entity": 1}}}}}]""",
+                revision = 2,
+                timestampMs = 1.0,
+            ),
+        )
+        val (entries, remapped) = mergeBranch(state, branch)
+        assertEquals(mapOf(1 to 3), remapped)
+        val spawned = entries[0].ops[1].obj!!["SpawnEntity"]!!.obj!!["entity"]!!.obj!!
+        val camera = spawned["ext-cinematography"]!!.obj!!["camera"]!!.obj!!
+        assertEquals(json("3"), camera["aim_entity"])
+        assertEquals(json("3"), camera["focus_entity"])
+        val patch = entries[0].ops[2].obj!!["ModifyEntity"]!!.obj!!["patch"]!!.obj!!
+        val patched = patch["ext-cinematography"]!!.obj!!["camera"]!!.obj!!
+        assertEquals(json("3"), patched["aim_entity"])
     }
 
     /** Merge rewriting walks the list for every scope: the spawn's

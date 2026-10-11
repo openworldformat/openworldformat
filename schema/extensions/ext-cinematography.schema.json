@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "ExtCinematography",
-  "description": "The ext-cinematography extension, version 0.2 (proposed). Everything rides under the namespaced 'ext-cinematography' key on entities: the 'camera' component makes an entity a camera, the 'shot' component makes it a setup in the shot list. The core schema leaves room for the key (unknown fields are allowed and must-ignored); this schema pins the extension's own shape. Spec: spec/extensions/cinematography.md.",
+  "description": "The ext-cinematography extension, version 0.3 (experimental). Everything rides under the namespaced 'ext-cinematography' key on entities: the 'camera' component makes an entity a camera, the 'shot' component makes it a setup in the shot list. The core schema leaves room for the key (unknown fields are allowed and must-ignored); this schema pins the extension's own shape. The camera's aim_entity and focus_entity are entity references in the core sense — marked x-entity-ref here, so the generated schema/entity-refs.json carries them and every reference binds, rewrites and validates them like parent. Spec: spec/extensions/cinematography.md.",
   "type": "object",
   "$defs": {
     "CameraComponent": {
@@ -40,10 +40,26 @@
           "minItems": 3,
           "maxItems": 3
         },
+        "aim_entity": {
+          "description": "An entity the camera looks at — its origin (transform position composed through its parents), +Y up — over aim while the entity exists. A name at intake, an id in the document (x-entity-ref bindable: bound at ingestion, rewritten at merge, like parent).",
+          "x-entity-ref": "bindable",
+          "oneOf": [
+            { "type": "integer", "minimum": 0 },
+            { "type": "string", "minLength": 1 }
+          ]
+        },
         "focus_distance_m": {
           "description": "Focus distance in meters.",
           "type": "number",
           "exclusiveMinimum": 0
+        },
+        "focus_entity": {
+          "description": "An entity the camera focuses on: the focus distance is the distance from the camera to the entity's origin, over focus_distance_m while the entity exists. An entity reference like aim_entity (x-entity-ref bindable).",
+          "x-entity-ref": "bindable",
+          "oneOf": [
+            { "type": "integer", "minimum": 0 },
+            { "type": "string", "minLength": 1 }
+          ]
         },
         "f_stop": {
           "description": "Aperture f-number.",

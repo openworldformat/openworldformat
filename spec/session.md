@@ -121,7 +121,11 @@ holds the batch's earlier ops:
    `DeleteEntity.id`, a `parent`), a string is a name: it resolves to the
    id it names now — the identity rule of [the world document](world.md),
    applied to op addresses. A `SpawnEntity` without an `id` gets the next
-   one. Committed ops always carry ids.
+   one. Committed ops always carry ids: the top-level references bind
+   here, and the deeper marked ones — a behavior's target, an
+   extension's `aim_entity` — bind once the op has applied, against the
+   world it made, into the op as committed as well as into the
+   document. A log never holds a name.
 2. **Merge.** A patch's object-valued struct fields — `ModifyEntity`'s
    `transform`, `material` and `light`; `SetEnvironment`'s `env`;
    `ModifyWorld`'s `meta`, `environment`, `camera`, `avatar` and
@@ -205,8 +209,8 @@ head and the same branch entries always produce the same merged entries:
 
    | Op | Fields that hold entity ids |
    |---|---|
-   | `SpawnEntity` | `entity.id`, `entity.parent`, the numeric `Orbit.center` / `LookAt.target` in `entity.behaviors[]` |
-   | `ModifyEntity` | `id`, `patch.parent`, the numeric behavior refs in `patch.behaviors[]` |
+   | `SpawnEntity` | `entity.id`, `entity.parent`, the numeric `Orbit.center` / `LookAt.target` in `entity.behaviors[]`, and every extension field the list marks (`ext-cinematography`'s `camera.aim_entity` / `camera.focus_entity`) |
+   | `ModifyEntity` | `id`, `patch.parent`, the numeric behavior refs in `patch.behaviors[]`, the marked extension fields in the patch |
    | `DeleteEntity` | `id` |
    | `Batch` | every inner op, recursively |
    | `ModifyWorld` | `patch.avatar.model_entity` (numeric), `patch.creations[].entities[]` |

@@ -93,6 +93,16 @@ pub const ENTITY_REFS: &[EntityRefField] = &[
     },
     EntityRefField {
         scope: EntityRefScope::Entity,
+        path: &["ext-cinematography", "camera", "aim_entity"],
+        kind: EntityRefKind::Bindable,
+    },
+    EntityRefField {
+        scope: EntityRefScope::Entity,
+        path: &["ext-cinematography", "camera", "focus_entity"],
+        kind: EntityRefKind::Bindable,
+    },
+    EntityRefField {
+        scope: EntityRefScope::Entity,
         path: &["parent"],
         kind: EntityRefKind::Bindable,
     },
@@ -155,25 +165,38 @@ pub(crate) fn walk_ref_path<E>(
     }
 }
 
-/// A marked leaf in the typed model: a bare id slot, or a classed
-/// (name-or-id) reference. Name binding touches only the classed kind;
-/// the merge remaps the ids of both.
+/// A marked leaf in the typed model: a bare id slot, a classed
+/// (name-or-id) reference, or a leaf inside an extension block — the
+/// `ext-*` paths walk the entity's `extra` JSON, where a reference is a
+/// number (an id) or a string (a name). Name binding touches the
+/// classed kind and the JSON kind; the merge remaps the ids of all three.
 pub(crate) enum RefSlot<'a> {
     /// A numeric-only slot (an entity's `parent`, a creation's member).
     Id(&'a mut EntityId),
     /// A name-or-id reference (a behavior's target, the avatar's model).
     Ref(&'a mut EntityRef),
+    /// A reference inside an extension block (`ext-cinematography`'s
+    /// `camera.aim_entity`): a JSON number or string, in place.
+    Json(&'a mut Value),
 }
 
 impl RefSlot<'_> {
     /// Move the id this slot holds through the merge's remap, when it
-    /// holds one: a `Ref` still holding a name is left alone — names
-    /// bind at ingestion, a merge only moves ids.
+    /// holds one: a `Ref` or `Json` still holding a name is left alone —
+    /// names bind at ingestion, a merge only moves ids.
     pub(crate) fn remap(self, remapped: &BTreeMap<u64, u64>) {
         let held = match self {
             Self::Id(id) => Some(id),
             Self::Ref(EntityRef::Id(id)) => Some(id),
             Self::Ref(EntityRef::Name(_)) => None,
+            Self::Json(value) => {
+                if let Some(id) = value.as_u64()
+                    && let Some(&to) = remapped.get(&id)
+                {
+                    *value = Value::from(to);
+                }
+                None
+            }
         };
         if let Some(id) = held
             && let Some(&to) = remapped.get(&id.0)
@@ -233,7 +256,16 @@ impl RefWalk for WorldEntity {
                     }
                 }
             }
-            _ => {}
+            // An extension's marked field: the path's first key is the
+            // extension's namespaced key in `extra`, the rest walks its
+            // JSON (the raw walk, so an extension never needs a typed
+            // arm here to be seen).
+            [key, rest @ ..] => {
+                if let Some(block) = self.extra.get_mut(*key) {
+                    walk_ref_path(block, rest, &mut |leaf| f(RefSlot::Json(leaf)))?;
+                }
+            }
+            [] => {}
         }
         Ok(())
     }
@@ -262,7 +294,14 @@ impl RefWalk for EntityPatch {
                     }
                 }
             }
-            _ => {}
+            // An extension's marked field, in the block the patch sets
+            // (a clearing `null` has no leaves to walk).
+            [key, rest @ ..] => {
+                if let Some(Some(block)) = self.extra.get_mut(*key) {
+                    walk_ref_path(block, rest, &mut |leaf| f(RefSlot::Json(leaf)))?;
+                }
+            }
+            [] => {}
         }
         Ok(())
     }
@@ -346,6 +385,10 @@ mod tests {
                 .collect()
         }
 
+        // The extension block every `ext-cinematography` path lands in.
+        let camera_block =
+            serde_json::json!({"camera": {"aim_entity": 2, "focus_entity": 2}});
+
         let mut entity = WorldEntity::new(1, "e");
         entity.parent = Some(EntityId(2));
         entity.behaviors = vec![
@@ -362,6 +405,9 @@ mod tests {
                 tilt: 0.0,
             },
         ];
+        entity
+            .extra
+            .insert("ext-cinematography".into(), camera_block.clone());
         for (path, visited) in visits(&mut entity) {
             assert!(visited > 0, "entity path {path} visited nothing");
         }
@@ -384,6 +430,9 @@ mod tests {
             ]),
             ..Default::default()
         };
+        patch
+            .extra
+            .insert("ext-cinematography".into(), Some(camera_block));
         for (path, visited) in visits(&mut patch) {
             assert!(visited > 0, "patch path {path} visited nothing");
         }
@@ -428,5 +477,19 @@ mod tests {
         .unwrap_or_else(|never| match never {});
         assert_eq!(value["behaviors"][0]["Orbit"]["center"], 1);
         assert_eq!(value["parent"], "sun", "a path not walked is untouched");
+    }
+
+    #[test]
+    fn an_extension_leaf_remaps_its_id_and_leaves_a_name_alone() {
+        let remapped: BTreeMap<u64, u64> = [(1, 7)].into_iter().collect();
+        let mut id = serde_json::json!(1);
+        RefSlot::Json(&mut id).remap(&remapped);
+        assert_eq!(id, 7);
+        let mut other = serde_json::json!(3);
+        RefSlot::Json(&mut other).remap(&remapped);
+        assert_eq!(other, 3, "an id outside the remap stays");
+        let mut name = serde_json::json!("maya");
+        RefSlot::Json(&mut name).remap(&remapped);
+        assert_eq!(name, "maya", "names bind at ingestion, a merge moves ids");
     }
 }

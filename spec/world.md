@@ -47,7 +47,12 @@ generated. Name binding, merge rewriting ([the session log](session.md),
 "The merge rules, exactly") and ingestion validation MUST read every
 field the list names: when the format gains a reference field, the
 marker is how the five references all see it, instead of five
-hand-written lists drifting apart.
+hand-written lists drifting apart. Extension schemas
+([`schema/extensions/`](../schema/extensions/)) mark their reference
+fields the same way, and the list carries them with the path rooted at
+the extension's namespaced key — `ext-cinematography`'s
+`camera.aim_entity` binds, rewrites and validates exactly like
+`parent`, through the same list.
 
 ## Entities
 

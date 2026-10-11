@@ -31,10 +31,72 @@ class EntityRefsTest(unittest.TestCase):
             "entity:parent",
             "entity:behaviors/*/Orbit/center",
             "entity:behaviors/*/LookAt/target",
+            "entity:ext-cinematography/camera/aim_entity",
+            "entity:ext-cinematography/camera/focus_entity",
             "avatar:model_entity",
             "creation:entities/*",
         ):
             self.assertIn(expected, paths)
+
+    def test_an_extensions_marked_refs_bind_at_ingestion_by_name(self):
+        manifest = {
+            "version": 3,
+            "meta": {"name": "t"},
+            "entities": [{"id": 1, "name": "maya"}],
+        }
+        state = fold_log(manifest, [])
+        result = ingest(state, [
+            {"SpawnEntity": {"entity": {
+                "id": 2, "name": "4A",
+                "ext-cinematography": {"camera": {"aim_entity": "maya"}},
+            }}},
+            # An ``ext-*`` patch replaces the block, so the patch carries
+            # the whole camera.
+            {"ModifyEntity": {"id": "4A", "patch": {
+                "ext-cinematography": {"camera": {"aim_entity": "maya", "focus_entity": "maya"}},
+            }}},
+        ])
+        self.assertTrue(result["ok"], result)
+        camera = result["state"]["by_id"][2]["ext-cinematography"]["camera"]
+        self.assertEqual(camera["aim_entity"], 1)  # the document holds the id
+        self.assertEqual(camera["focus_entity"], 1)  # a patch's references bind too
+        # Committed ops always carry ids (spec/session.md): the spawn's and
+        # the patch's own JSON are bound, not only the document.
+        spawn, patch = result["ops"]
+        self.assertEqual(spawn["SpawnEntity"]["entity"]["ext-cinematography"]["camera"]["aim_entity"], 1)
+        self.assertEqual(patch["ModifyEntity"]["patch"]["ext-cinematography"]["camera"]["focus_entity"], 1)
+        # A name nothing answers to is refused, like any marked ref.
+        refused = ingest(state, [
+            {"SpawnEntity": {"entity": {
+                "id": 3, "name": "4B",
+                "ext-cinematography": {"camera": {"aim_entity": "nobody"}},
+            }}},
+        ])
+        self.assertFalse(refused["ok"])
+
+    def test_merge_rewriting_walks_the_extensions_marked_refs(self):
+        manifest = {"version": 3, "meta": {"name": "t"}, "entities": []}
+        state = fold_log(manifest, [{"revision": 1, "ops": [
+            {"SpawnEntity": {"entity": {"id": 1, "name": "maya"}}},
+        ]}])
+        branch = [{"revision": 2, "ops": [
+            {"SpawnEntity": {"entity": {"id": 1, "name": "kai"}}},
+            {"SpawnEntity": {"entity": {
+                "id": 2, "name": "4A",
+                "ext-cinematography": {"camera": {"aim_entity": 1, "focus_entity": 1}},
+            }}},
+            {"ModifyEntity": {"id": 2, "patch": {
+                "ext-cinematography": {"camera": {"aim_entity": 1}},
+            }}},
+        ]}]
+        merged = merge_branch(state, branch)
+        self.assertEqual(merged["remapped"], {1: 3})
+        _, spawn, patch = merged["entries"][0]["ops"]
+        camera = spawn["SpawnEntity"]["entity"]["ext-cinematography"]["camera"]
+        self.assertEqual((camera["aim_entity"], camera["focus_entity"]), (3, 3))
+        self.assertEqual(
+            patch["ModifyEntity"]["patch"]["ext-cinematography"]["camera"]["aim_entity"], 3
+        )
 
     def test_name_binding_walks_the_list_a_string_parent_binds_at_intake(self):
         manifest = {

@@ -95,6 +95,9 @@ public func ingest(_ state: FoldState, _ batch: JSONValue) -> IngestResult {
                     try resolveNames(&step, index)
                 }
             }
+            // The committed op carries ids in every marked field, like
+            // the document it just changed.
+            try bindCommittedRefs(&op, in: step)
             trial = step
             committed.append(op)
         } catch {

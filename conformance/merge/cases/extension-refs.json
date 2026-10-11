@@ -1,0 +1,153 @@
+{
+  "name": "extension-refs",
+  "description": "An extension’s marked references rewrite like the core’s: main’s camera 4A aims and focuses on maya; the branch spawns kai on the id maya holds, a camera 4B on kai, and re-aims 4A at kai. After the merge kai takes the fresh id and both ext-cinematography refs — in the spawn and in the patch — follow it: schema/entity-refs.json carries the extension schema’s x-entity-ref fields, and the merge walks that one list.",
+  "base": {
+    "version": 3,
+    "meta": {
+      "name": "extension-refs"
+    },
+    "entities": []
+  },
+  "main": [
+    {
+      "revision": 1,
+      "ops": [
+        {
+          "SpawnEntity": {
+            "entity": {
+              "id": 1,
+              "name": "maya"
+            }
+          }
+        },
+        {
+          "SpawnEntity": {
+            "entity": {
+              "id": 2,
+              "name": "4A",
+              "ext-cinematography": {
+                "camera": {
+                  "focal_length_mm": 50,
+                  "aim_entity": 1,
+                  "focus_entity": 1
+                },
+                "shot": {
+                  "order": 1
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "branch": [
+    {
+      "revision": 1,
+      "ops": [
+        {
+          "SpawnEntity": {
+            "entity": {
+              "id": 1,
+              "name": "kai"
+            }
+          }
+        },
+        {
+          "SpawnEntity": {
+            "entity": {
+              "id": 3,
+              "name": "4B",
+              "ext-cinematography": {
+                "camera": {
+                  "focal_length_mm": 85,
+                  "aim_entity": 1,
+                  "focus_entity": 1
+                },
+                "shot": {
+                  "order": 2
+                }
+              }
+            }
+          }
+        },
+        {
+          "ModifyEntity": {
+            "id": 2,
+            "patch": {
+              "ext-cinematography": {
+                "camera": {
+                  "focal_length_mm": 50,
+                  "aim_entity": 1,
+                  "focus_entity": 1
+                },
+                "shot": {
+                  "order": 1
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "expected": {
+    "remapped": [
+      [
+        1,
+        4
+      ]
+    ],
+    "entries": [
+      {
+        "revision": 1,
+        "ops": [
+          {
+            "SpawnEntity": {
+              "entity": {
+                "id": 4,
+                "name": "kai"
+              }
+            }
+          },
+          {
+            "SpawnEntity": {
+              "entity": {
+                "id": 3,
+                "name": "4B",
+                "ext-cinematography": {
+                  "camera": {
+                    "focal_length_mm": 85,
+                    "aim_entity": 4,
+                    "focus_entity": 4
+                  },
+                  "shot": {
+                    "order": 2
+                  }
+                }
+              }
+            }
+          },
+          {
+            "ModifyEntity": {
+              "id": 2,
+              "patch": {
+                "ext-cinematography": {
+                  "camera": {
+                    "focal_length_mm": 50,
+                    "aim_entity": 4,
+                    "focus_entity": 4
+                  },
+                  "shot": {
+                    "order": 1
+                  }
+                }
+              }
+            }
+          }
+        ]
+      }
+    ],
+    "head": "{\n  \"entities\": [\n    {\n      \"id\": 1,\n      \"name\": \"maya\"\n    },\n    {\n      \"ext-cinematography\": {\n        \"camera\": {\n          \"aim_entity\": 4,\n          \"focal_length_mm\": 50,\n          \"focus_entity\": 4\n        },\n        \"shot\": {\n          \"order\": 1\n        }\n      },\n      \"id\": 2,\n      \"name\": \"4A\"\n    },\n    {\n      \"ext-cinematography\": {\n        \"camera\": {\n          \"aim_entity\": 4,\n          \"focal_length_mm\": 85,\n          \"focus_entity\": 4\n        },\n        \"shot\": {\n          \"order\": 2\n        }\n      },\n      \"id\": 3,\n      \"name\": \"4B\"\n    },\n    {\n      \"id\": 4,\n      \"name\": \"kai\"\n    }\n  ],\n  \"meta\": {\n    \"name\": \"extension-refs\"\n  },\n  \"next_entity_id\": 5,\n  \"version\": 3\n}\n"
+  }
+}
