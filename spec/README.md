@@ -69,6 +69,14 @@ engine's.
    the generated list, and name binding, merge rewriting and ingestion
    validation in all five references read it (each embeds a copy and
    drift-tests it against the canonical file).
+4. ~~Aim and focus by entity~~ — **done** (2026-10-11):
+   [`ext-cinematography`](extensions/cinematography.md) 0.3 adds
+   `aim_entity` and `focus_entity` as marked references — the generated
+   list now carries extension schemas' markers, so the five references
+   bind, rewrite and validate them like `parent` — with origins
+   composed through parents, `centred` and `focus` assertions, a Swift
+   reference (the fourth), and every authority committing ids for the
+   deeper references, as the log always promised.
 
 **Deferred until a producer needs them:** collision-free ids, an `id` and
 `parent` on every entry, and timed input samples (a breaking bundle, for git

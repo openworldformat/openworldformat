@@ -33,9 +33,10 @@ let same = doc.to_manifest();                          // a whole manifest again
 `openworldformat::physics` carries the extension's deterministic
 reference solver, trajectory write/fold, and the conformance outcome
 runner; `openworldformat::cinematography` carries the
-`ext-cinematography` extension's crop math, view and projection, shot
-list, and outcome runner; the `schema` feature generates
-`world.schema.json`.
+`ext-cinematography` extension's crop math, view and projection, entity
+origins through parents, aim and focus by entity (`view_in`,
+`aim_point_of`, `focus_distance_of`), shot list, and outcome runner;
+the `schema` feature generates `world.schema.json`.
 
 ## The 0.3 surface (draft 0.3: head-first, live authoring)
 
