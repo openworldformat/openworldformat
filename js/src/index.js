@@ -757,11 +757,16 @@ function applyEdit(state, edit, value) {
       if (entity.parent !== undefined && entity.parent !== null && !state.byId.has(entity.parent)) {
         throw invalid(`entity ${entity.id}'s parent ${entity.parent} isn't in the document`);
       }
-      state.entities.push(entity);
-      state.byId.set(entity.id, entity);
-      state.names.add(entity.name);
-      state.nameToId.set(entity.name, entity.id);
-      state.scene.next_entity_id = Math.max(state.scene.next_entity_id, entity.id + 1);
+      // The fold owns its copy: the op's object stays as the caller sent
+      // it, whatever later patches do to the entity — a log is input,
+      // never scratch space (and binding a committed op's references is
+      // the authority's explicit step, not a side effect of this alias).
+      const owned = structuredClone(entity);
+      state.entities.push(owned);
+      state.byId.set(owned.id, owned);
+      state.names.add(owned.name);
+      state.nameToId.set(owned.name, owned.id);
+      state.scene.next_entity_id = Math.max(state.scene.next_entity_id, owned.id + 1);
       return;
     }
     case "DeleteEntity": {

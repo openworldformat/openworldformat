@@ -18,6 +18,22 @@ import {
   foldPath,
 } from "../src/index.js";
 
+test("the fold never writes into its input ops", () => {
+  // A spawn followed by a patch of the same entity: the fold's entity
+  // takes the patch, the op the caller passed in does not — a log is
+  // input, never scratch space.
+  const log = [{ revision: 1, ops: [
+    { SpawnEntity: { entity: { id: 2, name: "4A", "ext-cinematography": { camera: { focal_length_mm: 50 } } } } },
+    { ModifyEntity: { id: 2, patch: { name: "4A-renamed", "ext-cinematography": { camera: { f_stop: 2.8 } } } } },
+  ] }];
+  const before = JSON.stringify(log);
+  const state = foldLog({ version: 3, meta: { name: "t" }, entities: [] }, log);
+  assert.equal(JSON.stringify(log), before, "the input ops are untouched");
+  const entity = state.byId.get(2);
+  assert.equal(entity.name, "4A-renamed");
+  assert.deepEqual(entity["ext-cinematography"], { camera: { f_stop: 2.8 } });
+});
+
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const manifestText = readFileSync(path.join(root, "examples/hello-world/snapshots/base.json"), "utf8");
 const logText = readFileSync(path.join(root, "examples/hello-world/ops.jsonl"), "utf8");
