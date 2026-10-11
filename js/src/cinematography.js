@@ -207,7 +207,7 @@ export function worldOrigin(entity, world) {
  */
 export function aimPointOf(camera, world) {
   const target = world ? entityOf(camera.aim_entity, world) : null;
-  if (target) return worldOrigin(target, world);
+  if (target && world) return worldOrigin(target, world);
   return camera.aim ? /** @type {Vec3} */ (camera.aim) : null;
 }
 
