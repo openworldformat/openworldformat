@@ -158,8 +158,13 @@ ops:
 5. **Apply** to the trial — an op that no longer applies fails here.
 
 Then the world the batch makes must validate. Validation is structural:
-the document holds against the schema and every reference resolves —
-the same checks the fold's apply step runs. Budget limits — an entity's
+the document holds against the schema and every reference the fold binds
+resolves — a parent, a name at intake — the same checks the fold's apply
+step runs. A reference an entity still holds to an entity deleted later
+(a `look_at` target) is not one of these: the fold keeps reading the
+world, the behavior has nothing to look at until it is retargeted or
+dropped, and an authority reports it as a warning on the batch that
+caused it. Budget limits — an entity's
 extent, a chunk's entity or triangle count, an entity's behavior or
 modulation count — are an authority's policy, not the format's: the
 authority reports them to the author as warnings, and they never refuse
