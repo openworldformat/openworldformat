@@ -113,9 +113,24 @@ value and one past its largest id.
 An **authority** — an open app, or a command-line tool when no app is
 open — is the one writer of a package. **Authors** (agents, scripts,
 people) change the world only by sending it a **batch** of edit ops: a
-JSON array, or `{"ops": [...], "author": …, "message": …}`. The
-authority takes each op in order, against a trial document that already
-holds the batch's earlier ops:
+JSON array, or an envelope:
+
+```json
+{"ops": [ … ], "author": "maya", "message": "a lantern by the gate",
+ "expected_revision": 42}
+```
+
+`author` and `message` become the entry's. `expected_revision`
+(optional) is the revision of the document the author read before
+writing the batch — the head's, or the entry's the batch builds on. An
+authority that finds the document at another revision MUST refuse the
+batch whole, naming both revisions (`the world is at revision 44, not
+42`), so an author whose world moved under it re-reads and decides
+again instead of landing a stale edit; without the field, the batch
+binds against the world as it is now, which is the right default for an
+author addressing entities by name. The authority then takes each op in
+order, against a trial document that already holds the batch's earlier
+ops:
 
 1. **Bind.** Where an entity id goes (`ModifyEntity.id`,
    `DeleteEntity.id`, a `parent`), a string is a name: it resolves to the
@@ -152,6 +167,16 @@ a batch. **Any structural failure refuses the whole batch**: nothing is
 written, and the reply lists a reason for every op that failed. Success
 appends one entry — the batch's edits, its author and its message — and
 writes the new head.
+
+The reply is the author's **receipt**, whatever carries it (an HTTP
+body, a function's return value). A commit's receipt holds at least the
+entry's `revision` and `id`, `spawned` — the names the batch spawned
+and the ids they got, which is how an author or a panel finds what it
+just made — and `warnings`; a refusal's holds `errors`, one reason per
+failing op (`op 2: no entity is named "lanterm"`), and promises that
+nothing changed. An authority MAY add what its readers need (whether
+the entry started a branch, what the canvas shows, where stored assets
+went); the reference authority's receipts are examples of both forms.
 
 Undo is a batch like any other: the inverse of the newest batch nobody
 has undone, appended. Two authorities never write one package at once;
