@@ -1,13 +1,13 @@
 # openworldformat (Kotlin · JVM + Android)
 
 The Open World Format's Kotlin package. The core — parse a `.world`
-manifest, fold its session log — is pure common Kotlin with one
-dependency (kotlinx-serialization), no engine, no renderer, compiled
-for the **JVM** and for **Android** from the same `commonMain`. It is
-the fold contract's fifth independently-built implementation, sharing
-no code with the JS, Python, Rust or Swift ones — every conformance
-world the other references fold, this package folds too, with the
-same entity counts pinned in its tests.
+manifest, fold its session log, ingest an author's batch — is pure
+common Kotlin with one dependency (kotlinx-serialization), no engine,
+no renderer, compiled for the **JVM** and for **Android** from the
+same `commonMain`. It is the fold contract's fifth independently-built
+implementation, sharing no code with the JS, Python, Rust or Swift
+ones — every conformance world the other references fold, this
+package folds too, with the same entity counts pinned in its tests.
 
 ## Add
 
@@ -46,6 +46,21 @@ val variant = foldPath(pkg.base, pkg.entries, tip = "e5")
 
 // Save-game state: typed fields, folded over the declaration.
 val values = pkg.stateValues().values   // ["score.tour" to 1]
+
+// Authoring: a batch by name, partial patches merged, refused whole.
+val batch = Json.parseToJsonElement(
+    """[{"ModifyEntity": {"id": "lantern",
+         "patch": {"transform": {"position": [-12, 0.5, 3]}}}}]""",
+)
+when (val result = ingest(state, batch)) {
+    is IngestResult.Ingested -> {
+        result.ops        // to commit: names bound to ids, patches merged whole
+        result.state      // the world the batch makes
+        manifestText(toManifest(result.state))  // the head's canonical bytes
+    }
+    is IngestResult.Refused ->
+        result.errors     // one reason per failing op; nothing was written
+}
 ```
 
 Piece by piece, if a package is more than folders for you:
@@ -62,6 +77,11 @@ val same = toManifest(world)             // a whole manifest again
 what the log folds from. The fold is total (`toManifest`), `ModifyWorld`
 applies and inverts, `compactWorldPackage` moves the base up to the head,
 and an entry's `message` is part of its identity (spec draft 0.3).
+Authoring is `ingest` (spec/session.md, "Authoring"): names bound to
+ids, ids allocated for spawns that left theirs out, struct patches
+merged as a JSON merge patch (`mergePatch`, RFC 7396), read strictly,
+all-or-nothing — and `manifestText` writes the head's canonical bytes,
+the same bytes the other references write.
 
 On Android, content-URI sources go through the app's own copy layer,
 then the same `loadWorldPackage(File)`.
@@ -73,8 +93,10 @@ then the same `loadWorldPackage(File)`.
   op classification (edits first, the compatibility rule), the fold
   (all-or-nothing per entry and per batch), branching histories
   (`buildHistory`, `foldPath`), the state fold (declared,
-  dotted-map-subkey and undeclared keys), and the package loader
-  (a torn last line skipped per spec).
+  dotted-map-subkey and undeclared keys), the package loader (a torn
+  last line skipped per spec), and the Authoring profile's batch
+  ingestion (`ingest`, `mergePatch`) with the canonical head text
+  (`manifestText`).
 - **Doesn't** — the `ext-physics` solver (the Rust crate owns the
   reference one), schema validation (the JSON Schema is normative;
   AJV in CI is the checker), and any rendering, audio or asset
@@ -83,7 +105,7 @@ then the same `loadWorldPackage(File)`.
 ## Build and test
 
 ```bash
-./gradlew jvmTest            # 59 tests: examples, conformance worlds, the shared merge corpus
+./gradlew jvmTest            # 75 tests: examples, conformance worlds, the shared merge corpus, authoring
 ./gradlew compileAndroidMain # the Android target compiles
 ./gradlew publishToMavenLocal
 ```

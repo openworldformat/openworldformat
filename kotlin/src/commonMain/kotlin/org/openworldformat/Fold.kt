@@ -154,7 +154,7 @@ internal fun resolveNames(state: FoldState, index: Int): FoldState {
 
 /** The entity ids an entry's edit ops touch (spawn or modify,
  *  recursing batches) — the entities whose refs bind at ingestion. */
-private fun touchedEntityIds(edits: List<ClassifiedOp.Edit>): List<Int> {
+internal fun touchedEntityIds(edits: List<ClassifiedOp.Edit>): List<Int> {
     val ids = mutableListOf<Int>()
     fun visit(edit: ClassifiedOp.Edit) {
         when (edit.name) {

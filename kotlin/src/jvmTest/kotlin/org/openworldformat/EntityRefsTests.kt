@@ -2,14 +2,14 @@
 // schema/entity-refs.json): the Kotlin reference embeds a copy
 // (commonMain's EntityRefs.kt) and this test fails when the copy
 // drifts from the canonical file — and pins that the passes actually
-// walk it. The JS suite's intake-binding cases don't mirror: this
-// reference's surface is the fold — intake is the log — with no
-// ingest entry point to bind names pre-apply.
+// walk it: name binding at the fold and at intake (`ingest`), merge
+// rewriting, every scope.
 
 package org.openworldformat
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertIs
 import kotlin.test.assertTrue
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -128,5 +128,78 @@ class EntityRefsTests {
         val patch = entries[0].ops[1].obj!!["ModifyWorld"]!!.obj!!["patch"]!!.obj!!
         assertEquals(json("2"), patch["avatar"]!!.obj!!["model_entity"])
         assertEquals(json("[2]"), patch["creations"]!!.arr!![0].obj!!["entities"])
+    }
+
+    /** An extension's marked refs bind at ingestion like a behavior's:
+     *  a camera spawned aiming at "maya" by name holds her id once the
+     *  batch applies, a patch's reference binds the same way, and a
+     *  name nothing answers to is refused. */
+    @Test
+    fun anExtensionsMarkedRefsBindAtIngestionByName() {
+        val manifest = parseManifest(
+            """{"version": 3, "meta": {"name": "t"}, "entities": [{"id": 1, "name": "maya"}]}""",
+        )
+        // An `ext-*` patch replaces the block, so the patch carries the whole camera.
+        val batch = json(
+            """[{"SpawnEntity": {"entity": {"id": 2, "name": "4A", """ +
+                """"ext-cinematography": {"camera": {"aim_entity": "maya"}}}}}, """ +
+                """{"ModifyEntity": {"id": "4A", "patch": """ +
+                """{"ext-cinematography": {"camera": {"aim_entity": "maya", "focus_entity": "maya"}}}}}]""",
+        )
+        val done = assertIs<IngestResult.Ingested>(ingest(foldLog(manifest, emptyList()), batch))
+        val camera = done.state.entities.first { it.name == "4A" }
+            .fields["ext-cinematography"]!!.obj!!["camera"]!!.obj!!
+        assertEquals(1, camera["aim_entity"]?.int, "the document holds the id")
+        assertEquals(1, camera["focus_entity"]?.int, "a patch's references bind too")
+        // Committed ops always carry ids (spec/session.md): the spawn's
+        // and the patch's own JSON are bound, not only the document.
+        val spawnedEntity = done.ops[0].obj!!["SpawnEntity"]!!.obj!!["entity"]!!.obj!!
+        val spawnedCamera = spawnedEntity["ext-cinematography"]!!.obj!!["camera"]!!.obj!!
+        assertEquals(1, spawnedCamera["aim_entity"]?.int)
+        val patchedEntity = done.ops[1].obj!!["ModifyEntity"]!!.obj!!["patch"]!!.obj!!
+        val patchedCamera = patchedEntity["ext-cinematography"]!!.obj!!["camera"]!!.obj!!
+        assertEquals(1, patchedCamera["focus_entity"]?.int)
+        val dangling = json(
+            """[{"SpawnEntity": {"entity": {"id": 3, "name": "4B", """ +
+                """"ext-cinematography": {"camera": {"aim_entity": "nobody"}}}}}]""",
+        )
+        assertIs<IngestResult.Refused>(
+            ingest(foldLog(manifest, emptyList()), dangling),
+            "a name nothing answers to is refused",
+        )
+    }
+
+    /** Name binding walks the list: a string `parent` binds at intake,
+     *  before the op applies — into the committed op, not only the
+     *  document. (The fold's own reading of a raw log's string parent
+     *  is Fold.kt's: it reads as absent, where the JS and Swift folds
+     *  refuse it — so that half of the siblings' case isn't pinned here.) */
+    @Test
+    fun nameBindingWalksTheListAStringParentBindsAtIntake() {
+        val manifest = parseManifest(
+            """{"version": 3, "meta": {"name": "t"}, "entities": [{"id": 1, "name": "sun"}]}""",
+        )
+        val batch = json(
+            """[{"SpawnEntity": {"entity": {"id": 2, "name": "planet", "parent": "sun"}}}, """ +
+                """{"SpawnEntity": {"entity": {"name": "moon", "parent": "planet"}}}]""",
+        )
+        val done = assertIs<IngestResult.Ingested>(ingest(foldLog(manifest, emptyList()), batch))
+        assertEquals(1, done.ops[0].obj!!["SpawnEntity"]!!.obj!!["entity"]!!.obj!!["parent"]?.int)
+        assertEquals(2, done.ops[1].obj!!["SpawnEntity"]!!.obj!!["entity"]!!.obj!!["parent"]?.int)
+        assertEquals(2, done.state.entities.first { it.name == "moon" }.parent)
+    }
+
+    /** The avatar's marked ref binds at intake too: `model_entity` by
+     *  name, into the committed op and the document. */
+    @Test
+    fun ingestBindsTheAvatarsMarkedRefsModelEntityByName() {
+        val manifest = parseManifest(
+            """{"version": 3, "meta": {"name": "t"}, "entities": [{"id": 1, "name": "hero"}]}""",
+        )
+        val batch = json("""[{"ModifyWorld": {"patch": {"avatar": {"model_entity": "hero"}}}}]""")
+        val done = assertIs<IngestResult.Ingested>(ingest(foldLog(manifest, emptyList()), batch))
+        val avatar = done.ops[0].obj!!["ModifyWorld"]!!.obj!!["patch"]!!.obj!!["avatar"]!!.obj!!
+        assertEquals(1, avatar["model_entity"]?.int)
+        assertEquals(1, done.state.scene["avatar"]?.obj?.get("model_entity")?.int)
     }
 }
