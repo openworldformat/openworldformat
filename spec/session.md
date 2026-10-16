@@ -183,6 +183,14 @@ nothing changed. An authority MAY add what its readers need (whether
 the entry started a branch, what the canvas shows, where stored assets
 went); the reference authority's receipts are examples of both forms.
 
+A batch builds on main's tip unless the author names another entry to
+build on (the reference authority's `at`); from an entry that already has
+a child that starts a branch. An entry always builds on an entry: once
+the log holds one, the base can no longer be built on — the format has no
+second root — so an authority MUST refuse a batch that asks for it rather
+than land it on main. To branch from the very beginning, build on the
+first entry and undo its ops in the same batch.
+
 Undo is a batch like any other: the inverse of the newest batch nobody
 has undone, appended. Two authorities never write one package at once;
 one that finds another holding the package (`.live/endpoint.json` with a
@@ -213,13 +221,20 @@ is nobody's parent. Folding generalizes: **state at any tip is a fold of
 the path** — walk parent links from tip to base, fold that chain. A log
 with no ids is a chain in file order (a reader synthesizes
 `line-<n>` ids, counting lines from 0), so branching is purely additive and old readers see a
-linear prefix. `revision` stays the room's total order; `parent` records
-causality — sequence is not causality.
+linear prefix. `revision` stays the room's total order — every entry
+across every branch, in the order written, so a branch's tip may carry a
+higher revision than main's; an authority compares `expected_revision`
+with the revision of the entry the batch builds on, never with the
+highest in the log. `parent` records causality — sequence is not
+causality.
 
 Forks and refs live in `package.json` ([the package](package.md)); the
 `merge` op records where a merged batch came from. When merging a branch, the merge authority must handle ID collisions. See
 [`rfcs/branching-histories.md`](rfcs/branching-histories.md). In a git-backed package, branches are git branches and the
-same merge rules resolve a merge's conflicts ([the package](package.md), "Git").
+same merge rules resolve a merge's conflicts ([the package](package.md), "Git");
+an authority may also keep every entry on one git line, branch entries
+included, with the tree in `ops.jsonl`'s parents — the reference authority
+does — since the log alone carries causality.
 
 ### The merge rules, exactly
 

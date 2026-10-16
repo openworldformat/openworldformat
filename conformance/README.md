@@ -72,3 +72,7 @@ without a cross-language harness.
 Spec changes that alter what a renderer draws require new or changed
 cases here, in the same PR ([CONTRIBUTING.md](../CONTRIBUTING.md)).
 A case states, in its `meta.description`, exactly what it pins.
+
+## Authoring outcomes
+
+`authoring/cases.json`: batches an author sends to an authority over a base world, and what must come back — names bound to ids in every marked field, merged patches carried whole, refusals with a reason per op, warnings on the receipt. Any ingest can run it; see `authoring/README.md`.
