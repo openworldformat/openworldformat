@@ -46,6 +46,11 @@ public struct Ingested: Equatable, Sendable {
     public var spawned: [String: Int]
     /// The world after the batch.
     public var state: FoldState
+    /// What validation warns about in the new world — a behavior whose
+    /// target the batch deleted — in the words the Rust crate's validation
+    /// uses. Warnings never refuse (spec/session.md "Authoring"); an
+    /// authority puts them on the receipt.
+    public var warnings: [String]
 }
 
 /// `ingest`'s reply: a batch taken whole, or refused whole — one reason
@@ -108,7 +113,53 @@ public func ingest(_ state: FoldState, _ batch: JSONValue) -> IngestResult {
         return .refused(errors: errors)
     }
     trial.appliedEdits = state.appliedEdits + committed.count
-    return .ingested(Ingested(ops: committed, spawned: spawned, state: trial))
+    return .ingested(Ingested(
+        ops: committed, spawned: spawned, state: trial, warnings: receiptWarnings(trial)
+    ))
+}
+
+/// What the batch left that validation warns about and never refuses
+/// (spec/session.md "Authoring": warnings come back on the receipt): a
+/// behavior whose target the world no longer holds — a `LookAt` target or
+/// an `Orbit` center whose entity a delete took — in the words the Rust
+/// crate's validation uses, so a receipt reads the same from every
+/// reference.
+func receiptWarnings(_ state: FoldState) -> [String] {
+    var warnings: [String] = []
+    for entity in state.entities {
+        guard case .array(let behaviors)? = entity.fields["behaviors"] else { continue }
+        for behavior in behaviors {
+            let kind: String
+            let target: JSONValue?
+            if case .object(let look)? = behavior["LookAt"] {
+                (kind, target) = ("look_at", look["target"])
+            } else if case .object(let orbit)? = behavior["Orbit"] {
+                (kind, target) = ("orbit", orbit["center"])
+            } else {
+                continue
+            }
+            let gone: String
+            switch target {
+            case .number(let n)?:
+                if let id = Int(exactly: n) {
+                    if state.idToIndex[id] != nil { continue }
+                    gone = "entity \(id)"
+                } else {
+                    gone = "entity \(n)"
+                }
+            case .string(let name)?:
+                if state.nameToId[name] != nil { continue }
+                gone = "'\(name)'"
+            default:
+                continue
+            }
+            warnings.append(
+                "Entity '\(entity.name)' has a \(kind) behavior targeting \(gone), "
+                    + "which is not in the world (it looks at nothing until retargeted or dropped)"
+            )
+        }
+    }
+    return warnings
 }
 
 /// The raw message of an error, without the `invalid:` prefix the fold's

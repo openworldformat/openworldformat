@@ -93,9 +93,11 @@ let same = try toManifest(world)                     // a whole manifest again
 `message` is part of its identity (spec draft 0.3). Authoring is
 `ingest` (spec/session.md, "Authoring"): names bound to ids, ids
 allocated for spawns that left theirs out, struct patches merged as a
-JSON merge patch (`mergePatch`, RFC 7396), read strictly, all-or-nothing
-— and `manifestText` writes the head's canonical bytes, the same bytes
-the Rust and JS references write.
+JSON merge patch (`mergePatch`, RFC 7396), read strictly, all-or-nothing,
+with `warnings` on the result for what validation warns about in the new
+world (a behavior whose target the batch deleted) — and `manifestText`
+writes the head's canonical bytes, the same bytes the Rust and JS
+references write.
 
 ## What it carries, what it doesn't
 

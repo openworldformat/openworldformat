@@ -218,7 +218,7 @@ notebooks.
 | `compact_package(package_json, head_revision)` | the package.json of a compaction |
 | `read_package(world_dir)` | a head-first package: `(base, entries, head, package_json)` |
 | `to_manifest(state)` | the fold's state as a whole manifest — `to_manifest(fold_log(m, []))` is `m` again |
-| `ingest(state, batch)` | live authoring: bind, validate and apply a batch whole-or-refused; the state passed in is never touched |
+| `ingest(state, batch)` | live authoring: bind, validate and apply a batch whole-or-refused; the state passed in is never touched; `warnings` for what validation warns about in the new world (a behavior whose target the batch deleted) |
 | `merge_patch(current, change)` | JSON merge patch, RFC 7396 — the rule partial transforms merge by |
 | `compact(world_dir, head_revision=None)` | move the base up to the head (or a revision): `snapshots/base.json` rewritten, the entries it holds archived |
 | `ext_provenance(manifest)` | the provenance extension's five lineage fields, or None |

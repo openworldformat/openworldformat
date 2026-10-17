@@ -1545,8 +1545,10 @@ export function mergePatch(current, change) {
  *
  * @param {FoldState} state the world as it stands (unchanged by this call)
  * @param {any} batch
- * @returns {{ok: true, ops: any[], spawned: Record<string, number>, state: FoldState}
- *   | {ok: false, errors: string[]}}
+ * @returns {{ok: true, ops: any[], spawned: Record<string, number>, state: FoldState, warnings: string[]}
+ *   | {ok: false, errors: string[]}} — `warnings` is what validation warns
+ *   about in the new world (a behavior whose target the batch deleted);
+ *   warnings never refuse.
  */
 export function ingest(state, batch) {
   const ops = Array.isArray(batch) ? batch : batch?.ops;
@@ -1585,7 +1587,43 @@ export function ingest(state, batch) {
   });
   if (errors.length > 0) return { ok: false, errors };
   trial.appliedEdits += committed.length;
-  return { ok: true, ops: committed, spawned, state: trial };
+  return { ok: true, ops: committed, spawned, state: trial, warnings: receiptWarnings(trial) };
+}
+
+/** What the batch left that validation warns about and never refuses
+ *  (spec/session.md "Authoring": warnings come back on the receipt): a
+ *  behavior whose target the world no longer holds — a `LookAt` target or
+ *  an `Orbit` center whose entity a delete took — in the words the Rust
+ *  crate's validation uses, so a receipt reads the same from every
+ *  reference.
+ *  @param {FoldState} state @returns {string[]} */
+function receiptWarnings(state) {
+  /** @type {string[]} */
+  const warnings = [];
+  for (const entity of state.entities) {
+    const behaviors = /** @type {any} */ (entity).behaviors;
+    for (const behavior of Array.isArray(behaviors) ? behaviors : []) {
+      if (behavior === null || typeof behavior !== "object") continue;
+      let kind, target;
+      if (behavior.LookAt && typeof behavior.LookAt === "object") {
+        kind = "look_at";
+        target = behavior.LookAt.target;
+      } else if (behavior.Orbit && typeof behavior.Orbit === "object") {
+        kind = "orbit";
+        target = behavior.Orbit.center;
+      } else {
+        continue;
+      }
+      let gone;
+      if (typeof target === "number" && !state.byId.has(target)) gone = `entity ${target}`;
+      else if (typeof target === "string" && !state.nameToId.has(target)) gone = `'${target}'`;
+      else continue;
+      warnings.push(
+        `Entity '${entity.name}' has a ${kind} behavior targeting ${gone}, which is not in the world (it looks at nothing until retargeted or dropped)`,
+      );
+    }
+  }
+  return warnings;
 }
 
 /** Names to ids, ids for spawns, merged struct patches — in place.

@@ -1208,10 +1208,12 @@ def ingest(state: dict, batch) -> dict:
 
     :param state: the world as it stands (unchanged by this call)
     :param batch: the ops an author or agent is sending
-    :return: ``{"ok": True, "ops", "spawned", "state"}`` — the committed
-        ops as they bind (serialize into an entry and append), the names
-        the batch spawned with the ids they got, the new world — or
-        ``{"ok": False, "errors"}``, one reason per op
+    :return: ``{"ok": True, "ops", "spawned", "state", "warnings"}`` — the
+        committed ops as they bind (serialize into an entry and append),
+        the names the batch spawned with the ids they got, the new world,
+        and what validation warns about in it (a behavior whose target
+        the batch deleted; warnings never refuse) — or ``{"ok": False,
+        "errors"}``, one reason per op
     """
     ops = batch if isinstance(batch, list) else (
         batch.get("ops") if isinstance(batch, dict) else None
@@ -1248,7 +1250,46 @@ def ingest(state: dict, batch) -> dict:
     if errors:
         return {"ok": False, "errors": errors}
     trial["applied_edits"] += len(committed)
-    return {"ok": True, "ops": committed, "spawned": spawned, "state": trial}
+    return {
+        "ok": True,
+        "ops": committed,
+        "spawned": spawned,
+        "state": trial,
+        "warnings": _receipt_warnings(trial),
+    }
+
+
+def _receipt_warnings(state: dict) -> list:
+    """What the batch left that validation warns about and never refuses
+    (spec/session.md "Authoring": warnings come back on the receipt): a
+    behavior whose target the world no longer holds — a ``LookAt`` target
+    or an ``Orbit`` center whose entity a delete took — in the words the
+    Rust crate's validation uses, so a receipt reads the same from every
+    reference."""
+    ids = set(state["by_id"])
+    names = set(state["names"])
+    warnings: list = []
+    for entity in state["entities"]:
+        for behavior in entity.get("behaviors") or []:
+            if not isinstance(behavior, dict):
+                continue
+            if isinstance(behavior.get("LookAt"), dict):
+                kind, target = "look_at", behavior["LookAt"].get("target")
+            elif isinstance(behavior.get("Orbit"), dict):
+                kind, target = "orbit", behavior["Orbit"].get("center")
+            else:
+                continue
+            if _is_num(target) and target not in ids:
+                gone = f"entity {target}"
+            elif isinstance(target, str) and target not in names:
+                gone = f"'{target}'"
+            else:
+                continue
+            warnings.append(
+                f"Entity '{entity.get('name')}' has a {kind} behavior targeting {gone}, "
+                "which is not in the world (it looks at nothing until retargeted or dropped)"
+            )
+    return warnings
 
 
 # ---------------------------------------------------------------------------

@@ -42,6 +42,13 @@ sealed class IngestResult {
         val spawned: Map<String, Int>,
         /** The world after the batch. */
         val state: FoldState,
+        /**
+         * What validation warns about in the new world — a behavior whose
+         * target the batch deleted — in the words the Rust crate's
+         * validation uses. Warnings never refuse (spec/session.md
+         * "Authoring"); an authority puts them on the receipt.
+         */
+        val warnings: List<String> = emptyList(),
     ) : IngestResult()
 
     /** Nothing was written: one reason per failing op, `op N: <reason>`. */
@@ -92,7 +99,44 @@ fun ingest(state: FoldState, batch: JsonElement): IngestResult {
         ops = committed,
         spawned = spawned,
         state = trial.copy(appliedEdits = state.appliedEdits + committed.size),
+        warnings = receiptWarnings(trial),
     )
+}
+
+/**
+ * What the batch left that validation warns about and never refuses
+ * (spec/session.md "Authoring": warnings come back on the receipt): a
+ * behavior whose target the world no longer holds — a `LookAt` target or
+ * an `Orbit` center whose entity a delete took — in the words the Rust
+ * crate's validation uses, so a receipt reads the same from every
+ * reference.
+ */
+internal fun receiptWarnings(state: FoldState): List<String> {
+    val ids = state.entities.mapTo(HashSet()) { it.id }
+    val names = state.entities.mapTo(HashSet()) { it.name }
+    val warnings = mutableListOf<String>()
+    for (entity in state.entities) {
+        val behaviors = entity.fields["behaviors"]?.arr ?: continue
+        for (behavior in behaviors) {
+            val look = behavior.obj["LookAt"]?.obj
+            val orbit = behavior.obj["Orbit"]?.obj
+            val (kind, target) = when {
+                look != null -> "look_at" to look["target"]
+                orbit != null -> "orbit" to orbit["center"]
+                else -> continue
+            }
+            val id = target?.int
+            val name = target?.str
+            val gone = when {
+                id != null -> if (id in ids) continue else "entity $id"
+                name != null -> if (name in names) continue else "'$name'"
+                else -> continue
+            }
+            warnings += "Entity '${entity.name}' has a $kind behavior targeting $gone, " +
+                "which is not in the world (it looks at nothing until retargeted or dropped)"
+        }
+    }
+    return warnings
 }
 
 /** The raw reason, without the `invalid: ` prefix the fold's thrown

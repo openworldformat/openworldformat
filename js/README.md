@@ -84,7 +84,7 @@ unchanged — peer `three`, nothing else.
 | `editOps(entry)` | an entry's edits, in order |
 | `foldLog(manifest, entries)` | the document at the last entry (the linear fold) |
 | `toManifest(state)` | the fold's state as a whole manifest — `toManifest(foldLog(m, []))` is `m` again |
-| `ingest(state, batch)` | the Authoring profile: a batch by name, partial patches merged, read strictly, all or nothing |
+| `ingest(state, batch)` | the Authoring profile: a batch by name, partial patches merged, read strictly, all or nothing; `warnings` on the result for what validation warns about in the new world (a behavior whose target the batch deleted) |
 | `mergePatch(current, change)` | JSON Merge Patch (RFC 7396), as ingestion applies it |
 | `manifestText(manifest)` | the canonical text an authority writes (byte-identical to the Rust reference's) |
 | `buildHistory(entries)` | ids, parents, children and tips of a branching log |
