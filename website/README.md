@@ -28,7 +28,7 @@ Cloudflare static-assets Worker (`wrangler.toml`); no Worker script.
 | Path | What it is |
 |---|---|
 | `config.toml` | site config (named for Zola 0.22.0, which CI installs) |
-| `templates/` | hand-written base/index/section/page templates |
+| `templates/` | hand-written base/index/section/page/404 templates; the footer's draft, schema and package-format numbers come from `config.toml` `[extra]` |
 | `static/style.css` | one stylesheet, light/dark via `light-dark()` |
 | `content/_index.md` | the front page |
 | `content/spec/` | **generated** by `scripts/render_spec.py` — never edit; edit `../spec` |

@@ -5,6 +5,23 @@
 {% block content %}
 <article>
   <h1>{{ page.title }}</h1>
+  {% if page.toc | length > 1 %}
+  <nav class="toc" aria-label="On this page">
+    <p class="toc-title">On this page</p>
+    <ol>
+      {% for h in page.toc %}
+      <li><a href="{{ h.permalink | safe }}">{{ h.title }}</a></li>
+      {% endfor %}
+    </ol>
+  </nav>
+  {% endif %}
   {{ page.content | safe }}
 </article>
+{% if page.lower or page.higher or page.extra.source %}
+<nav class="pager" aria-label="Spec pages">
+  {% if page.lower %}<a class="prev" href="{{ page.lower.permalink }}">← {{ page.lower.title }}</a>{% else %}<span></span>{% endif %}
+  {% if page.extra.source %}<a class="source" href="{{ config.extra.repo }}/blob/main/{{ page.extra.source }}">Source: {{ page.extra.source }}</a>{% endif %}
+  {% if page.higher %}<a class="next" href="{{ page.higher.permalink }}">{{ page.higher.title }} →</a>{% else %}<span></span>{% endif %}
+</nav>
+{% endif %}
 {% endblock content %}

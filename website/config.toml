@@ -23,4 +23,13 @@ dark_theme = "github-dark"
 
 [extra]
 repo = "https://github.com/openworldformat/openworldformat"
+# The footer's numbers. The spec's README states the same three; when a
+# draft lands, change them there and here.
+draft = "0.3"
+schema = "3"
+package_format = "2"
+# Where the five reference packages live; the front page lists them.
 npm = "https://www.npmjs.com/package/openworldformat"
+pypi = "https://pypi.org/project/openworldformat/"
+crates = "https://crates.io/crates/openworldformat"
+docs_rs = "https://docs.rs/openworldformat"

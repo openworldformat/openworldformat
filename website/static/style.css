@@ -95,3 +95,30 @@ footer {
   padding-top: 1rem;
   padding-bottom: 2.5rem;
 }
+
+/* The skip link, for keyboards and readers: off screen until focused. */
+.skip { position: absolute; left: -999px; top: .5rem; padding: .4rem .7rem; background: var(--accent); color: #fff; border-radius: 6px; z-index: 10; }
+.skip:focus { left: .5rem; }
+
+/* The nav wraps under the brand on a narrow screen instead of overflowing. */
+header { flex-wrap: wrap; gap: .3rem 0; }
+nav { display: flex; flex-wrap: wrap; gap: .2rem 1.1rem; }
+nav a { margin-left: 0; }
+
+/* A spec page's contents, from its headings. */
+.toc { margin: 1.2rem 0 1.6rem; padding: .8rem 1rem; background: var(--wash); border: 1px solid var(--line); border-radius: 8px; font-size: .95rem; }
+.toc-title { margin: 0 0 .3rem; font-size: .8rem; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+.toc ol { margin: 0; padding-left: 1.2rem; columns: 2; column-gap: 2rem; }
+.toc li { padding: .1rem 0; break-inside: avoid; }
+.toc a { text-decoration: none; }
+.toc a:hover { text-decoration: underline; }
+@media (max-width: 560px) { .toc ol { columns: 1; } }
+
+/* Previous and next spec page, and the page's source file. */
+.pager { display: flex; flex-wrap: wrap; justify-content: space-between; gap: .4rem 1rem; margin-top: 2.5rem; padding-top: 1rem; border-top: 1px solid var(--line); font-size: .95rem; }
+.pager a { text-decoration: none; }
+.pager a:hover { text-decoration: underline; }
+.pager .source { color: var(--muted); }
+
+.packages li { margin: .55rem 0; }
+.not-found ul { padding-left: 1.2rem; }

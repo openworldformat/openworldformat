@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+
+{% block title %}Not found · {{ config.title }}{% endblock title %}
+
+{% block content %}
+<article class="not-found">
+  <h1>Nothing at this address</h1>
+  <p>The page may have moved with a draft. What is here:</p>
+  <ul>
+    <li><a href="{{ get_url(path="@/spec/_index.md") }}">The specification</a> — the world document, the package, the session log, state, profiles, versioning.</li>
+    <li><a href="{{ get_url(path="world.html") }}?src=conformance/shapes.json">The live viewer</a> — the conformance worlds, drawn in this tab.</li>
+    <li><a href="{{ get_url(path="@/_index.md") }}#packages">The packages</a> — npm, PyPI, crates.io, Swift, Kotlin.</li>
+    <li><a href="{{ config.extra.repo }}">The repository</a> on GitHub.</li>
+  </ul>
+</article>
+{% endblock content %}
