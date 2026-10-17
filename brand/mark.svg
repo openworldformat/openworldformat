@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Open World Format">
+  <!-- The mark: a folded sheet, its top edge a W, inside a world. -->
+  <defs><clipPath id="owf-disc"><circle cx="32" cy="32" r="30"/></clipPath></defs>
+  <circle cx="32" cy="32" r="30" fill="#0B62C4"/>
+  <g clip-path="url(#owf-disc)">
+    <path d="M2 16 17 32 17 48 2 32Z" fill="#9CC9FF"/>
+    <path d="M17 32 32 16 32 32 17 48Z" fill="#FFFFFF"/>
+    <path d="M32 16 47 32 47 48 32 32Z" fill="#9CC9FF"/>
+    <path d="M47 32 62 16 62 32 47 48Z" fill="#FFFFFF"/>
+  </g>
+</svg>

@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Open World Format">
+  <!-- One colour (currentColor): the world with the fold cut out of it. -->
+  <defs><mask id="owf-fold"><circle cx="32" cy="32" r="30" fill="#fff"/><path d="M2 16 17 32 32 16 47 32 62 16V32L47 48 32 32 17 48 2 32Z" fill="#000"/></mask></defs>
+  <circle cx="32" cy="32" r="30" fill="currentColor" mask="url(#owf-fold)"/>
+</svg>

@@ -27,13 +27,15 @@ header, main, footer {
 
 header {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   padding-top: 1.6rem;
   padding-bottom: .4rem;
   border-bottom: 1px solid var(--line);
 }
 
+.brand { display: inline-flex; align-items: center; gap: .55rem; color: var(--ink); text-decoration: none; }
+.brand .logo { display: block; width: 26px; height: 26px; }
 .brand .mark { font-weight: 700; }
 nav a { margin-left: 1.1rem; color: var(--muted); text-decoration: none; }
 nav a:hover { color: var(--accent); }

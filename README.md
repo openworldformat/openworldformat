@@ -1,3 +1,5 @@
+<img src="brand/mark.svg" alt="" width="80" height="80">
+
 # Open World Format
 
 **An open format for `.world` packages: interactive, AI-authorable 3D
