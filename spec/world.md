@@ -73,31 +73,56 @@ SHA-256 of the file, an optional node within it, and per-node overrides
 (hide, recolour) applied to named nodes of that asset for this entity
 only.
 
-### The prism (experimental)
+### The geometry of the shapes
 
 The shapes are `Cuboid`, `Sphere`, `Cylinder`, `Cone`, `Capsule`,
 `Torus`, `Plane`, `Pyramid`, `Tetrahedron`, `Icosahedron`, `Wedge` and,
 experimentally, `Prism`. The schema states each one's parameters and
-defaults. The prism's geometry is stated here as well, because a radius
-and a side count leave more for two renderers to disagree about than a
-cylinder does:
+defaults; the geometry is stated here, not inherited from any engine.
+Two renderers drawing a shape from its parameters have more to disagree
+about than its dimensions — which way a wedge faces, where an apex is,
+the plane a torus lies in — and each of those has been disagreed about
+by this format's own renderers. The common rules, then each shape:
 
-- `Prism { sides, radius, height }` is a right prism on a regular polygon
-  with `sides` sides, 3 to 8 (6 is the hexagonal prism, 5 the pentagonal
-  one). `sides` is its only segment parameter; there is no other.
-- Its origin is its centroid; its axis is local +Y; its caps are flat, at
-  y = ±`height`/2.
-- `radius` is the **circumradius**, centre to vertex: cap vertex *i* sits
-  at (`radius`·cos θ, ±`height`/2, −`radius`·sin θ) with θ = 2π·*i*/`sides`
-  — the first vertex on +X, the ring counter-clockwise seen from above
-  (+Y).
-- Every face winds outward: each side is one planar quad (two
-  triangles), each cap a fan from vertex 0, and renderers draw the sides
-  flat, not smoothed across the edges.
-- Its bounding box is the inscribing cylinder's: half-extents
-  (`radius`, `height`/2, `radius`).
+- **Origin and axes.** Every shape is centred on the origin of its
+  bounding box, with its axis of symmetry along local +Y where it has
+  one; the conventions above apply (Y up, metres).
+- **Winding.** Every face winds counter-clockwise seen from outside
+  (outward normals). A plane's front face is +Y.
+- **Segments.** Shapes of revolution — sphere, cylinder, cone, capsule,
+  torus — are drawn with at least 24 segments around their axis, and the
+  phase of a ring around the axis is the renderer's: none of their rim
+  vertices is pinned, only their bounds and the points on the axis.
+  Every other shape is drawn flat, with exactly the vertices stated.
+- **Bounds.** A shape's box is stated with it, as half-extents; the
+  references' `local_aabb_half` is that box, conservative where the
+  exact extent is smaller.
 
-**Status.** `Prism` is experimental, under the ladder
+| Shape | Geometry |
+|---|---|
+| `Cuboid { x, y, z }` | The box `[−x/2, x/2] × [−y/2, y/2] × [−z/2, z/2]`. |
+| `Sphere { radius }` | Centred, with vertices at the poles `(0, ±radius, 0)`. Box (radius, radius, radius). |
+| `Cylinder { radius, height }` | Axis +Y, flat caps at y = ±height/2. Box (radius, height/2, radius). |
+| `Cone { radius, height }` | A base disc of `radius` at y = −height/2 and the apex at `(0, height/2, 0)`. Box (radius, height/2, radius). |
+| `Capsule { radius, half_length }` | A cylinder of `radius` from y = −half_length to +half_length, closed by hemispheres; poles at `(0, ±(half_length + radius), 0)`. Box (radius, half_length + radius, radius). |
+| `Torus { major_radius, minor_radius }` | The ring lies flat in the XZ plane, around +Y: the tube's centre circle has radius `major_radius` at y = 0 and the tube radius `minor_radius`, so `(major_radius ± minor_radius, 0, 0)` and `(major_radius, ±minor_radius, 0)` are on it. Box (major + minor, minor, major + minor). |
+| `Plane { x, z }` | The rectangle `[−x/2, x/2] × {0} × [−z/2, z/2]`, front face +Y. Box (x/2, 0, z/2). |
+| `Pyramid { base_x, base_z, height }` | The base `[−base_x/2, base_x/2] × [−base_z/2, base_z/2]` at y = −height/2 and the apex `(0, height/2, 0)`: four side triangles and a two-triangle base, outward. Box (base_x/2, height/2, base_z/2). |
+| `Tetrahedron { radius }` | The regular tetrahedron with circumradius `radius` whose vertices are the four cube corners with an even number of negative coordinates: `radius·(±1, ±1, ±1)/√3` for `(+,+,+)`, `(+,−,−)`, `(−,+,−)` and `(−,−,+)`. Exact extent ±radius/√3 on every axis; box (radius, radius, radius). |
+| `Icosahedron { radius }` | The regular icosahedron with circumradius `radius` on the three golden rectangles: vertices `(±1, ±φ, 0)`, `(0, ±1, ±φ)` and `(±φ, 0, ±1)` scaled by `radius/√(1 + φ²)`, φ the golden ratio. Exact extent ±radius·φ/√(1 + φ²) (0.851·radius) on every axis; box (radius, radius, radius). |
+| `Wedge { x, y, z }` | Half a box cut diagonally: a right-triangle profile with its vertical face at x = −x/2 (full height, y from −y/2 to +y/2), its base at y = −y/2 (x from −x/2 to +x/2) and its slope from `(−x/2, +y/2)` down to `(+x/2, −y/2)`, extruded along Z from −z/2 to +z/2. Its six vertices are `(−x/2, ±y/2, ±z/2)` and `(+x/2, −y/2, ±z/2)`. Box (x/2, y/2, z/2). |
+| `Prism { sides, radius, height }` | *Experimental.* A right prism on a regular polygon with `sides` sides, 3 to 8 (6 is the hexagonal prism, 5 the pentagonal one); `sides` is its only segment parameter. Axis +Y, flat caps at y = ±height/2. `radius` is the circumradius, centre to vertex: cap vertex *i* sits at `(radius·cos θ, ±height/2, −radius·sin θ)` with θ = 2π·i/sides — the first vertex on +X, the ring counter-clockwise seen from above. Each side is one planar quad, each cap a fan from vertex 0, all outward, sides flat-shaded. Box (radius, height/2, radius), the inscribing cylinder's. |
+
+[`conformance/geometry/shapes.json`](../conformance/geometry/shapes.json)
+pins this table: for one instance of every shape, the exact bounds, the box, and
+landmark points that must be vertices of a renderer's mesh — an apex, a
+wedge's six corners, a torus's equator, a prism's first vertex, a
+polyhedron's orientation. The reference renderer runs it in CI, the Rust
+reference checks the boxes, and any renderer can run it; a renderer
+whose mesh fails a landmark is drawing a different shape, whatever its
+dimensions say.
+
+**The prism's status.** `Prism` is experimental, under the ladder
 [profiles](profiles.md) sets for extensions, applied to a core shape:
 one renderer draws it (the reference three.js viewer), and it leaves
 experimental when a second renderer draws

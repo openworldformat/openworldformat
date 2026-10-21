@@ -44,6 +44,16 @@ H3 library ([spec/extensions/h3.md](../spec/extensions/h3.md)).
 The reference solvers run them in CI (`npm test` in `js/`, `cargo test`
 in `rust/`).
 
+`geometry/shapes.json` is the geometry parity fixture
+([spec/world.md](../spec/world.md), "The geometry of the shapes"): for
+one instance of every shape, the exact bounds its mesh must have, the
+format's box, and landmark points that must be vertices — which way the
+wedge faces, where the apex is, the plane the torus lies in, the prism's
+first vertex, a polyhedron's orientation. The JS renderer runs it in CI
+(`js/test/geometry.test.mjs`), the Rust reference checks the boxes
+(`rust/tests/geometry.rs`), and any renderer can run it: a mesh that
+fails a landmark is a different shape, whatever its dimensions say.
+
 Each world is a complete `manifest.json` — also valid base worlds for
 session tests. License: Apache-2.0, from the LocalGPT conformance suite.
 

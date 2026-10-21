@@ -266,7 +266,9 @@ export function createGeometry(shape) {
     case 'Cylinder': return new THREE.CylinderGeometry(p.radius ?? 0.5, p.radius ?? 0.5, p.height ?? 1, 32);
     case 'Cone': return new THREE.ConeGeometry(p.radius ?? 0.5, p.height ?? 1, 32);
     case 'Capsule': return new THREE.CapsuleGeometry(p.radius ?? 0.5, (p.half_length ?? 0.5) * 2, 16, 32);
-    case 'Torus': return new THREE.TorusGeometry(p.major_radius ?? 1, p.minor_radius ?? 0.25, 24, 48);
+    // three's torus lies in the XY plane; the format's lies flat in XZ, the ring around +Y
+    // (spec/world.md "The geometry of the shapes"), like its bounds say.
+    case 'Torus': { const g = new THREE.TorusGeometry(p.major_radius ?? 1, p.minor_radius ?? 0.25, 24, 48); g.rotateX(-Math.PI / 2); return g; }
     case 'Plane': { const g = new THREE.PlaneGeometry(p.x ?? 10, p.z ?? 10); g.rotateX(-Math.PI / 2); return g; }
     case 'Pyramid': return pyramidGeometry(p.base_x ?? 1, p.base_z ?? 1, p.height ?? 1);
     case 'Tetrahedron': return new THREE.TetrahedronGeometry(p.radius ?? 1);

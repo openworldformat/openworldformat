@@ -94,7 +94,18 @@ engine's.
 **Deferred until a producer needs them:** collision-free ids, an `id` and
 `parent` on every entry, and timed input samples (a breaking bundle, for git
 merges and gameplay replay); a semantic merge driver for git; a runtime that
-re-runs triggers over recorded input (semantic replay).
+re-runs triggers over recorded input (semantic replay); a side count on
+`Cylinder` and `Cone` — when the producer behind `Prism` ships `sides` on
+its cylinders and cones, decide whether `sides` becomes a parameter of
+those shapes rather than more shapes, so the prism is not a one-off.
+
+- The geometry of every shape is now stated in prose ([the world
+  document](world.md), "The geometry of the shapes") and pinned by
+  [`conformance/geometry/shapes.json`](../conformance/geometry/shapes.json): exact
+  bounds, the box, and landmark vertices, run by the JS renderer and
+  the Rust reference in CI. The table settled three disagreements
+  between shipping renderers — the torus plane, the wedge's facing, the
+  icosahedron's orientation — in favour of the majority each time.
 
 - The state document is now pinned with its own
   [`schema/state.schema.json`](../schema/state.schema.json); it joins
