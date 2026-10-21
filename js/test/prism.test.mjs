@@ -1,13 +1,13 @@
 // The Prism shape's geometry, as spec/world.md "The prism" states it:
 // the first cap vertex on +X, the ring counter-clockwise from above, flat
 // caps at ±height/2, every face wound outward, 4·sides − 4 triangles, and
-// `sides` clamped to the schema's 3..8. The renderer (render.js) draws
-// exactly these triangles; the Rust reference's triangle estimate counts
-// the same number.
+// `sides` clamped to the schema's 3..8. The renderer draws exactly these
+// triangles (they live in render.js, which node loads without a renderer);
+// the Rust reference's triangle estimate counts the same number.
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import { prismRing, prismSides, prismTriangles } from "../src/prism.js";
+import { prismRing, prismSides, prismTriangles } from "../src/render.js";
 
 const close = (a, b, eps = 1e-9) => Math.abs(a - b) <= eps;
 

@@ -32,7 +32,6 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { cameraOf, frameOf, viewOf, aimPointOf, shotList } from './cinematography.js';
-import { prismTriangles } from './prism.js';
 
 /** @typedef {import('./index.js').Vec3} Vec3 */
 /** @typedef {import('./index.js').WorldEntity} WorldEntity */
@@ -254,6 +253,57 @@ function wedgeGeometry(x, y, z) {
     [Ab, Af, Cf], [Ab, Cf, Cb], // vertical face at -x
     [Bf, Bb, Cb], [Bf, Cb, Cf], // slope
   ]);
+}
+
+// ---------------------------------------------------------------------------
+// The prism (experimental; spec/world.md "The geometry of the shapes") — the
+// normative triangles as plain arrays, exported so node can test the vertex
+// order with no renderer (js/test/prism.test.mjs). Origin at the centroid,
+// axis +Y, flat caps at y = ±height/2; `radius` is the circumradius: cap
+// vertex i sits at (radius·cos θ, ±height/2, −radius·sin θ), θ = 2π·i/sides —
+// the first vertex on +X, the ring counter-clockwise seen from above. Sides
+// are quads, caps are fans from vertex 0, all wound outward; `sides` clamps
+// to the schema's 3..8. Kept in this file on purpose: the renderer is one
+// file plus cinematography.js wherever it is vendored, and a third module
+// would have to travel with it.
+// ---------------------------------------------------------------------------
+
+/** The side count drawn for a declared `sides`: an integer in 3..8.
+ * @param {number} sides @returns {number} */
+export function prismSides(sides) {
+  const n = Math.round(Number(sides));
+  return Number.isFinite(n) ? Math.min(8, Math.max(3, n)) : 6;
+}
+
+/** One cap's ring of vertices at height `y`, vertex 0 on +X, counter-clockwise from above.
+ * @param {number} sides @param {number} radius @param {number} y @returns {Vec3[]} */
+export function prismRing(sides, radius, y) {
+  const n = prismSides(sides);
+  return Array.from({ length: n }, (_, i) => {
+    const theta = (2 * Math.PI * i) / n;
+    return /** @type {Vec3} */ ([radius * Math.cos(theta), y, -radius * Math.sin(theta)]);
+  });
+}
+
+/** The prism as triangles — `sides` side quads (two triangles each) and two
+ * fanned caps: 4·sides − 4 triangles, all wound outward.
+ * @param {number} sides @param {number} radius @param {number} height
+ * @returns {Vec3[][]} */
+export function prismTriangles(sides, radius, height) {
+  const n = prismSides(sides);
+  const top = prismRing(n, radius, height / 2);
+  const bottom = prismRing(n, radius, -height / 2);
+  /** @type {Vec3[][]} */
+  const triangles = [];
+  for (let i = 0; i < n; i++) {
+    const j = (i + 1) % n;
+    triangles.push([bottom[i], bottom[j], top[j]], [bottom[i], top[j], top[i]]);
+  }
+  for (let i = 1; i < n - 1; i++) {
+    triangles.push([top[0], top[i], top[i + 1]]); // seen from +Y: counter-clockwise
+    triangles.push([bottom[0], bottom[i + 1], bottom[i]]); // seen from −Y: counter-clockwise
+  }
+  return triangles;
 }
 
 /** @param {Shape} [shape]

@@ -158,8 +158,10 @@ runOutcomes(manifest, outcomesDoc);             // conformance/outcomes/h3.json
 ```
 
 The renderer (`openworldformat/render`) also draws the experimental
-`Prism` shape from `src/prism.js`, the normative triangles as plain
-arrays: the first cap vertex on +X, outward winding, flat caps.
+`Prism` shape, and exports its normative triangles as plain arrays
+(`prismTriangles`): the first cap vertex on +X, outward winding, flat
+caps. The renderer stays one file plus `cinematography.js` wherever it
+is vendored.
 
 ## Test
 
