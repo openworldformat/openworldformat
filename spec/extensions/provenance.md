@@ -16,6 +16,20 @@ When an authoring tool generates a world or entity, it MAY attach the following 
 - `biome`: A procedural generation hint specifying the environmental type.
 - `semantic_category`: A string tag aiding LLM reasoning and search.
 
+## What is not here
+
+A per-entry label of how a batch came to be — by hand, from a library,
+with a model's help — is `author.source` on the log entry ([the session
+log](../session.md), "The entry"), not a field of this extension: it is
+a fact about the actor, needs no model name, and must never carry a
+prompt. This block is a world's generation lineage, and lives on `meta`.
+
 ## Security and Privacy
 
 Because `prompt` often carries the exact text typed by the author, tools circulating worlds MUST warn the user or scrub the `prompt` field before publishing the package to prevent accidental disclosure of personal information.
+
+For an exporter — a tool writing a package for other people from a
+system of its own ([the package](../package.md), "Exports from other
+systems") — scrubbing is the **default**: `prompt` is left out unless
+the author opted in, and an exporter that never stored the prompt has
+nothing to decide.

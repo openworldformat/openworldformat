@@ -190,3 +190,42 @@ Engines SHOULD implement a "Safe Mode" boot that explicitly warns the user
 if a session log contains operations from profiles or extensions they do
 not have installed. This prevents silent erasure of custom content when
 saving the world back to disk.
+
+## Exports from other systems
+
+A producer that keeps its own live truth — rows in a database, a scene
+format of its own — MAY export a world and the history of how it was
+built as a package. The export is a view of that truth, never its
+authority, and it is a package like any other: every rule above applies
+in full. In particular:
+
+- **`manifest.json` is a snapshot** of the producer's state at export,
+  in canonical text, and `snapshots/base.json` is the state at the
+  start of the recorded history — an empty world, when the history is
+  complete.
+- **`ops.jsonl` is a replayable history**: one entry per recorded event
+  or batch, in the order they happened, each with an `author` naming
+  who (under the producer's own privacy policy; a pseudonym is a name)
+  and an `author.source` saying how — `hand`, `library` or `ai` ([the
+  session log](session.md), "The entry"). An exporter that cannot label
+  an entry leaves `source` out rather than guessing.
+- **The fold must hold.** `manifest.json` MUST equal the fold of the
+  exported log over the base ("Head-first"), and an exporter MUST check
+  that before it writes `package.json`'s hashes, since nothing else
+  will. Where a recorded event has no edit form — a moderation
+  redaction, a thinned span — the exporter writes the resulting state
+  as an edit by the host, not a gap.
+- **Time to the day is enough.** `timestamp_ms` MAY be coarsened to the
+  day for a public history; the format requires no finer time, and a
+  replay keys on `clock` entries, never on entry timestamps.
+- **No prompt by default.** Generation lineage goes in
+  `meta["ext-provenance"]` when the exporter chooses to write it, and
+  its `prompt` is left out unless the author opted in — the
+  [provenance](extensions/provenance.md) page's scrub rule, as the
+  default for every exporter.
+- **Declare what you used.** `package.json`'s `extensions` lists every
+  extension the package carries — [`ext-h3`](extensions/h3.md) for a
+  globe producer's cell frames — and shapes the format lacks are mesh
+  assets, never private keys.
+
+The RFC is [`rfcs/history-exports.md`](rfcs/history-exports.md).

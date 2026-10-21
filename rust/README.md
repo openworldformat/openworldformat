@@ -36,7 +36,25 @@ runner; `openworldformat::cinematography` carries the
 `ext-cinematography` extension's crop math, view and projection, entity
 origins through parents, aim and focus by entity (`view_in`,
 `aim_point_of`, `focus_distance_of`), shot list, and outcome runner;
-the `schema` feature generates `world.schema.json`.
+`openworldformat::ext_h3` carries the `ext-h3` geo frame extension's
+unit table, quantisation, block readers, the tangent-plane derivation
+of the core transform (`local_position`, `derive_transform`) and its
+outcome runner; the `schema` feature generates `world.schema.json`.
+
+## Since 0.3.6 (unreleased): a globe producer's brief
+
+- **`Shape::Prism { sides, radius, height }`** — experimental
+  (spec/world.md "The prism"): `sides` 3..=8, `radius` the circumradius;
+  `estimate_triangles` counts `4·sides − 4`, `local_aabb_half` is the
+  inscribing cylinder's box. The schema gained the variant; no version
+  bump (an additive shape a reader may ignore).
+- **`Author.source`** — `hand`, `library` or `ai` (`AUTHOR_SOURCES`),
+  optional, part of the entry's identity; `Author::known_source` reads
+  an unknown label as none. `Author::named` builds a plain author.
+- **`ext_h3`** — see above; `EXT_H3_KEY`, `ExtH3Frame`, `ExtH3Placement`
+  and `LatLng` are re-exported at the root.
+- **`timestamp_ms`** is documented as precision-free: a writer may
+  coarsen it to the day.
 
 ## The 0.3 surface (draft 0.3: head-first, live authoring)
 

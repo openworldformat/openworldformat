@@ -132,6 +132,7 @@ mod tests {
             author: crate::author::Author {
                 peer: None,
                 name: "t".into(),
+                source: None,
             },
             ops: vec![SessionOp::State(StateRecord {
                 state: state

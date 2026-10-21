@@ -77,6 +77,19 @@ engine's.
    composed through parents, `centred` and `focus` assertions, a Swift
    reference (the fourth), and every authority committing ids for the
    deeper references, as the log always promised.
+5. ~~A globe producer's export~~ — **done** (2026-10-20), three generic
+   additions from one brief: the experimental `Prism` shape with its
+   geometry stated in prose ([the world document](world.md), "The
+   prism"; `conformance/prism.json`; the JS renderer draws it);
+   [`ext-h3`](extensions/h3.md), a geo frame extension carrying an
+   entity's H3 cell and integer transform beside the derived core
+   transform, proposed with a schema, a conformance world with outcome
+   assertions and two references; and the export contract —
+   `author.source` (`hand`, `library`, `ai`), day-coarse time, no prompt
+   by default ([the session log](session.md) "The entry", [the
+   package](package.md) "Exports from other systems"). RFCs:
+   [`rfcs/ext-h3.md`](rfcs/ext-h3.md),
+   [`rfcs/history-exports.md`](rfcs/history-exports.md).
 
 **Deferred until a producer needs them:** collision-free ids, an `id` and
 `parent` on every entry, and timed input samples (a breaking bundle, for git
@@ -88,11 +101,12 @@ re-runs triggers over recorded input (semantic replay).
   `world.schema.json` in the generated core.
 - The **extension registry** holds two experimental extensions,
   [`ext-physics`](extensions/physics.md) and
-  [`ext-cinematography`](extensions/cinematography.md), and three
+  [`ext-cinematography`](extensions/cinematography.md), and four
   proposed ones:
   [`ext-strict-determinism`](extensions/strict-determinism.md),
-  [`ext-visibility`](extensions/visibility.md) and
-  [`ext-provenance`](extensions/provenance.md). A proposed extension
+  [`ext-visibility`](extensions/visibility.md),
+  [`ext-provenance`](extensions/provenance.md) and
+  [`ext-h3`](extensions/h3.md). A proposed extension
   reserves its name; it becomes experimental with a reference
   implementation and conformance cases, and leaves experimental when a
   producer ships a package using it.

@@ -29,7 +29,10 @@ pub struct OpLogEntry {
     #[serde(default)]
     pub author: Author,
     pub ops: Vec<SessionOp>,
-    /// Milliseconds since the Unix epoch (0 when the writer didn't clock).
+    /// Milliseconds since the Unix epoch (0 when the writer didn't
+    /// clock). The format requires no precision: a writer MAY coarsen
+    /// it — to the day, for a public history (spec/session.md, "The
+    /// entry") — and a reader never assumes it is finer than written.
     #[serde(default)]
     pub timestamp_ms: u64,
     /// The entry's identity, for branching histories (a reader treats it
@@ -115,6 +118,7 @@ mod tests {
             author: Author {
                 peer: Some(3),
                 name: "maya".into(),
+                source: None,
             },
             ops: vec![SessionOp::Edit(Box::new(wt::EditOp::spawn(
                 wt::WorldEntity::new(1, "lighthouse"),
@@ -166,6 +170,7 @@ mod tests {
             author: Author {
                 peer: Some(3),
                 name: "maya".into(),
+                source: None,
             },
             ops: vec![SessionOp::Edit(Box::new(wt::EditOp::spawn(
                 wt::WorldEntity::new(1, "beacon"),

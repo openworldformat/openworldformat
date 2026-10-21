@@ -605,10 +605,8 @@ fn rewrite_edit(op: EditOp, remapped: &std::collections::BTreeMap<u64, u64>) -> 
 /// references elsewhere are names, not ids, and ride. In place on the
 /// merged entries.
 fn rename_colliding_spawns(main: &WorldDoc, entries: &mut [OpLogEntry]) {
-    let mut taken: std::collections::HashSet<String> = main
-        .entities()
-        .map(|e| e.name.0.clone())
-        .collect();
+    let mut taken: std::collections::HashSet<String> =
+        main.entities().map(|e| e.name.0.clone()).collect();
     for entry in entries {
         for op in &mut entry.ops {
             if let SessionOp::Edit(edit) = op {
@@ -752,6 +750,7 @@ mod tests {
             author: Author {
                 peer: None,
                 name: "llm".into(),
+                source: None,
             },
             ops: vec![
                 SessionOp::Tool(ToolRecord {
@@ -801,6 +800,7 @@ mod tests {
             author: Author {
                 peer: None,
                 name: "maya".into(),
+                source: None,
             },
             ops: vec![SessionOp::Edit(Box::new(EditOp::spawn(entity(
                 100 + rev,
@@ -821,6 +821,7 @@ mod tests {
                 author: Author {
                     peer: None,
                     name: "host".into(),
+                    source: None,
                 },
                 ops: vec![SessionOp::Merge(MergeRecord {
                     merge: MergeSource {
@@ -880,6 +881,7 @@ mod tests {
                 author: Author {
                     peer: None,
                     name: "t".into(),
+                    source: None,
                 },
                 ops: vec![SessionOp::Edit(Box::new(EditOp::spawn(entity(1, "a"))))],
                 timestamp_ms: 0,
@@ -892,6 +894,7 @@ mod tests {
                 author: Author {
                     peer: None,
                     name: "t".into(),
+                    source: None,
                 },
                 ops: vec![SessionOp::Edit(Box::new(EditOp::spawn(entity(2, "b"))))],
                 timestamp_ms: 1,
@@ -926,6 +929,7 @@ mod tests {
                 author: Author {
                     peer: None,
                     name: "branch".into(),
+                    source: None,
                 },
                 ops: vec![SessionOp::Edit(Box::new(wt::EditOp::spawn(entity(
                     5, "wall",
@@ -940,6 +944,7 @@ mod tests {
                 author: Author {
                     peer: None,
                     name: "branch".into(),
+                    source: None,
                 },
                 ops: vec![SessionOp::Edit(Box::new(wt::EditOp::spawn(branch_child)))],
                 timestamp_ms: 4,
@@ -979,7 +984,8 @@ mod tests {
         // past the spent floor, rewrites the world refs, suffixes the
         // name, and keeps the entry's message and author.
         let mut main = WorldDoc::new("main");
-        main.apply(&wt::EditOp::spawn(entity(1, "lighthouse"))).unwrap();
+        main.apply(&wt::EditOp::spawn(entity(1, "lighthouse")))
+            .unwrap();
         main.apply(&wt::EditOp::spawn(entity(2, "gone"))).unwrap();
         main.apply(&wt::EditOp::delete(wt::EntityId(2))).unwrap();
         assert_eq!(main.next_id(), 3, "a deleted id stays spent");
@@ -989,6 +995,7 @@ mod tests {
             author: Author {
                 peer: None,
                 name: "branch".into(),
+                source: None,
             },
             ops: vec![
                 SessionOp::Edit(Box::new(wt::EditOp::spawn(entity(1, "lighthouse")))),
@@ -1056,6 +1063,7 @@ mod tests {
             author: Author {
                 peer: None,
                 name: "branch".into(),
+                source: None,
             },
             ops: vec![SessionOp::Edit(Box::new(wt::EditOp::modify(
                 wt::EntityId(1),
@@ -1117,6 +1125,7 @@ mod tests {
                 author: Author {
                     peer: None,
                     name: "llm".into(),
+                    source: None,
                 },
                 ops: vec![SessionOp::Edit(Box::new(EditOp::spawn(entity(1, "a"))))],
                 timestamp_ms: 0,
@@ -1129,6 +1138,7 @@ mod tests {
                 author: Author {
                     peer: None,
                     name: "llm".into(),
+                    source: None,
                 },
                 ops: vec![SessionOp::Tool(ToolRecord {
                     tool: "gen_modify_entity".into(),
@@ -1147,6 +1157,7 @@ mod tests {
                 author: Author {
                     peer: None,
                     name: "maya".into(),
+                    source: None,
                 },
                 ops: vec![SessionOp::Edit(Box::new(EditOp::spawn(entity(2, "b"))))],
                 timestamp_ms: 2,
@@ -1164,6 +1175,7 @@ mod tests {
             author: Author {
                 peer: None,
                 name: "x".into(),
+                source: None,
             },
             ops: vec![SessionOp::Edit(Box::new(EditOp::delete(wt::EntityId(99))))],
             timestamp_ms: 3,

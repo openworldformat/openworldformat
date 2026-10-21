@@ -11,7 +11,7 @@ down ([the package](package.md), "Head-first").
 
 ```json
 {"revision": 42, "timestamp_ms": 1790000000123,
- "author": {"peer": 3, "name": "maya"},
+ "author": {"peer": 3, "name": "maya", "source": "hand"},
  "message": "a lantern by the gate",
  "ops": [ … ]}
 ```
@@ -23,7 +23,26 @@ between edit entries. Edit entries themselves are totally ordered.
 
 `author` is who or what did it — a person, a model, a visitor, a host.
 Authorship is what makes the log an audit trail: "what did the model do
-here, versus the people?" is a filter on one field.
+here, versus the people?" is a filter on one field. The filter has two
+levels. `author.name` says who. `author.source` (optional) says how the
+batch came to be, in one word: `hand` (a person acting directly),
+`library` (ready-made content placed from a catalogue or template) or
+`ai` (a model's output, whether or not a person accepted it). A reader
+MUST treat any other value as no label, so the vocabulary can grow
+without a bump; the field is part of the entry's identity like every
+other, and a reader that re-encodes an entry keeps it. The label is a
+fact about the actor, so it lives on the author, not in
+[`ext-provenance`](extensions/provenance.md), which is a world's
+generation lineage (model, prompt, duration) and belongs to `meta`: a
+label needs no model name, and a prompt never belongs in a history
+([the package](package.md), "Exports from other systems").
+
+`timestamp_ms` is milliseconds since the Unix epoch, and the format
+requires no precision of it. A writer MAY coarsen a timestamp — to the
+day, for a public history, where a per-entry clock would tell when a
+person was where — and a reader MUST NOT assume a timestamp is finer than
+the writer chose. Replay never keys on entry timestamps: the clock of a
+replay is the `clock` entries ("Replay and determinism").
 
 `message` (optional) is what the author says the batch is for — a commit
 message. It folds to nothing, is part of the entry's identity, and is the
