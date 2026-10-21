@@ -49,6 +49,7 @@ export const REGISTERED_EXTENSIONS = [
   "ext-visibility",
   "ext-cinematography",
   "ext-provenance",
+  "ext-h3",
 ];
 
 // ---------------------------------------------------------------------------

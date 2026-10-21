@@ -102,13 +102,14 @@ class ConstantsTest(unittest.TestCase):
         ])])
         self.assertIn(MAX_ENTITY_ID, state["by_id"])
 
-    def test_the_registry_names_the_five_registered_extensions(self):
+    def test_the_registry_names_the_six_registered_extensions(self):
         self.assertEqual(REGISTERED_EXTENSIONS, (
             "ext-physics",
             "ext-strict-determinism",
             "ext-visibility",
             "ext-cinematography",
             "ext-provenance",
+            "ext-h3",
         ))
 
 

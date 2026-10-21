@@ -158,6 +158,33 @@ fn the_cinematography_conformance_outcomes_pass_under_the_reference_math() {
 }
 
 #[test]
+fn the_h3_conformance_outcomes_pass_under_the_reference_derivation() {
+    let manifest: Manifest =
+        serde_json::from_str(&std::fs::read_to_string(repo("conformance/h3.json")).unwrap())
+            .unwrap();
+    let outcomes: openworldformat::ext_h3::OutcomesDoc = serde_json::from_str(
+        &std::fs::read_to_string(repo("conformance/outcomes/h3.json")).unwrap(),
+    )
+    .unwrap();
+    let result = openworldformat::ext_h3::run_outcomes(&manifest, &outcomes);
+    assert_eq!(result.failures, Vec::<String>::new());
+    assert!(result.ok);
+    // The invariant from both ends: move the column by its core transform
+    // alone and the derivation still agrees with the fixture, the core
+    // transform no longer does.
+    let mut liar = manifest.clone();
+    let column = liar
+        .entities
+        .iter_mut()
+        .find(|e| e.name.as_str() == "column")
+        .unwrap();
+    column.transform.position[0] = 5.0;
+    let result = openworldformat::ext_h3::run_outcomes(&liar, &outcomes);
+    assert_eq!(result.failures.len(), 1, "{:?}", result.failures);
+    assert!(result.failures[0].starts_with("column: core position"));
+}
+
+#[test]
 fn hand_authored_ron_named_structs_parse() {
     // The regression this pins: serde(flatten) forces map-form
     // deserialization, which rejects RON's named-struct syntax — the

@@ -27,6 +27,7 @@ pub const REGISTERED_EXTENSIONS: &[&str] = &[
     "ext-visibility",
     "ext-cinematography",
     "ext-provenance",
+    "ext-h3",
 ];
 
 /// The keys a manifest's top level may carry (schema v3, post-pruning:

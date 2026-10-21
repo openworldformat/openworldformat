@@ -55,6 +55,7 @@ val REGISTERED_EXTENSIONS: Set<String> = setOf(
     "ext-visibility",
     "ext-cinematography",
     "ext-provenance",
+    "ext-h3",
 )
 
 /** A refusal: parse errors say what the document lacks; fold refusals

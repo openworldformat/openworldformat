@@ -14,12 +14,14 @@ class ConformanceTests {
     /** (world, entity count) — pinned from the conformance worlds. */
     private val counts = mapOf(
         "behaviors" to 13,
+        "h3" to 6,
         "hierarchy_rotations" to 9,
         "hierarchy_tours" to 12,
         "instances" to 7,
         "lights" to 8,
         "materials" to 21,
         "physics" to 5,
+        "prism" to 12,
         "shapes" to 13,
         "soundtrack" to 10,
         "textures" to 8,

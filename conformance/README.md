@@ -19,6 +19,8 @@ the same scene, within the tolerance the format's conventions allow
 | `soundtrack.json` | soundtrack curves, modulations |
 | `physics.json` | the `ext-physics` extension, drawn at rest |
 | `cinematography.json` | a set with cameras and shots; the `ext-cinematography` extension's outcomes pair with it |
+| `prism.json` | the experimental `Prism` shape: every side count beside a cylinder for scale, a column, a tile, one on its side ([spec/world.md](../spec/world.md), "The prism"). Not required for a Viewer claim until a second renderer draws it |
+| `h3.json` | the `ext-h3` extension: a terrace pinned to H3 cells, drawn flat by a reader without it; the extension's outcomes pair with it |
 
 `assets/textures/` holds the checker and grid textures `textures.json`
 references. Worlds referencing `assets/` are packages in miniature: the
@@ -34,7 +36,13 @@ scrubbed playback ([spec/extensions/physics.md](../spec/extensions/physics.md)).
 same way: derived field of view, frame membership and the shot list,
 checked by math alone
 ([spec/extensions/cinematography.md](../spec/extensions/cinematography.md)).
-The reference solvers run them in CI (`npm test` in `js/`).
+`outcomes/h3.json` pairs with `h3.json`: the core transform of every
+placed entity is derived from its H3 cell and integer transform, and
+checked from both ends — the derivation and what the producer wrote —
+with the cells' centres carried as data, since no reference embeds an
+H3 library ([spec/extensions/h3.md](../spec/extensions/h3.md)).
+The reference solvers run them in CI (`npm test` in `js/`, `cargo test`
+in `rust/`).
 
 Each world is a complete `manifest.json` — also valid base worlds for
 session tests. License: Apache-2.0, from the LocalGPT conformance suite.

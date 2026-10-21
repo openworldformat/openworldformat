@@ -101,9 +101,13 @@ jobs:
           const fs = require("fs");
           const files = ["schema/world.schema.json",
             "schema/extensions/ext-physics.schema.json",
+            "schema/extensions/ext-cinematography.schema.json",
+            "schema/extensions/ext-h3.schema.json",
             ...fs.readdirSync("conformance").filter(f => f.endsWith(".json"))
               .map(f => "conformance/" + f),
             "conformance/outcomes/physics.json",
+            "conformance/outcomes/cinematography.json",
+            "conformance/outcomes/h3.json",
             "examples/hello-world/manifest.json",
             "examples/hello-world/package.json"];
           for (const f of files) { JSON.parse(fs.readFileSync(f, "utf8")); console.log("ok", f); }
@@ -127,4 +131,8 @@ jobs:
             -d "examples/*/state.json" \
             --spec=draft2020 --strict=false
           npx -y ajv-cli@5 compile -s schema/extensions/ext-physics.schema.json \
+            --spec=draft2020 --strict=false
+          npx -y ajv-cli@5 compile -s schema/extensions/ext-cinematography.schema.json \
+            --spec=draft2020 --strict=false
+          npx -y ajv-cli@5 compile -s schema/extensions/ext-h3.schema.json \
             --spec=draft2020 --strict=false

@@ -1,0 +1,18 @@
+{
+  "comment": "Outcome assertions for conformance/h3.json — the ext-h3 extension's conformance is the derivation, not pixels: read the blocks, derive the core transform from the H3 fields, check that the derivation and the core transform the producer wrote both equal the expected values (spec/extensions/h3.md, 'Deriving the core transform'). No reference carries an H3 library, so cell_centres holds cellToLatLng of every cell the world names, [lat, lng] in degrees, as data; a runner with an H3 library SHOULD verify them. Assertion kinds: frame {cell, resolution, body} (what the environment declares); edge_length {resolution, metres, tolerance} (the unit table, H3 4's getHexagonEdgeLengthAvgM); placed {entity, position, rotation_degrees, scale, tolerance} (the entity's derived transform and its core transform are both within tolerance of these: metres, degrees, factors).",
+  "world": "conformance/h3.json",
+  "cell_centres": {
+    "8f1fb46741a12d5": [48.85839598760832, 2.29450022174426],
+    "8f1fb46741a12c2": [48.85839650384499, 2.2945128264283987],
+    "8f1fb46741a12c6": [48.85840397463363, 2.294505057425001]
+  },
+  "expect": [
+    { "frame": { "cell": "8f1fb46741a12d5", "resolution": 15, "body": "earth" } },
+    { "edge_length": { "resolution": 15, "metres": 0.584169, "tolerance": 1e-9 } },
+    { "edge_length": { "resolution": 0, "metres": 1281256.011, "tolerance": 1e-6 } },
+    { "placed": { "entity": "column", "position": [0.0, 0.747736, 0.0], "rotation_degrees": [0.0, 30.0, 0.0], "scale": [1.0, 1.0, 1.0], "tolerance": 0.001 } },
+    { "placed": { "entity": "marker", "position": [-0.701003, 0.099309, 0.525752], "rotation_degrees": [0.0, 18.0, 0.0], "scale": [0.5, 1.0, 0.5], "tolerance": 0.001 } },
+    { "placed": { "entity": "lantern", "position": [0.92213, 1.752507, -0.057403], "rotation_degrees": [0.0, 0.0, 0.0], "scale": [1.0, 1.0, 1.0], "tolerance": 0.001 } },
+    { "placed": { "entity": "plinth", "position": [0.353767, 0.151884, -0.888118], "rotation_degrees": [0.0, -45.0, 0.0], "scale": [2.0, 1.0, 2.0], "tolerance": 0.001 } }
+  ]
+}

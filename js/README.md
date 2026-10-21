@@ -135,6 +135,32 @@ ones. Deterministic within an engine (no randomness, document order,
 IEEE-754 doubles); across engines, only the semantic contract holds —
 never bit-exact, per the spec.
 
+## The geo frame extension (`openworldformat/h3`)
+
+The reference half of [`ext-h3`](../spec/extensions/h3.md) 0.1
+(proposed): an entity's H3 cell and integer transform are authoritative,
+and the core transform a flat reader draws is derived from them. This
+module is the derivation — the unit table, the quantisation the
+producing format uses, the block readers, the tangent-plane math, and
+the conformance outcome runner. No H3 library is embedded: cell centres
+come in as `{lat, lng}` or `[lat, lng]` from whatever `cellToLatLng` you
+have.
+
+```js
+import { placementOf, frameOf, deriveTransform, quantizeTranslation, runOutcomes }
+  from "openworldformat/h3";
+
+const placement = placementOf(entity);          // {cell, resolution, body, translation, rotation, scale} | null
+const frame = frameOf(manifest);                // the environment's origin cell, or null
+const t = deriveTransform(originLatLng, cellLatLng, placement); // {position, rotation_degrees, scale}
+quantizeTranslation(0.75, 15);                  // 128 — hundredths of an edge at resolution 15
+runOutcomes(manifest, outcomesDoc);             // conformance/outcomes/h3.json
+```
+
+The renderer (`openworldformat/render`) also draws the experimental
+`Prism` shape from `src/prism.js`, the normative triangles as plain
+arrays: the first cap vertex on +X, outward winding, flat caps.
+
 ## Test
 
 ```bash

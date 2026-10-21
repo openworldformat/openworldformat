@@ -58,6 +58,22 @@
       "status": "proposed",
       "spec": "spec/extensions/provenance.md",
       "notes": "Carries LLM lineage metadata such as prompt, model, and generation duration. The Rust reference round-trips the block from its core types; promotion to experimental wants that round-trip as a conformance case."
+    },
+    "ext-h3": {
+      "version": "0.1.0",
+      "status": "proposed",
+      "spec": "spec/extensions/h3.md",
+      "rfc": "spec/rfcs/ext-h3.md",
+      "schema": "schema/extensions/ext-h3.schema.json",
+      "implementations": [
+        "rust/src/ext_h3.rs (crates.io openworldformat::ext_h3)",
+        "js/src/h3.js (npm openworldformat/h3)"
+      ],
+      "conformance": [
+        "conformance/h3.json",
+        "conformance/outcomes/h3.json"
+      ],
+      "notes": "A geo frame for globe-aware producers: an entity carries its H3 cell, resolution, body and an integer-only transform in the cell's frame (hundredths of the mean edge length, hundredths of a degree, log2 fixed-point scale) beside the core transform the producer derives from them; the environment carries the package's origin cell. The one invariant: the H3 fields are authoritative, the core transform is derived, a reader that knows both prefers the H3 fields. Proposed with the page, the schema, a conformance world with outcome assertions, and two references (Rust, JS) running the same derivation; it becomes experimental when a second implementer signs off, and leaves experimental when a producer outside this repository ships a package using it."
     }
   }
 }

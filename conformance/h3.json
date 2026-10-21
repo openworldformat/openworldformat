@@ -1,0 +1,48 @@
+{
+  "version": 3,
+  "meta": {
+    "name": "conformance-h3",
+    "description": "The ext-h3 extension (spec/extensions/h3.md): a terrace of four entities pinned to H3 cells — a hexagonal column and a pentagonal marker in the origin cell, a lantern and a plinth in two neighbouring cells — each carrying its cell and its integer transform in the cell's frame beside the core transform the producer derived from them. A reader without the extension draws the core transforms (this is a flat terrace); a reader with it places each entity on the globe by its cell. outcomes/h3.json checks the derivation from both ends. The ground plane carries no block: it stands in for the globe's surface.",
+    "tags": ["conformance", "ext-h3"]
+  },
+  "environment": {
+    "background_color": [0.55, 0.7, 0.9, 1.0],
+    "ambient_color": [1.0, 1.0, 1.0, 1.0],
+    "ambient_intensity": 300.0,
+    "ext-h3": { "cell": "8f1fb46741a12d5", "resolution": 15, "body": "earth" }
+  },
+  "camera": { "position": [0.0, 2.5, 5.0], "look_at": [0.0, 0.6, 0.0], "fov_degrees": 50.0 },
+  "entities": [
+    { "id": 1, "name": "ground", "transform": { "position": [0.0, 0.0, 0.0] },
+      "shape": { "Plane": { "x": 8.0, "z": 8.0 } },
+      "material": { "color": [0.35, 0.45, 0.3, 1.0], "roughness": 0.95 } },
+    { "id": 2, "name": "sun", "transform": { "position": [0.0, 20.0, 0.0] },
+      "light": { "light_type": "directional", "color": [1.0, 0.96, 0.9, 1.0], "intensity": 12000.0, "direction": [-0.4, -1.0, -0.35], "shadows": true } },
+    { "id": 10, "name": "column",
+      "transform": { "position": [0.0, 0.747736, 0.0], "rotation_degrees": [0.0, 30.0, 0.0], "scale": [1.0, 1.0, 1.0] },
+      "shape": { "Prism": { "sides": 6, "radius": 0.4, "height": 1.5 } },
+      "material": { "color": [0.9, 0.85, 0.2, 1.0] },
+      "ext-h3": { "cell": "8f1fb46741a12d5", "resolution": 15, "body": "earth",
+                  "translation": [0, 128, 0], "rotation": [0, 3000, 0], "scale": [0, 0, 0] } },
+    { "id": 11, "name": "marker",
+      "transform": { "position": [-0.701003, 0.099309, 0.525752], "rotation_degrees": [0.0, 18.0, 0.0], "scale": [0.5, 1.0, 0.5] },
+      "shape": { "Prism": { "sides": 5, "radius": 0.3, "height": 0.2 } },
+      "material": { "color": [0.85, 0.25, 0.2, 1.0] },
+      "ext-h3": { "cell": "8f1fb46741a12d5", "resolution": 15,
+                  "translation": [-120, 17, 90], "rotation": [0, 1800, 0], "scale": [-1024, 0, -1024] } },
+    { "id": 12, "name": "lantern",
+      "transform": { "position": [0.92213, 1.752507, -0.057403], "rotation_degrees": [0.0, 0.0, 0.0], "scale": [1.0, 1.0, 1.0] },
+      "shape": { "Sphere": { "radius": 0.15 } },
+      "material": { "color": [1.0, 0.9, 0.6, 1.0], "emissive": [2.0, 1.6, 0.8, 1.0] },
+      "light": { "light_type": "point", "color": [1.0, 0.9, 0.6, 1.0], "intensity": 800.0, "range": 6.0 },
+      "ext-h3": { "cell": "8f1fb46741a12c2", "resolution": 15,
+                  "translation": [0, 300, 0] } },
+    { "id": 13, "name": "plinth",
+      "transform": { "position": [0.353767, 0.151884, -0.888118], "rotation_degrees": [0.0, -45.0, 0.0], "scale": [2.0, 1.0, 2.0] },
+      "shape": { "Cuboid": { "x": 0.6, "y": 0.3, "z": 0.6 } },
+      "material": { "color": [0.6, 0.6, 0.65, 1.0], "roughness": 0.6 },
+      "ext-h3": { "cell": "8f1fb46741a12c6", "resolution": 15,
+                  "translation": [0, 26, 0], "rotation": [0, -4500, 0], "scale": [1024, 0, 1024] } }
+  ],
+  "next_entity_id": 14
+}

@@ -21,6 +21,10 @@
     "./cinematography": {
       "types": "./dist/cinematography.d.ts",
       "default": "./src/cinematography.js"
+    },
+    "./h3": {
+      "types": "./dist/h3.d.ts",
+      "default": "./src/h3.js"
     }
   },
   "files": [
