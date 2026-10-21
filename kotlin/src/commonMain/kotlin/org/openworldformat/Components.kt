@@ -44,6 +44,9 @@ sealed class Shape {
     data class Tetrahedron(val radius: Double) : Shape()
     data class Icosahedron(val radius: Double) : Shape()
     data class Wedge(val x: Double, val y: Double, val z: Double) : Shape()
+    /** Experimental (spec/world.md "The prism"): a right prism on a regular
+     *  polygon, `sides` 3..8, `radius` the circumradius, axis along +Y. */
+    data class Prism(val sides: Int, val radius: Double, val height: Double) : Shape()
 
     companion object {
         operator fun invoke(json: JsonElement?): Shape? {
@@ -63,6 +66,7 @@ sealed class Shape {
                 "Tetrahedron" -> Tetrahedron(d("radius", 0.5))
                 "Icosahedron" -> Icosahedron(d("radius", 0.5))
                 "Wedge" -> Wedge(d("x"), d("y"), d("z"))
+                "Prism" -> Prism(d("sides", 6.0).toInt(), d("radius", 0.5), d("height"))
                 else -> null
             }
         }

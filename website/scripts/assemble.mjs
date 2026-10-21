@@ -31,9 +31,11 @@ await cp(
   path.join(root, 'static/conformance/hello-world.json'),
 );
 
-// The reference renderer, and the extension module it imports.
+// The reference renderer, and the sibling modules it imports (the
+// extension module, and the prism's geometry).
 await cp(path.join(repo, 'js/src/render.js'), path.join(root, 'static/viewer/world-viewer.js'));
 await cp(path.join(repo, 'js/src/cinematography.js'), path.join(root, 'static/viewer/cinematography.js'));
+await cp(path.join(repo, 'js/src/prism.js'), path.join(root, 'static/viewer/prism.js'));
 
 // The brand files the templates reference (base.html).
 await rm(path.join(root, 'static/brand'), { recursive: true, force: true });

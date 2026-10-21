@@ -32,6 +32,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { cameraOf, frameOf, viewOf, aimPointOf, shotList } from './cinematography.js';
+import { prismTriangles } from './prism.js';
 
 /** @typedef {import('./index.js').Vec3} Vec3 */
 /** @typedef {import('./index.js').WorldEntity} WorldEntity */
@@ -271,6 +272,8 @@ export function createGeometry(shape) {
     case 'Tetrahedron': return new THREE.TetrahedronGeometry(p.radius ?? 1);
     case 'Icosahedron': return new THREE.IcosahedronGeometry(p.radius ?? 1, 0);
     case 'Wedge': return wedgeGeometry(p.x ?? 1, p.y ?? 1, p.z ?? 1);
+    // Experimental (spec/world.md "The prism"): the normative triangles, flat-shaded.
+    case 'Prism': return flatGeometry(prismTriangles(p.sides ?? 6, p.radius ?? 0.5, p.height ?? 1));
     default: return new THREE.BoxGeometry(1, 1, 1);
   }
 }
@@ -706,7 +709,7 @@ export function shapeHalfExtents(shape) {
   switch (kind) {
     case 'Cuboid': case 'Wedge': return [a.x / 2, a.y / 2, a.z / 2];
     case 'Sphere': case 'Tetrahedron': case 'Icosahedron': return [a.radius, a.radius, a.radius];
-    case 'Cylinder': case 'Cone': return [a.radius, a.height / 2, a.radius];
+    case 'Cylinder': case 'Cone': case 'Prism': return [a.radius, a.height / 2, a.radius];
     case 'Capsule': return [a.radius, a.half_length + a.radius, a.radius];
     case 'Torus': return [a.major_radius + a.minor_radius, a.minor_radius, a.major_radius + a.minor_radius];
     case 'Plane': return [a.x / 2, 0, a.z / 2];

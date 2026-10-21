@@ -76,10 +76,26 @@ pub enum Shape {
         #[serde(default = "default_one")]
         z: f32,
     },
+    /// A right prism on a regular polygon, `sides` long (experimental: spec/world.md "The prism"). Origin at the centroid, axis along local +Y, flat caps at y = ±height/2. `radius` is the circumradius: cap vertex i sits at (radius·cos θ, ±height/2, −radius·sin θ) with θ = 2π·i/sides, so the first vertex is on +X and the ring runs counter-clockwise seen from above. Faces wind outward; no segment parameter beyond `sides`.
+    Prism {
+        /// How many sides, 3 to 8 (6 is a hexagonal prism, 5 a pentagonal one).
+        #[serde(default = "default_six")]
+        #[cfg_attr(feature = "schema", schemars(range(min = 3, max = 8)))]
+        sides: u8,
+        /// The circumradius: centre to any cap vertex.
+        #[serde(default = "default_half")]
+        radius: f32,
+        /// Cap to cap along +Y.
+        #[serde(default = "default_one")]
+        height: f32,
+    },
 }
 
 fn default_one() -> f32 {
     1.0
+}
+fn default_six() -> u8 {
+    6
 }
 fn default_half() -> f32 {
     0.5
@@ -106,6 +122,8 @@ impl Shape {
             Shape::Tetrahedron { .. } => 4, // 4 triangular faces
             Shape::Icosahedron { .. } => 20, // 20 triangular faces
             Shape::Wedge { .. } => 8,   // 2 end caps + 3 sides (as triangles)
+            // Each side is a quad (2), each cap a fan of sides − 2.
+            Shape::Prism { sides, .. } => 4 * usize::from(*sides).max(3) - 4,
         }
     }
 
@@ -137,6 +155,9 @@ impl Shape {
             Shape::Tetrahedron { radius } => [*radius, *radius, *radius],
             Shape::Icosahedron { radius } => [*radius, *radius, *radius],
             Shape::Wedge { x, y, z } => [x / 2.0, y / 2.0, z / 2.0],
+            // The cylinder it is inscribed in: exact for the square (a
+            // vertex on each axis), conservative for the others.
+            Shape::Prism { radius, height, .. } => [*radius, height / 2.0, *radius],
         }
     }
 
@@ -154,6 +175,7 @@ impl Shape {
             Shape::Tetrahedron { .. } => "tetrahedron",
             Shape::Icosahedron { .. } => "icosahedron",
             Shape::Wedge { .. } => "wedge",
+            Shape::Prism { .. } => "prism",
         }
     }
 }
@@ -173,6 +195,7 @@ pub enum PrimitiveShapeKind {
     Tetrahedron,
     Icosahedron,
     Wedge,
+    Prism,
 }
 
 impl Shape {
@@ -190,6 +213,7 @@ impl Shape {
             Shape::Tetrahedron { .. } => PrimitiveShapeKind::Tetrahedron,
             Shape::Icosahedron { .. } => PrimitiveShapeKind::Icosahedron,
             Shape::Wedge { .. } => PrimitiveShapeKind::Wedge,
+            Shape::Prism { .. } => PrimitiveShapeKind::Prism,
         }
     }
 }
@@ -224,6 +248,11 @@ mod tests {
                 y: 1.0,
                 z: 3.0,
             },
+            Shape::Prism {
+                sides: 6,
+                radius: 0.6,
+                height: 1.5,
+            },
         ];
 
         for shape in &shapes {
@@ -231,6 +260,37 @@ mod tests {
             let back: Shape = serde_json::from_str(&json).unwrap();
             assert_eq!(*shape, back, "roundtrip failed for {}", shape.kind());
         }
+    }
+
+    /// The prism as the spec states it: `sides` is the only segment
+    /// parameter, the defaults are a hexagonal prism of radius 0.5 and
+    /// height 1, the box is the inscribing cylinder's, and the budget
+    /// counts two triangles per side plus two fanned caps.
+    #[test]
+    fn prism_defaults_box_and_budget() {
+        let prism: Shape = serde_json::from_str(r#"{"Prism": {}}"#).unwrap();
+        assert_eq!(
+            prism,
+            Shape::Prism {
+                sides: 6,
+                radius: 0.5,
+                height: 1.0
+            }
+        );
+        assert_eq!(prism.kind(), "prism");
+        assert_eq!(prism.primitive_kind(), PrimitiveShapeKind::Prism);
+        assert_eq!(prism.local_aabb_half(), [0.5, 0.5, 0.5]);
+        assert_eq!(prism.estimate_triangles(), 20); // 6 sides × 2 + 2 caps × 4
+        let triangle: Shape =
+            serde_json::from_str(r#"{"Prism": {"sides": 3, "radius": 1.0, "height": 2.0}}"#)
+                .unwrap();
+        assert_eq!(triangle.estimate_triangles(), 8); // 3 × 2 + 2 × 1
+        assert_eq!(triangle.local_aabb_half(), [1.0, 1.0, 1.0]);
+        // The wire form is the externally tagged variant like every shape.
+        assert_eq!(
+            serde_json::to_string(&triangle).unwrap(),
+            r#"{"Prism":{"sides":3,"radius":1.0,"height":2.0}}"#
+        );
     }
 
     #[test]
@@ -280,6 +340,11 @@ mod tests {
                 x: 1.0,
                 y: 1.0,
                 z: 1.0,
+            },
+            Shape::Prism {
+                sides: 8,
+                radius: 1.0,
+                height: 1.0,
             },
         ];
         for s in &shapes {

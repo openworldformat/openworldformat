@@ -73,6 +73,39 @@ SHA-256 of the file, an optional node within it, and per-node overrides
 (hide, recolour) applied to named nodes of that asset for this entity
 only.
 
+### The prism (experimental)
+
+The shapes are `Cuboid`, `Sphere`, `Cylinder`, `Cone`, `Capsule`,
+`Torus`, `Plane`, `Pyramid`, `Tetrahedron`, `Icosahedron`, `Wedge` and,
+experimentally, `Prism`. The schema states each one's parameters and
+defaults. The prism's geometry is stated here as well, because a radius
+and a side count leave more for two renderers to disagree about than a
+cylinder does:
+
+- `Prism { sides, radius, height }` is a right prism on a regular polygon
+  with `sides` sides, 3 to 8 (6 is the hexagonal prism, 5 the pentagonal
+  one). `sides` is its only segment parameter; there is no other.
+- Its origin is its centroid; its axis is local +Y; its caps are flat, at
+  y = ±`height`/2.
+- `radius` is the **circumradius**, centre to vertex: cap vertex *i* sits
+  at (`radius`·cos θ, ±`height`/2, −`radius`·sin θ) with θ = 2π·*i*/`sides`
+  — the first vertex on +X, the ring counter-clockwise seen from above
+  (+Y).
+- Every face winds outward: each side is one planar quad (two
+  triangles), each cap a fan from vertex 0, and renderers draw the sides
+  flat, not smoothed across the edges.
+- Its bounding box is the inscribing cylinder's: half-extents
+  (`radius`, `height`/2, `radius`).
+
+**Status.** `Prism` is experimental, under the ladder
+[profiles](profiles.md) sets for extensions, applied to a core shape:
+one renderer draws it (the reference three.js viewer), and it leaves
+experimental when a second renderer draws
+[`conformance/prism.json`](../conformance/prism.json). Until then a
+Viewer-profile claim does not require it, `shapes.json` does not include
+it, and a reader without it skips the shape — must-ignore, never an
+error. The RFC is [`rfcs/history-exports.md`](rfcs/history-exports.md).
+
 ### Reuse: creations and instances
 
 A creation is a named, reusable tree of entities. An entity with

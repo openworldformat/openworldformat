@@ -191,9 +191,9 @@ fn shape_extents(shape: &Shape) -> Option<[f64; 3]> {
         Shape::Cuboid { x, y, z } => [f(*x), f(*y), f(*z)],
         Shape::Wedge { x, y, z } => [f(*x), f(*y), f(*z)],
         Shape::Sphere { radius } => [f(*radius) * 2.0; 3],
-        Shape::Cylinder { radius, height } | Shape::Cone { radius, height } => {
-            [f(*radius) * 2.0, f(*height), f(*radius) * 2.0]
-        }
+        Shape::Cylinder { radius, height }
+        | Shape::Cone { radius, height }
+        | Shape::Prism { radius, height, .. } => [f(*radius) * 2.0, f(*height), f(*radius) * 2.0],
         Shape::Capsule {
             radius,
             half_length,

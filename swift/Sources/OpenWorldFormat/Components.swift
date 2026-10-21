@@ -43,6 +43,9 @@ public enum Shape: Equatable, Sendable {
     case tetrahedron(radius: Double)
     case icosahedron(radius: Double)
     case wedge(x: Double, y: Double, z: Double)
+    /// Experimental (spec/world.md "The prism"): a right prism on a regular
+    /// polygon, `sides` 3…8, `radius` the circumradius, axis along +Y.
+    case prism(sides: Int, radius: Double, height: Double)
 
     public init?(json: JSONValue) {
         guard let o = json.object, o.count == 1, let (tag, params) = o.first else { return nil }
@@ -60,6 +63,7 @@ public enum Shape: Equatable, Sendable {
         case "Tetrahedron": self = .tetrahedron(radius: d("radius", 0.5))
         case "Icosahedron": self = .icosahedron(radius: d("radius", 0.5))
         case "Wedge": self = .wedge(x: d("x"), y: d("y"), z: d("z"))
+        case "Prism": self = .prism(sides: Int(d("sides", 6).rounded()), radius: d("radius", 0.5), height: d("height"))
         default: return nil
         }
     }
