@@ -119,7 +119,7 @@ metadata is already configured here; the remaining release-time
 steps: verify the `org.openworldformat` namespace on Central Portal
 (DNS TXT on openworldformat.org, which this project owns), GPG-sign,
 drop the `-SNAPSHOT`, and `publish…PublicationToCentralPortal`.
-Until then the version stays `0.3.0-SNAPSHOT` and consumers can use
+Until then the version stays `0.4.0-SNAPSHOT` and consumers can use
 `mavenLocal()` or a Gradle sourceDependency on this repository.
 
 ## License
