@@ -1,0 +1,78 @@
+# Publish the Rust crate to crates.io when a `rust-vX.Y.Z` tag is pushed.
+#
+# Trusted Publishing (OIDC): no token lives in this repository. crates.io
+# takes the upload because the crate's settings name this repository and
+# this workflow file as a trusted publisher, and GitHub vouches for the
+# run; rust-lang/crates-io-auth-action exchanges the run's identity for a
+# token that lives thirty minutes. Set up once, on both sides:
+#   - crates.io -> openworldformat -> Settings -> Trusted Publishing -> add
+#     a GitHub config: repository owner `openworldformat`, repository name
+#     `openworldformat`, workflow filename `publish-rust.yml`, environment
+#     `crates-io` (or leave the environment blank; then any job in this
+#     file may publish).
+#   - github.com -> this repository -> Settings -> Environments -> `crates-io`
+#     (with required reviewers, if an upload should wait for a second
+#     look).
+#
+# To release: bump `version` in rust/Cargo.toml (and the rust/README.md
+# notes), commit, then
+#   git tag -a rust-v0.4.0 -m "openworldformat (Rust) 0.4.0 — <what>"
+#   git push origin rust-v0.4.0
+# The build job refuses a tag whose number is not Cargo.toml's and runs the
+# tests the CI job runs (schema snapshot included); the publish job then
+# runs `cargo publish`, which packages, verifies the package builds, and
+# uploads. crates.io refuses a version it already has, so a re-run of a
+# published tag fails loudly and overwrites nothing. The Swift package is
+# released by the bare `vX.Y.Z` tag alone (SwiftPM reads git), and the npm
+# package by publish-js.yml on a `js-vX.Y.Z` tag.
+name: Publish Rust
+
+on:
+  push:
+    tags: ["rust-v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Check and test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: rust
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: The tag names Cargo.toml's version
+        run: |
+          tag="${GITHUB_REF_NAME#rust-v}"
+          version="$(cargo metadata --no-deps --format-version 1 | jq -r '.packages[] | select(.name == "openworldformat") | .version')"
+          if [ "$tag" != "$version" ]; then
+            echo "::error::the tag says $tag, rust/Cargo.toml says $version"
+            exit 1
+          fi
+      - run: cargo test --features schema
+      - run: cargo publish --dry-run
+
+  publish:
+    name: Upload to crates.io
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: crates-io
+      url: https://crates.io/crates/openworldformat
+    permissions:
+      id-token: write # the OIDC token crates.io trusts; nothing else
+      contents: read
+    defaults:
+      run:
+        working-directory: rust
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: rust-lang/crates-io-auth-action@v1
+        id: auth
+      - run: cargo publish
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}

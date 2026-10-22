@@ -1,0 +1,87 @@
+# Publish the npm package when a `js-vX.Y.Z` tag is pushed.
+#
+# Trusted Publishing (OIDC): no token lives in this repository. npm takes
+# the upload because the package's settings name this repository and this
+# workflow file as a trusted publisher, and GitHub vouches for the run; the
+# npm CLI (11.5.1 or newer) exchanges the run's identity for a short-lived
+# credential itself, and the registry records a provenance attestation
+# linking the tarball to this commit and workflow. Set up once, on both
+# sides:
+#   - npmjs.com -> openworldformat -> Settings -> Trusted Publisher ->
+#     GitHub Actions: organization or user `openworldformat`, repository
+#     `openworldformat`, workflow filename `publish-js.yml`, environment
+#     `npm` (or leave the environment blank; then any job in this file may
+#     publish).
+#   - github.com -> this repository -> Settings -> Environments -> `npm`
+#     (with required reviewers, if an upload should wait for a second
+#     look).
+#
+# To release: bump `version` in js/package.json and VIEWER_VERSION in
+# js/src/render.js (js/test/version.test.mjs pins them together), commit,
+# then
+#   git tag -a js-v0.3.6 -m "openworldformat (JS) 0.3.6 — <what>"
+#   git push origin js-v0.3.6
+# The build job refuses a tag whose number is not package.json's and runs
+# the CI job's checks (the strict JSDoc typecheck, the tests); the publish
+# job runs `npm publish` from a clean checkout, whose prepublishOnly step
+# emits the declarations the package ships — a stale dist/ cannot leak in.
+# npm refuses a version it already has, so a re-run of a published tag
+# fails loudly and overwrites nothing. The renderer the LocalGPT apps vendor
+# flows from this release (their scripts/sync-viewer.sh pins the version).
+name: Publish JS
+
+on:
+  push:
+    tags: ["js-v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Check and test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: js
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: The tag names package.json's version
+        run: |
+          tag="${GITHUB_REF_NAME#js-v}"
+          version="$(node -p "require('./package.json').version")"
+          if [ "$tag" != "$version" ]; then
+            echo "::error::the tag says $tag, js/package.json says $version"
+            exit 1
+          fi
+      - run: npm ci
+      - run: npm run build:types
+      - run: npm test
+      - run: npm pack --dry-run
+
+  publish:
+    name: Upload to npm
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: npm
+      url: https://www.npmjs.com/package/openworldformat
+    permissions:
+      id-token: write # the OIDC token npm trusts; nothing else
+      contents: read
+    defaults:
+      run:
+        working-directory: js
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+      # Trusted publishing needs npm 11.5.1 or newer; Node 22 bundles an older one.
+      - run: npm install -g npm@latest
+      - run: npm ci
+      - run: npm publish
