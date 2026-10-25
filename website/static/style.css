@@ -123,4 +123,6 @@ nav a { margin-left: 0; }
 .pager .source { color: var(--muted); }
 
 .packages li { margin: .55rem 0; }
+/* The Swift line's URL is one unbreakable word at phone width. */
+.packages code { overflow-wrap: anywhere; }
 .not-found ul { padding-left: 1.2rem; }

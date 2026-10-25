@@ -82,6 +82,17 @@ so a fold — and a receipt — reads the same in every one.
 <li><strong>Kotlin</strong> — <a href="https://github.com/openworldformat/openworldformat/tree/main/kotlin"><code>kotlin/</code></a>, JVM and Android (minSdk 26), built from source as a Gradle composite build until it reaches Maven Central.</li>
 </ul>
 
+## Tools that use it {#tools}
+
+Packages are written and read outside this repository, each tool riding
+one of the references above.
+
+<ul class="packages">
+<li><strong>worldprobe</strong> — the desktop inspector (<a href="https://github.com/yilab/worldprobe">source</a>): drop a package folder and see the fold, the validation verdict, the branches, a diff between any two points of the history, the state and the physics. Over the Rust crate, adding no format semantics of its own.</li>
+<li><strong>worldwalk</strong> — a viewer for macOS, iOS, iPadOS and visionOS (SwiftUI and RealityKit, over the Swift package) and Android (Compose, over the Kotlin package) (<a href="https://github.com/yilab/worldwalk">source</a>): open a package, pick a branch tip, walk the world it folds to. It draws what the fold says and nothing more.</li>
+<li><strong>LocalGPT</strong> — local apps that write packages from a prompt, a Markdown document or a song, and open any package as a live canvas that agents edit from outside (<a href="https://localgpt.app">localgpt.app</a>, over the Rust crate). <a href="https://localgpt.md">localgpt.md</a> drafts a screenplay into one package per scene in the browser, and <a href="https://localgpt.world">localgpt.world</a> plays worlds in the reference renderer.</li>
+</ul>
+
 ## Status
 
 Draft 0.3, describing manifest schema version 3 and package format 2
@@ -90,3 +101,25 @@ implementations [above](#packages) are in the
 [repository](https://github.com/openworldformat/openworldformat), tested
 in CI. Expect churn until 1.0; the
 [versioning policy](spec/versioning/) is the contract.
+
+Since draft 0.3, within schema version 3 — every addition optional, so a
+reader that predates it stays conforming by ignoring it:
+
+- **Receipts for agents.** A batch may name the revision it read, the
+  authority's reply is a receipt, and every reference runs one
+  [authoring outcome suite](https://github.com/openworldformat/openworldformat/tree/main/conformance/authoring)
+  ([the session log](spec/session/#authoring)).
+- **The geometry of every shape**, stated here rather than inherited
+  from an engine, and pinned by landmark points any renderer can check
+  ([the world document](spec/world/#the-geometry-of-the-shapes)).
+- **`Prism`**, a prism with a side count, 3 to 8 —
+  experimental ([see it](world.html?src=conformance/prism.json)).
+- **Exports from other systems.** `author.source` says how each batch
+  came to be — `hand`, `library` or `ai` — and a producer that keeps its
+  own live truth can export a world with the history that built it
+  ([the package](spec/package/#exports-from-other-systems)).
+- **Extensions.** [`ext-cinematography`](https://github.com/openworldformat/openworldformat/blob/main/spec/extensions/cinematography.md)
+  is experimental at 0.3 — cameras with a filmback and a lens, shots
+  aimed and focused by entity — in four references;
+  [`ext-h3`](https://github.com/openworldformat/openworldformat/blob/main/spec/extensions/h3.md),
+  a geo frame for worlds that live on a globe, is proposed.
