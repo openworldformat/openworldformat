@@ -1,43 +1,41 @@
-# Stage the npm package when a `js-vX.Y.Z` tag is pushed; a maintainer
-# makes it public by approving it with 2FA.
+# Publish the npm package when a `js-vX.Y.Z` tag is pushed.
 #
 # Trusted Publishing (OIDC): no token lives in this repository. npm takes
 # the upload because the package's settings name this repository and this
 # workflow file as a trusted publisher, and GitHub vouches for the run; the
-# npm CLI exchanges the run's identity for a short-lived credential itself.
-# The run *stages* the release (`npm stage publish`): the version sits in
-# the package's staging area, not public, until a maintainer approves it —
-# on npmjs.com (the package's Staged Packages tab) or with
-#   npm stage list openworldformat && npm stage approve <stage-id>
-# — and both prompt for 2FA. A stolen run, or a compromised dependency in
-# CI, can stage at worst; nothing reaches the registry without a person.
-# That matters here more than for the other packages: the LocalGPT apps
-# vendor this renderer from the registry into the HTML they export.
-#
-# Set up once, on both sides:
+# npm CLI exchanges the run's identity for a short-lived credential itself,
+# and the registry records a provenance attestation linking the tarball to
+# this commit and workflow. Set up once, on both sides:
 #   - npmjs.com -> openworldformat -> Settings -> Trusted Publisher ->
 #     GitHub Actions: organization or user `openworldformat`, repository
 #     `openworldformat`, workflow filename `publish-js.yml`, environment
-#     `npm`. Allowed actions: stage-only — leave "publish directly" and
-#     "Allow npm dist-tag" off (npm's recommendation, and the default for
-#     configurations created since 2026-09-03). This workflow only stages
-#     and never runs `npm dist-tag`.
+#     `npm`. Allowed actions: tick "publish directly" — this workflow runs
+#     `npm publish`, which a stage-only configuration refuses (stage-only is
+#     the default for configurations created since 2026-09-03). Leave
+#     "Allow npm dist-tag" off: the release sets `latest` itself, and moving
+#     dist-tags from CI would change what everyone installs without a new
+#     version to review.
 #   - github.com -> this repository -> Settings -> Environments -> `npm`
-#     (no reviewers needed: the approval on npmjs.com is the gate).
+#     (with required reviewers, if an upload should wait for a second
+#     look — the only human gate on this path).
+#
+# Direct, not staged: npm also offers `npm stage publish`, which holds the
+# version until a maintainer approves it with 2FA. This repository chose
+# tag-to-release with no approval step; switching back is the last line of
+# the publish job plus unticking "publish directly".
 #
 # To release: bump `version` in js/package.json and VIEWER_VERSION in
 # js/src/render.js (js/test/version.test.mjs pins them together), commit,
 # then
 #   git tag -a js-v0.3.6 -m "openworldformat (JS) 0.3.6 — <what>"
 #   git push origin js-v0.3.6
-# then approve the staged version as above. The build job refuses a tag
-# whose number is not package.json's and runs the CI job's checks (the
-# strict JSDoc typecheck, the tests); the publish job builds the
-# declarations the package ships from a clean checkout — dist/ is not in
-# git, so a stale one cannot leak in — and stages. npm refuses a version it
-# already has, so a re-run of a published tag fails loudly and overwrites
-# nothing. The renderer the LocalGPT apps vendor flows from the approved
-# release (their scripts/sync-viewer.sh pins the version).
+# The build job refuses a tag whose number is not package.json's and runs
+# the CI job's checks (the strict JSDoc typecheck, the tests); the publish
+# job runs `npm publish` from a clean checkout, whose prepublishOnly step
+# emits the declarations the package ships — a stale dist/ cannot leak in.
+# npm refuses a version it already has, so a re-run of a published tag
+# fails loudly and overwrites nothing. The renderer the LocalGPT apps vendor
+# flows from this release (their scripts/sync-viewer.sh pins the version).
 name: Publish JS
 
 on:
@@ -73,7 +71,7 @@ jobs:
       - run: npm pack --dry-run
 
   publish:
-    name: Stage on npm (approve on npmjs.com with 2FA)
+    name: Upload to npm
     needs: build
     runs-on: ubuntu-latest
     environment:
@@ -91,13 +89,10 @@ jobs:
         with:
           node-version: 22
           registry-url: https://registry.npmjs.org
-      # Staged publishing needs npm 11.15.0 or newer (trusted publishing alone,
-      # 11.5.1); Node 22 bundles an older one. Pinned to the major that runs on
-      # any Node 22.9+: npm 12 already wants 22.22.2, and a later major may
-      # drop Node 22 outright.
+      # Trusted publishing needs npm 11.5.1 or newer; Node 22 bundles an older
+      # one. Pinned to the major that runs on any Node 22.9+: npm 12 already
+      # wants 22.22.2, and a later major may drop Node 22 outright.
       - run: npm install -g npm@11
       - run: npm ci
-      # The declarations the package ships, built here rather than left to a
-      # lifecycle script the stage command may not run.
-      - run: npm run build:types
-      - run: npm stage publish
+      # prepublishOnly builds the declarations the package ships.
+      - run: npm publish
