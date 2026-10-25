@@ -157,8 +157,8 @@ quantizeTranslation(0.75, 15);                  // 128 — hundredths of an edge
 runOutcomes(manifest, outcomesDoc);             // conformance/outcomes/h3.json
 ```
 
-The renderer (`openworldformat/render`) also draws the experimental
-`Prism` shape, and exports its normative triangles as plain arrays
+The renderer (`openworldformat/render`) also draws the `Prism` shape,
+and exports its normative triangles as plain arrays
 (`prismTriangles`): the first cap vertex on +X, outward winding, flat
 caps. The renderer stays one file plus `cinematography.js` wherever it
 is vendored.

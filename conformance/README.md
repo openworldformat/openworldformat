@@ -7,7 +7,7 @@ the same scene, within the tolerance the format's conventions allow
 
 | World | Covers |
 |---|---|
-| `shapes.json` | every parametric shape, on a ground plane under a sun |
+| `shapes.json` | every parametric shape but the prism, which has its own world, on a ground plane under a sun |
 | `materials.json` | PBR parameters, alpha modes, emissive |
 | `lights.json` | directional, point, spot; intensity units |
 | `behaviors.json` | all behavior types running from load |
@@ -19,7 +19,7 @@ the same scene, within the tolerance the format's conventions allow
 | `soundtrack.json` | soundtrack curves, modulations |
 | `physics.json` | the `ext-physics` extension, drawn at rest |
 | `cinematography.json` | a set with cameras and shots; the `ext-cinematography` extension's outcomes pair with it |
-| `prism.json` | the experimental `Prism` shape: every side count beside a cylinder for scale, a column, a tile, one on its side ([spec/world.md](../spec/world.md), "The prism"). Not required for a Viewer claim until a second renderer draws it |
+| `prism.json` | the `Prism` shape: every side count beside a cylinder for scale, a column, a tile, one on its side ([spec/world.md](../spec/world.md), "The geometry of the shapes") |
 | `h3.json` | the `ext-h3` extension: a terrace pinned to H3 cells, drawn flat by a reader without it; the extension's outcomes pair with it |
 
 `assets/textures/` holds the checker and grid textures `textures.json`

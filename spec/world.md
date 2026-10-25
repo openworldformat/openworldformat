@@ -76,8 +76,8 @@ only.
 ### The geometry of the shapes
 
 The shapes are `Cuboid`, `Sphere`, `Cylinder`, `Cone`, `Capsule`,
-`Torus`, `Plane`, `Pyramid`, `Tetrahedron`, `Icosahedron`, `Wedge` and,
-experimentally, `Prism`. The schema states each one's parameters and
+`Torus`, `Plane`, `Pyramid`, `Tetrahedron`, `Icosahedron`, `Wedge` and
+`Prism`. The schema states each one's parameters and
 defaults; the geometry is stated here, not inherited from any engine.
 Two renderers drawing a shape from its parameters have more to disagree
 about than its dimensions — which way a wedge faces, where an apex is,
@@ -111,7 +111,7 @@ by this format's own renderers. The common rules, then each shape:
 | `Tetrahedron { radius }` | The regular tetrahedron with circumradius `radius` whose vertices are the four cube corners with an even number of negative coordinates: `radius·(±1, ±1, ±1)/√3` for `(+,+,+)`, `(+,−,−)`, `(−,+,−)` and `(−,−,+)`. Exact extent ±radius/√3 on every axis; box (radius, radius, radius). |
 | `Icosahedron { radius }` | The regular icosahedron with circumradius `radius` on the three golden rectangles: vertices `(±1, ±φ, 0)`, `(0, ±1, ±φ)` and `(±φ, 0, ±1)` scaled by `radius/√(1 + φ²)`, φ the golden ratio. Exact extent ±radius·φ/√(1 + φ²) (0.851·radius) on every axis; box (radius, radius, radius). |
 | `Wedge { x, y, z }` | Half a box cut diagonally: a right-triangle profile with its vertical face at x = −x/2 (full height, y from −y/2 to +y/2), its base at y = −y/2 (x from −x/2 to +x/2) and its slope from `(−x/2, +y/2)` down to `(+x/2, −y/2)`, extruded along Z from −z/2 to +z/2. Its six vertices are `(−x/2, ±y/2, ±z/2)` and `(+x/2, −y/2, ±z/2)`. Box (x/2, y/2, z/2). |
-| `Prism { sides, radius, height }` | *Experimental.* A right prism on a regular polygon with `sides` sides, 3 to 8 (6 is the hexagonal prism, 5 the pentagonal one); `sides` is its only segment parameter. Axis +Y, flat caps at y = ±height/2. `radius` is the circumradius, centre to vertex: cap vertex *i* sits at `(radius·cos θ, ±height/2, −radius·sin θ)` with θ = 2π·i/sides — the first vertex on +X, the ring counter-clockwise seen from above. Each side is one planar quad, each cap a fan from vertex 0, all outward, sides flat-shaded. Box (radius, height/2, radius), the inscribing cylinder's. |
+| `Prism { sides, radius, height }` | A right prism on a regular polygon with `sides` sides, 3 to 8 (6 is the hexagonal prism, 5 the pentagonal one); `sides` is its only segment parameter. Axis +Y, flat caps at y = ±height/2. `radius` is the circumradius, centre to vertex: cap vertex *i* sits at `(radius·cos θ, ±height/2, −radius·sin θ)` with θ = 2π·i/sides — the first vertex on +X, the ring counter-clockwise seen from above. Each side is one planar quad, each cap a fan from vertex 0, all outward, sides flat-shaded. Box (radius, height/2, radius), the inscribing cylinder's. |
 
 [`conformance/geometry/shapes.json`](../conformance/geometry/shapes.json)
 pins this table: for one instance of every shape, the exact bounds, the box, and
@@ -122,14 +122,17 @@ reference checks the boxes, and any renderer can run it; a renderer
 whose mesh fails a landmark is drawing a different shape, whatever its
 dimensions say.
 
-**The prism's status.** `Prism` is experimental, under the ladder
-[profiles](profiles.md) sets for extensions, applied to a core shape:
-one renderer draws it (the reference three.js viewer), and it leaves
-experimental when a second renderer draws
-[`conformance/prism.json`](../conformance/prism.json). Until then a
-Viewer-profile claim does not require it, `shapes.json` does not include
-it, and a reader without it skips the shape — must-ignore, never an
-error. The RFC is [`rfcs/history-exports.md`](rfcs/history-exports.md).
+**The prism is a core shape.** It entered draft 0.3 as experimental,
+under the ladder [profiles](profiles.md) sets for extensions applied to
+a core shape, with one renderer drawing it (the reference three.js
+viewer), and left experimental once two more renderers built it from
+this table: LocalGPT's Bevy renderer, whose tests check the mesh against
+the box, and worldwalk's on RealityKit and on Android, whose Android
+tests run the geometry fixture. A Viewer-profile claim draws it like any
+other shape, and [`conformance/prism.json`](../conformance/prism.json)
+is part of the Viewer suite. A reader older than the shape skips it —
+must-ignore, never an error. The RFC is
+[`rfcs/history-exports.md`](rfcs/history-exports.md).
 
 ### Reuse: creations and instances
 

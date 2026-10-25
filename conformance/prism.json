@@ -2,8 +2,8 @@
   "version": 3,
   "meta": {
     "name": "conformance-prism",
-    "description": "The experimental Prism shape (spec/world.md, 'The prism'): one prism for every side count, three to eight, beside a cylinder of the same radius and height for scale, on a ground plane under a sun; then a hexagonal column, a flat hexagonal tile, and a square prism laid on its side. Pins the geometry the spec states: origin at the centroid, axis along +Y, the first cap vertex on +X, flat caps at ±height/2, outward faces. A Viewer claim does not need this world until a second renderer draws it.",
-    "tags": ["conformance", "experimental"]
+    "description": "The Prism shape (spec/world.md, 'The geometry of the shapes'): one prism for every side count, three to eight, beside a cylinder of the same radius and height for scale, on a ground plane under a sun; then a hexagonal column, a flat hexagonal tile, and a square prism laid on its side. Pins the geometry the spec states: origin at the centroid, axis along +Y, the first cap vertex on +X, flat caps at ±height/2, outward faces. Part of the Viewer suite.",
+    "tags": ["conformance"]
   },
   "environment": {
     "background_color": [0.55, 0.7, 0.9, 1.0],

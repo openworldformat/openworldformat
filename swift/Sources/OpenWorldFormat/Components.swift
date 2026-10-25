@@ -43,8 +43,8 @@ public enum Shape: Equatable, Sendable {
     case tetrahedron(radius: Double)
     case icosahedron(radius: Double)
     case wedge(x: Double, y: Double, z: Double)
-    /// Experimental (spec/world.md "The prism"): a right prism on a regular
-    /// polygon, `sides` 3…8, `radius` the circumradius, axis along +Y.
+    /// A right prism on a regular polygon (spec/world.md "The geometry of the
+    /// shapes"): `sides` 3…8, `radius` the circumradius, axis along +Y.
     case prism(sides: Int, radius: Double, height: Double)
 
     public init?(json: JSONValue) {

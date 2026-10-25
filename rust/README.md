@@ -53,11 +53,12 @@ binding change takes its own minor bump under cargo's 0.x rules.
   by `conformance/geometry/shapes.json`; `tests/geometry.rs` checks that
   `local_aabb_half` is the fixture's box for every kind.
 
-- **`Shape::Prism { sides, radius, height }`** — experimental
-  (spec/world.md "The prism"): `sides` 3..=8, `radius` the circumradius;
+- **`Shape::Prism { sides, radius, height }`** (spec/world.md "The
+  geometry of the shapes"): `sides` 3..=8, `radius` the circumradius;
   `estimate_triangles` counts `4·sides − 4`, `local_aabb_half` is the
-  inscribing cylinder's box. The schema gained the variant; no version
-  bump (an additive shape a reader may ignore).
+  inscribing cylinder's box. The schema gained the variant; no schema
+  version bump (an additive shape a reader may ignore). Released as
+  experimental; a core shape since other renderers drew it.
 - **`Author.source`** — `hand`, `library` or `ai` (`AUTHOR_SOURCES`),
   optional, part of the entry's identity; `Author::known_source` reads
   an unknown label as none. `Author::named` builds a plain author.

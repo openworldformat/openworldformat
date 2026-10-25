@@ -256,7 +256,7 @@ function wedgeGeometry(x, y, z) {
 }
 
 // ---------------------------------------------------------------------------
-// The prism (experimental; spec/world.md "The geometry of the shapes") — the
+// The prism (spec/world.md "The geometry of the shapes") — the
 // normative triangles as plain arrays, exported so node can test the vertex
 // order with no renderer (js/test/prism.test.mjs). Origin at the centroid,
 // axis +Y, flat caps at y = ±height/2; `radius` is the circumradius: cap
@@ -324,7 +324,7 @@ export function createGeometry(shape) {
     case 'Tetrahedron': return new THREE.TetrahedronGeometry(p.radius ?? 1);
     case 'Icosahedron': return new THREE.IcosahedronGeometry(p.radius ?? 1, 0);
     case 'Wedge': return wedgeGeometry(p.x ?? 1, p.y ?? 1, p.z ?? 1);
-    // Experimental (spec/world.md "The prism"): the normative triangles, flat-shaded.
+    // spec/world.md "The geometry of the shapes": the normative triangles, flat-shaded.
     case 'Prism': return flatGeometry(prismTriangles(p.sides ?? 6, p.radius ?? 0.5, p.height ?? 1));
     default: return new THREE.BoxGeometry(1, 1, 1);
   }

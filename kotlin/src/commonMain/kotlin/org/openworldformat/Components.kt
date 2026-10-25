@@ -44,8 +44,8 @@ sealed class Shape {
     data class Tetrahedron(val radius: Double) : Shape()
     data class Icosahedron(val radius: Double) : Shape()
     data class Wedge(val x: Double, val y: Double, val z: Double) : Shape()
-    /** Experimental (spec/world.md "The prism"): a right prism on a regular
-     *  polygon, `sides` 3..8, `radius` the circumradius, axis along +Y. */
+    /** A right prism on a regular polygon (spec/world.md "The geometry of the
+     *  shapes"): `sides` 3..8, `radius` the circumradius, axis along +Y. */
     data class Prism(val sides: Int, val radius: Double, val height: Double) : Shape()
 
     companion object {

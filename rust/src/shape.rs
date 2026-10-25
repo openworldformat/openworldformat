@@ -76,7 +76,7 @@ pub enum Shape {
         #[serde(default = "default_one")]
         z: f32,
     },
-    /// A right prism on a regular polygon, `sides` long (experimental: spec/world.md "The prism"). Origin at the centroid, axis along local +Y, flat caps at y = ±height/2. `radius` is the circumradius: cap vertex i sits at (radius·cos θ, ±height/2, −radius·sin θ) with θ = 2π·i/sides, so the first vertex is on +X and the ring runs counter-clockwise seen from above. Faces wind outward; no segment parameter beyond `sides`.
+    /// A right prism on a regular polygon, `sides` long (spec/world.md "The geometry of the shapes"). Origin at the centroid, axis along local +Y, flat caps at y = ±height/2. `radius` is the circumradius: cap vertex i sits at (radius·cos θ, ±height/2, −radius·sin θ) with θ = 2π·i/sides, so the first vertex is on +X and the ring runs counter-clockwise seen from above. Faces wind outward; no segment parameter beyond `sides`.
     Prism {
         /// How many sides, 3 to 8 (6 is a hexagonal prism, 5 a pentagonal one).
         #[serde(default = "default_six")]

@@ -78,9 +78,11 @@ engine's.
    reference (the fourth), and every authority committing ids for the
    deeper references, as the log always promised.
 5. ~~A globe producer's export~~ — **done** (2026-10-20), three generic
-   additions from one brief: the experimental `Prism` shape with its
-   geometry stated in prose ([the world document](world.md), "The
-   prism"; `conformance/prism.json`; the JS renderer draws it);
+   additions from one brief: the `Prism` shape with its geometry stated
+   in prose ([the world document](world.md), "The geometry of the
+   shapes"; `conformance/prism.json`), experimental until LocalGPT's
+   Bevy renderer and the worldwalk viewers built it from the table
+   beside the JS one, and a core shape since (2026-10-25);
    [`ext-h3`](extensions/h3.md), a geo frame extension carrying an
    entity's H3 cell and integer transform beside the derived core
    transform, proposed with a schema, a conformance world with outcome

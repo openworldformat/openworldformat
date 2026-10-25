@@ -1,7 +1,10 @@
 # RFC: Exporting a build history from another system — the prism, the source label, day-coarse time
 
-**Status:** proposed. The normative text is in
-[the world document](../world.md) ("The prism"), [the session log](../session.md)
+**Status:** accepted. The prism left experimental on 2026-10-25, once
+LocalGPT's Bevy renderer and the worldwalk viewers built it from the
+geometry table beside the reference three.js viewer. The
+normative text is in [the world document](../world.md) ("The geometry
+of the shapes"), [the session log](../session.md)
 ("The entry") and [the package](../package.md) ("Exports from other
 systems"); this note states the problem, the alternatives and the cost,
 per [CONTRIBUTING](../../CONTRIBUTING.md). It lands with
@@ -45,9 +48,9 @@ drawing something wrong; `sides` is the only segment parameter, 3..8,
 the two cases a producer needs today plus the ones between. The geometry
 is stated in prose for the first time — origin, axis, the first vertex,
 winding, caps — because two renderers drawing a prism from a radius and a
-side count can disagree in four ways a cylinder cannot. It is marked
-experimental under the format's own ladder until a second renderer draws
-`conformance/prism.json`.
+side count can disagree in four ways a cylinder cannot. It was marked
+experimental under the format's own ladder until a second renderer drew
+it, and left the ladder when three renderers built it from the table.
 
 **The label.** (1) `ext-provenance`: the manifest-level lineage block.
 Its fields are about a world's generation — prompt, model, duration — and
