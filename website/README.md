@@ -21,7 +21,11 @@ zola serve            # http://127.0.0.1:1111 (after a build)
 ./scripts/deploy.sh   # build + wrangler deploy (needs `npx wrangler login` once)
 ```
 
-Cloudflare static-assets Worker (`wrangler.toml`); no Worker script.
+Cloudflare static-assets Worker (`wrangler.toml`); no Worker script. The
+deploy also attaches openworldformat.org as the Worker's Custom Domain —
+Cloudflare creates its DNS record and certificate — and keeps workers.dev
+off. www.openworldformat.org is a redirect rule on the zone, outside the
+deploy.
 
 ## Layout
 

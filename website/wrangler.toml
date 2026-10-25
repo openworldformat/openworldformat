@@ -3,6 +3,15 @@
 name = "openworldformat-org"
 compatibility_date = "2026-09-29"
 
+# The deploy attaches the apex as this Worker's Custom Domain: Cloudflare
+# creates the DNS record and the certificate, so nothing is bound by hand in
+# the dashboard. www.openworldformat.org is not the Worker's: a redirect rule
+# on the zone sends it to the apex. The site lives at its domain alone, so
+# the workers.dev copy and per-version preview URLs stay off.
+routes = [{ pattern = "openworldformat.org", custom_domain = true }]
+workers_dev = false
+preview_urls = false
+
 [assets]
 directory = "./public"
 # Zola writes pretty URLs (page/index.html) and a root 404.html.
