@@ -100,6 +100,7 @@ REGISTERED_EXTENSIONS = (
     "ext-cinematography",
     "ext-provenance",
     "ext-h3",
+    "ext-game",
 )
 
 #: The edit kinds in the spec's own order — the order error messages

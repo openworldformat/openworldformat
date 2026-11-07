@@ -114,12 +114,14 @@ those shapes rather than more shapes, so the prism is not a one-off.
   `world.schema.json` in the generated core.
 - The **extension registry** holds two experimental extensions,
   [`ext-physics`](extensions/physics.md) and
-  [`ext-cinematography`](extensions/cinematography.md), and four
+  [`ext-cinematography`](extensions/cinematography.md), and five
   proposed ones:
   [`ext-strict-determinism`](extensions/strict-determinism.md),
   [`ext-visibility`](extensions/visibility.md),
-  [`ext-provenance`](extensions/provenance.md) and
-  [`ext-h3`](extensions/h3.md). A proposed extension
+  [`ext-provenance`](extensions/provenance.md),
+  [`ext-h3`](extensions/h3.md) and [`ext-game`](extensions/game.md),
+  which makes a board or tick game a log of moves under named rule
+  sets ([`rfcs/ext-game.md`](rfcs/ext-game.md)). A proposed extension
   reserves its name; it becomes experimental with a reference
   implementation and conformance cases, and leaves experimental when a
   producer ships a package using it.

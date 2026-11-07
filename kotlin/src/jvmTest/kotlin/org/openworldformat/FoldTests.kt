@@ -82,9 +82,9 @@ class ManifestTests {
         assertRefuses("not in the extension registry") {
             parseManifest("""{"version": 3, "entities": [{"id": 1, "name": "a", "ext-magic": {}}]}""", strict = true)
         }
-        // The registry itself: the six names spec/extensions/registry.json lists.
+        // The registry itself: the seven names spec/extensions/registry.json lists.
         assertEquals(
-            setOf("ext-physics", "ext-strict-determinism", "ext-visibility", "ext-cinematography", "ext-provenance", "ext-h3"),
+            setOf("ext-physics", "ext-strict-determinism", "ext-visibility", "ext-cinematography", "ext-provenance", "ext-h3", "ext-game"),
             REGISTERED_EXTENSIONS,
         )
         // And non-strict reads every one of those documents just fine.

@@ -74,6 +74,13 @@
         "conformance/outcomes/h3.json"
       ],
       "notes": "A geo frame for globe-aware producers: an entity carries its H3 cell, resolution, body and an integer-only transform in the cell's frame (hundredths of the mean edge length, hundredths of a degree, log2 fixed-point scale) beside the core transform the producer derives from them; the environment carries the package's origin cell. The one invariant: the H3 fields are authoritative, the core transform is derived, a reader that knows both prefers the H3 fields. Proposed with the page, the schema, a conformance world with outcome assertions, and two references (Rust, JS) running the same derivation; it becomes experimental when a second implementer signs off, and leaves experimental when a producer outside this repository ships a package using it."
+    },
+    "ext-game": {
+      "version": "0.1.0",
+      "status": "proposed",
+      "spec": "spec/extensions/game.md",
+      "rfc": "spec/rfcs/ext-game.md",
+      "notes": "Board and tick games as logs: a move op (seat, move, notation; tick for ticked rule sets, event for what the rules made happen), a rule set named on meta (go, chess, snake in version 1, each pinned on the page \u2014 never code in the package), a cell-and-piece component on entities, and a reserved game. state namespace (turn, over, winner, reason, position, score, seat, ply). The one invariant: the moves are authoritative, the pieces and the state are derived from them by the authority in the move's entry; an authority that knows the rule set refuses illegal moves at intake. Proposed with the page and its RFC; it becomes experimental with a reference implementation of one rule set and that rule set's outcome assertions, and leaves experimental when two implementers sign off and a producer ships a package using it."
     }
   }
 }

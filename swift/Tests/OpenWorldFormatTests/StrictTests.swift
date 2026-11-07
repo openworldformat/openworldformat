@@ -17,10 +17,10 @@ func manifestText(_ mutate: (inout [String: JSONValue]) -> Void = { _ in }) thro
 }
 
 final class StrictTests: XCTestCase {
-    func testTheRegistryMirrorListsTheSixRegisteredExtensions() {
+    func testTheRegistryMirrorListsTheSevenRegisteredExtensions() {
         XCTAssertEqual(REGISTERED_EXTENSIONS, [
             "ext-physics", "ext-strict-determinism", "ext-visibility",
-            "ext-cinematography", "ext-provenance", "ext-h3",
+            "ext-cinematography", "ext-provenance", "ext-h3", "ext-game",
         ] as Set)
         XCTAssertEqual(
             EXT_PROVENANCE_FIELDS,

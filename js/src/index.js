@@ -50,6 +50,7 @@ export const REGISTERED_EXTENSIONS = [
   "ext-cinematography",
   "ext-provenance",
   "ext-h3",
+  "ext-game",
 ];
 
 // ---------------------------------------------------------------------------

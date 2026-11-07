@@ -18,6 +18,7 @@ public let REGISTERED_EXTENSIONS: Set<String> = [
     "ext-cinematography",
     "ext-provenance",
     "ext-h3",
+    "ext-game",
 ]
 
 // MARK: - Provenance
