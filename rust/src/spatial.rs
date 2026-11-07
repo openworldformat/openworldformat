@@ -2,7 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 
-/// Chunk size in world units (64×64, matching SpacetimeDB RFC).
+/// Chunk size in world units: a chunk is 64 × 64 metres of ground.
 pub const CHUNK_SIZE: f32 = 64.0;
 
 /// 2D chunk coordinate for spatial partitioning.
