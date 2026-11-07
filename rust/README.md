@@ -41,7 +41,7 @@ unit table, quantisation, block readers, the tangent-plane derivation
 of the core transform (`local_position`, `derive_transform`) and its
 outcome runner; the `schema` feature generates `world.schema.json`.
 
-## 0.5.0 (unreleased): pivots, the swing, and the behaviors a reader does not know
+## 0.5.0: pivots, the swing, and the behaviors a reader does not know
 
 Breaking for a consumer that matches `BehaviorDef` exhaustively or
 spells out `Spin` and `Pulse`: two variants and four fields are new —
@@ -72,7 +72,7 @@ minor bump, as for 0.4.0.
   alpha below 1 draws blended and 1 draws opaque. The field is the same;
   the schema's description now says what every renderer must do.
 
-## 0.4.0 (unreleased): a globe producer's brief, and the geometry table
+## 0.4.0: a globe producer's brief, and the geometry table
 
 Breaking for a consumer that matches `Shape` exhaustively or spells out
 `Author`: the new variant and the new field — the compile error is the
