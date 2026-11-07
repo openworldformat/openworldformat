@@ -479,7 +479,6 @@ export function makeBehavior(def, rec, byName, byId) {
   // references, never run — like a kind the switch below does not know.
   if (!p || typeof p !== 'object') return null;
   const obj = rec.object;
-  const base = rec.base;
   switch (kind) {
     case 'Spin': {
       const axis = new THREE.Vector3(...(p.axis || [0, 1, 0])).normalize();
@@ -500,10 +499,14 @@ export function makeBehavior(def, rec, byName, byId) {
     case 'Bob': {
       const axis = p.axis || [0, 1, 0];
       const amp = p.amplitude ?? 0.5, freq = p.frequency ?? 0.5, phase = THREE.MathUtils.degToRad(p.phase ?? 0);
+      // From what the behaviors before it left: the authored position, put
+      // back each frame, unless a spin about a pivot moved it first.
       rec.resetPosition = true;
       return (dt, t) => {
         const off = Math.sin(t * freq * TAU + phase) * amp;
-        obj.position.set(base.position.x + axis[0] * off, base.position.y + axis[1] * off, base.position.z + axis[2] * off);
+        obj.position.x += axis[0] * off;
+        obj.position.y += axis[1] * off;
+        obj.position.z += axis[2] * off;
       };
     }
     case 'Orbit': {
@@ -542,7 +545,7 @@ export function makeBehavior(def, rec, byName, byId) {
       return (dt, t) => {
         const s = mn + (mx - mn) * (Math.sin(t * freq * TAU + phase) * 0.5 + 0.5);
         const s0 = obj.scale.clone();
-        obj.scale.set(base.scale.x * s, base.scale.y * s, base.scale.z * s);
+        obj.scale.multiplyScalar(s);
         if (pivot) holdPivot(obj, pivot, obj.quaternion, s0);
       };
     }

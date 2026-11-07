@@ -154,3 +154,15 @@ test('a kind the renderer does not know is skipped, never fatal', () => {
   assert.equal(makeBehavior({ Wobble: { rate: 2 } }, rec, new Map(), new Map()), null);
   assert.equal(makeBehavior('Spin', rec, new Map(), new Map()), null);
 });
+
+test('a bob adds to what the behaviors before it left, so a wheel can bob on its axle', () => {
+  // A quarter turn about the base moves the centre a metre left; a bob at its
+  // crest lifts it half a metre from there — not from the authored position.
+  const rec = attach(record([9, 1.5, 0]), { Spin: { axis: [0, 0, 1], speed: 90, pivot: [0, -1, 0] } });
+  attach(rec, { Bob: { axis: [0, 1, 0], amplitude: 0.5, frequency: 0.25 } });
+  near(frame(rec, 1).position, new THREE.Vector3(8, 1, 0));
+  // Alone, from the authored position, and back to it at the trough.
+  const alone = attach(record([2, 3, 4]), { Bob: { amplitude: 0.5, frequency: 0.25 } });
+  near(frame(alone, 1).position, new THREE.Vector3(2, 3.5, 4));
+  near(frame(alone, 3).position, new THREE.Vector3(2, 2.5, 4));
+});
