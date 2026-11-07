@@ -109,6 +109,15 @@ those shapes rather than more shapes, so the prism is not a one-off.
   between shipping renderers — the torus plane, the wedge's facing, the
   icosahedron's orientation — in favour of the majority each time.
 
+- **Pivots, phases and the swing** (2026-11-06): `spin` and `pulse` act
+  about a pivot and start at a phase, and `swing` is a pendulum — a
+  wheel about its base, a block that breathes on the ground, a sign
+  that hangs from its top ([the world document](world.md), "Behavior
+  and triggers"; [rfcs/pivots-and-swing.md](rfcs/pivots-and-swing.md));
+  the Rust reference carries a behavior kind it does not know instead
+  of refusing the world. A colour's alpha below 1 with no `alpha_mode`
+  draws blended ("Conventions"), pinned by `conformance/materials.json`
+  — the two shipping renderers had read it two ways.
 - The state document is now pinned with its own
   [`schema/state.schema.json`](../schema/state.schema.json); it joins
   `world.schema.json` in the generated core.

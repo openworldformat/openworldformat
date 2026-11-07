@@ -46,7 +46,9 @@ for (const def of entityDefs) {
 
 // Behavior refs: the behavior kind's marked field, addressed through
 // any entity's behaviors array.
-for (const variant of schema.$defs?.BehaviorDef?.oneOf ?? []) {
+// (`anyOf` since the enum carries an untagged catch-all for kinds a reader
+// does not know; the variants it names are disjoint either way.)
+for (const variant of schema.$defs?.BehaviorDef?.oneOf ?? schema.$defs?.BehaviorDef?.anyOf ?? []) {
   for (const [kind, body] of Object.entries(variant.properties ?? {})) {
     for (const [field, sub] of Object.entries(body.properties ?? {})) {
       const mark = sub?.["x-entity-ref"];

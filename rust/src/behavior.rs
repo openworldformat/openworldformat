@@ -38,7 +38,8 @@ pub enum BehaviorDef {
         #[serde(default)]
         tilt: f32,
     },
-    /// Spin (rotate) around a local axis.
+    /// Spin (rotate) around a local axis: the angle at time `t` is
+    /// `speed × t + phase`, about `axis` through `pivot`.
     Spin {
         /// Local axis to spin around.
         #[serde(default = "default_y_axis")]
@@ -46,6 +47,15 @@ pub enum BehaviorDef {
         /// Rotation speed in degrees per second.
         #[serde(default = "default_spin_speed")]
         speed: f32,
+        /// Degrees added to the angle at time zero.
+        #[serde(default = "default_phase", skip_serializing_if = "is_zero")]
+        phase: f32,
+        /// The point the entity turns about, in its local frame — the frame
+        /// its shape is defined in, metres, before the transform's scale:
+        /// the origin by default, `[0, -height/2, 0]` for a shape's base.
+        /// The pivot stays where the authored transform put it.
+        #[serde(default = "default_pivot", skip_serializing_if = "is_origin")]
+        pivot: [f32; 3],
     },
     /// Bob up and down (sinusoidal oscillation along an axis).
     Bob {
@@ -68,7 +78,9 @@ pub enum BehaviorDef {
         #[cfg_attr(feature = "schema", schemars(extend("x-entity-ref" = "bindable")))]
         target: EntityRef,
     },
-    /// Scale pulsation (breathing effect).
+    /// Scale pulsation (breathing effect): the scale at time `t` is
+    /// `min + (max − min) × (sin(2π × frequency × t + phase) + 1) / 2`,
+    /// about `pivot`.
     Pulse {
         /// Minimum scale multiplier.
         #[serde(default = "default_pulse_min")]
@@ -79,6 +91,15 @@ pub enum BehaviorDef {
         /// Pulse frequency in Hz.
         #[serde(default = "default_bob_frequency")]
         frequency: f32,
+        /// Degrees added to the wave's argument at time zero.
+        #[serde(default = "default_phase", skip_serializing_if = "is_zero")]
+        phase: f32,
+        /// The point the entity scales about, in its local frame — the frame
+        /// its shape is defined in, metres, before the transform's scale:
+        /// the origin by default, `[0, -height/2, 0]` to keep a shape's base
+        /// on the ground. The pivot stays where the authored transform put it.
+        #[serde(default = "default_pivot", skip_serializing_if = "is_origin")]
+        pivot: [f32; 3],
     },
     /// Follow a path of waypoints in sequence.
     PathFollow {
@@ -109,6 +130,36 @@ pub enum BehaviorDef {
         #[serde(default)]
         surface_y: f32,
     },
+    /// Swing (a pendulum): a rotation about a local axis through a pivot
+    /// that oscillates — the angle at time `t` is
+    /// `amplitude × sin(2π × frequency × t + phase)` — a hanging sign, a
+    /// bell, a seat on its ropes.
+    Swing {
+        /// Local axis to swing about. Default: X, a hinge across the entity.
+        #[serde(default = "default_x_axis")]
+        axis: [f32; 3],
+        /// How far it swings each way, in degrees.
+        #[serde(default = "default_swing_amplitude")]
+        amplitude: f32,
+        /// Swings per second, in Hz.
+        #[serde(default = "default_bob_frequency")]
+        frequency: f32,
+        /// Degrees added to the wave's argument at time zero.
+        #[serde(default = "default_phase", skip_serializing_if = "is_zero")]
+        phase: f32,
+        /// The point the entity swings about, in its local frame — the frame
+        /// its shape is defined in, metres, before the transform's scale:
+        /// the origin by default, `[0, height/2, 0]` for a shape's top.
+        #[serde(default = "default_pivot", skip_serializing_if = "is_origin")]
+        pivot: [f32; 3],
+    },
+    /// A behavior this version does not know: carried through the fold
+    /// untouched and never run, so a world from a newer writer still opens
+    /// (the must-ignore rule, spec/profiles.md). Not in the schema, which
+    /// names only the kinds a reader can run.
+    #[serde(untagged)]
+    #[cfg_attr(feature = "schema", schemars(skip))]
+    Other(serde_json::Value),
 }
 
 /// Path follow loop mode.
@@ -135,6 +186,27 @@ pub(crate) fn default_y_axis() -> [f32; 3] {
 }
 pub(crate) fn default_spin_speed() -> f32 {
     90.0
+}
+pub(crate) fn default_x_axis() -> [f32; 3] {
+    [1.0, 0.0, 0.0]
+}
+pub(crate) fn default_swing_amplitude() -> f32 {
+    30.0
+}
+pub(crate) fn default_phase() -> f32 {
+    0.0
+}
+pub(crate) fn default_pivot() -> [f32; 3] {
+    [0.0, 0.0, 0.0]
+}
+/// A phase or an angle left at its default writes nothing, so a world
+/// written before the field existed reads back to the same text.
+pub(crate) fn is_zero(v: &f32) -> bool {
+    *v == 0.0
+}
+/// A pivot at the origin writes nothing (see [`is_zero`]).
+pub(crate) fn is_origin(v: &[f32; 3]) -> bool {
+    *v == [0.0, 0.0, 0.0]
 }
 pub(crate) fn default_bob_amplitude() -> f32 {
     0.5
@@ -175,6 +247,8 @@ impl BehaviorDef {
             BehaviorDef::Pulse { .. } => "pulse",
             BehaviorDef::PathFollow { .. } => "path_follow",
             BehaviorDef::Bounce { .. } => "bounce",
+            BehaviorDef::Swing { .. } => "swing",
+            BehaviorDef::Other(_) => "unknown",
         }
     }
 }
@@ -225,6 +299,8 @@ mod tests {
             BehaviorDef::Spin {
                 axis: [0.0, 1.0, 0.0],
                 speed: 90.0,
+                phase: 0.0,
+                pivot: [0.0; 3],
             },
             BehaviorDef::Bob {
                 axis: [0.0, 1.0, 0.0],
@@ -239,6 +315,8 @@ mod tests {
                 min_scale: 0.9,
                 max_scale: 1.1,
                 frequency: 0.5,
+                phase: 0.0,
+                pivot: [0.0; 3],
             },
             BehaviorDef::PathFollow {
                 waypoints: vec![[0.0, 0.0, 0.0], [5.0, 0.0, 0.0]],
@@ -252,6 +330,13 @@ mod tests {
                 damping: 0.7,
                 surface_y: 0.0,
             },
+            BehaviorDef::Swing {
+                axis: [1.0, 0.0, 0.0],
+                amplitude: 30.0,
+                frequency: 0.5,
+                phase: 0.0,
+                pivot: [0.0, 0.6, 0.0],
+            },
         ];
         let kinds: Vec<&str> = behaviors.iter().map(|b| b.kind()).collect();
         assert_eq!(
@@ -263,9 +348,80 @@ mod tests {
                 "look_at",
                 "pulse",
                 "path_follow",
-                "bounce"
+                "bounce",
+                "swing"
             ]
         );
+    }
+
+    #[test]
+    fn spin_and_pulse_without_a_pivot_serialize_as_before() {
+        // A behavior written before pivots and phases existed reads back
+        // with the defaults, and writes back to the same text.
+        let text = r#"{"Spin":{"axis":[0.0,1.0,0.0],"speed":90.0}}"#;
+        let b: BehaviorDef = serde_json::from_str(text).unwrap();
+        assert_eq!(
+            b,
+            BehaviorDef::Spin {
+                axis: [0.0, 1.0, 0.0],
+                speed: 90.0,
+                phase: 0.0,
+                pivot: [0.0; 3],
+            }
+        );
+        assert_eq!(serde_json::to_string(&b).unwrap(), text);
+        let pulse = BehaviorDef::Pulse {
+            min_scale: 0.9,
+            max_scale: 1.1,
+            frequency: 0.5,
+            phase: 0.0,
+            pivot: [0.0; 3],
+        };
+        assert!(!serde_json::to_string(&pulse).unwrap().contains("pivot"));
+        let wheel = BehaviorDef::Spin {
+            axis: [0.0, 0.0, -1.0],
+            speed: 45.0,
+            phase: 90.0,
+            pivot: [0.0, -1.0, 0.0],
+        };
+        let text = serde_json::to_string(&wheel).unwrap();
+        assert!(text.contains("\"pivot\":[0.0,-1.0,0.0]"));
+        let back: BehaviorDef = serde_json::from_str(&text).unwrap();
+        assert_eq!(wheel, back);
+    }
+
+    #[test]
+    fn swing_reads_with_its_defaults() {
+        let b: BehaviorDef = serde_json::from_str(r#"{"Swing":{"pivot":[0.0,0.6,0.0]}}"#).unwrap();
+        assert_eq!(
+            b,
+            BehaviorDef::Swing {
+                axis: [1.0, 0.0, 0.0],
+                amplitude: 30.0,
+                frequency: 0.5,
+                phase: 0.0,
+                pivot: [0.0, 0.6, 0.0],
+            }
+        );
+        assert_eq!(b.kind(), "swing");
+    }
+
+    #[test]
+    fn a_kind_this_version_does_not_know_is_carried() {
+        // The must-ignore rule for behaviors: a newer writer's kind reads
+        // as `Other`, never runs, and writes back as it came — and the
+        // entity around it still reads.
+        let text = r#"{"Wobble":{"rate":2.0}}"#;
+        let b: BehaviorDef = serde_json::from_str(text).unwrap();
+        assert_eq!(b.kind(), "unknown");
+        assert_eq!(serde_json::to_string(&b).unwrap(), text);
+        let entity: crate::WorldEntity = serde_json::from_str(
+            r#"{"id":1,"name":"a","behaviors":[{"Wobble":{"rate":2.0}},{"Spin":{"speed":10.0}}]}"#,
+        )
+        .unwrap();
+        assert_eq!(entity.behaviors.len(), 2);
+        assert_eq!(entity.behaviors[0].kind(), "unknown");
+        assert_eq!(entity.behaviors[1].kind(), "spin");
     }
 
     #[test]

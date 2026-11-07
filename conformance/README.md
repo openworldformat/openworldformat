@@ -8,9 +8,9 @@ the same scene, within the tolerance the format's conventions allow
 | World | Covers |
 |---|---|
 | `shapes.json` | every parametric shape but the prism, which has its own world, on a ground plane under a sun |
-| `materials.json` | PBR parameters, alpha modes, emissive |
+| `materials.json` | PBR parameters, alpha modes, a translucent colour with no mode (drawn blended), emissive |
 | `lights.json` | directional, point, spot; intensity units |
-| `behaviors.json` | all behavior types running from load |
+| `behaviors.json` | all behavior types running from load; the pivots — a blade that wheels about its base on an axle, a sign that swings from its hook, a block that breathes on the ground |
 | `hierarchy_tours.json` | parenting, camera, tour waypoints |
 | `hierarchy_rotations.json` | verifies intrinsic XYZ Euler composition and rotated parent-child hierarchies |
 | `textures.json` | texture maps (`assets/textures/`) |

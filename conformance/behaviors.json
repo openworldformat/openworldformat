@@ -2,7 +2,7 @@
   "version": 3,
   "meta": {
     "name": "conformance-behaviors",
-    "description": "Every behavior type, each on its own entity, around a central hub.",
+    "description": "Every behavior type, each on its own entity, around a central hub — and the pivots: a blade that wheels about its base on a hub, a sign that swings from its hook, a block that breathes on the ground.",
     "tags": ["conformance"]
   },
   "environment": {
@@ -58,7 +58,25 @@
     { "id": 13, "name": "bouncer", "transform": { "position": [0.0, 2.5, -5.0] },
       "shape": { "Sphere": { "radius": 0.5 } },
       "material": { "color": [1.0, 1.0, 1.0, 1.0] },
-      "behaviors": [ { "Bounce": { "height": 2.0, "gravity": 9.8, "damping": 0.85, "surface_y": 0.5 } } ] }
+      "behaviors": [ { "Bounce": { "height": 2.0, "gravity": 9.8, "damping": 0.85, "surface_y": 0.5 } } ] },
+    { "id": 14, "name": "axle", "transform": { "position": [9.0, 0.5, 0.0] },
+      "shape": { "Sphere": { "radius": 0.2 } },
+      "material": { "color": [0.3, 0.3, 0.35, 1.0], "metallic": 0.8, "roughness": 0.4 } },
+    { "id": 15, "name": "blade", "transform": { "position": [9.0, 1.5, 0.0] },
+      "shape": { "Cuboid": { "x": 0.3, "y": 2.0, "z": 0.1 } },
+      "material": { "color": [0.9, 0.9, 0.95, 1.0] },
+      "behaviors": [ { "Spin": { "axis": [0.0, 0.0, 1.0], "speed": 90.0, "pivot": [0.0, -1.0, 0.0] } } ] },
+    { "id": 16, "name": "hook", "transform": { "position": [9.0, 3.0, -4.0] },
+      "shape": { "Sphere": { "radius": 0.1 } },
+      "material": { "color": [0.3, 0.3, 0.35, 1.0] } },
+    { "id": 17, "name": "sign", "transform": { "position": [9.0, 2.4, -4.0] },
+      "shape": { "Cuboid": { "x": 0.8, "y": 1.2, "z": 0.1 } },
+      "material": { "color": [0.8, 0.5, 0.2, 1.0] },
+      "behaviors": [ { "Swing": { "axis": [0.0, 0.0, 1.0], "amplitude": 30.0, "frequency": 0.5, "pivot": [0.0, 0.6, 0.0] } } ] },
+    { "id": 18, "name": "breather", "transform": { "position": [-9.0, 0.5, 0.0] },
+      "shape": { "Cuboid": { "x": 1.0, "y": 1.0, "z": 1.0 } },
+      "material": { "color": [0.4, 0.8, 0.6, 1.0] },
+      "behaviors": [ { "Pulse": { "min_scale": 0.7, "max_scale": 1.3, "frequency": 0.8, "phase": 90.0, "pivot": [0.0, -0.5, 0.0] } } ] }
   ],
-  "next_entity_id": 14
+  "next_entity_id": 19
 }

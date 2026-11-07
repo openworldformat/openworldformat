@@ -14,6 +14,12 @@ Every renderer follows these, so two renderers draw the same geometry and lighti
 - Rotations are **intrinsic** XYZ Euler angles in **degrees** (applied in X, Y, Z order relative to the local moving frame).
 - Colours are RGBA in `0..=1`, **sRGB-encoded**, except `emissive`,
   which is **linear** (values above 1 glow).
+- A colour's alpha is its opacity. Without `alpha_mode`, a material
+  whose colour alpha is below 1 is drawn **blended**, as `blend` would
+  draw it, and one at 1 is opaque; `alpha_mode` set says otherwise —
+  `opaque` ignores the alpha, `mask` cuts at its threshold, `add` and
+  `multiply` blend their own way. `conformance/materials.json` pins the
+  translucent colour with no mode beside the four modes.
 - Directional light intensity is **lux**; point and spot lights are
   **lumens**; spot angles are **radians**. (Renderers SHOULD convert spot light lumens to candela using the cone angle at draw time).
 - Asset paths are relative to the package's `assets/` folder.
@@ -144,8 +150,25 @@ name (add, reshape, recolour, remove). Instances expand to parts named
 ### Behavior and triggers
 
 Behaviors (`orbit`, `spin`, `bob`, `look_at`, `pulse`, `path_follow`,
-`bounce`) are declarative constraints that run from load, referencing
-other entities by id. Triggers wait for an event (`start`, `click`,
+`bounce`, `swing`) are declarative constraints that run from load,
+referencing other entities by id. Each is a function of folded time,
+evaluated from the entity's authored transform — `spin` turns by
+`speed × t + phase` degrees, `swing` by `amplitude × sin(2π × frequency
+× t + phase)`, `pulse` scales by `min + (max − min) × (sin(2π ×
+frequency × t + phase) + 1) / 2`, `bob` and `orbit` as their fields say
+— so a seek lands where the clock says and two renderers agree. `spin`,
+`pulse` and `swing` act about a **pivot**: a point in the entity's local
+frame, the frame its shape is defined in, in metres before the
+transform's scale, the origin by default. The pivot stays where the
+authored transform put it and the rest of the entity turns or scales
+around it — `[0, -height/2, 0]` makes a wheel of a spin and keeps a
+breathing thing on the ground, `[0, height/2, 0]` hangs a swing from its
+top. An entity's behaviors apply in array order, each from what the
+ones before it left. A behavior kind a reader does not know is carried
+and never run, as any unknown field is; the entity still draws
+([rfcs/pivots-and-swing.md](rfcs/pivots-and-swing.md)).
+
+Triggers wait for an event (`start`, `click`,
 `proximity`, `area_enter`, `area_exit`, `collision`, `timer`) and run an
 action (`show_text`, `show`, `hide`, `toggle`, `remove`, `animate`,
 `teleport`, or a host action). Actions a renderer doesn't understand are

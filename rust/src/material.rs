@@ -21,7 +21,9 @@ pub struct MaterialDef {
     /// self-illuminating.
     #[serde(default)]
     pub emissive: [f32; 4],
-    /// Alpha blending mode.
+    /// Alpha blending mode. Absent, the colour's alpha decides: below 1 the
+    /// material is drawn blended, as `blend` would; at 1 it is opaque
+    /// (spec/world.md "Conventions").
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub alpha_mode: Option<AlphaModeDef>,
     /// If true, material ignores all lighting (flat shaded).

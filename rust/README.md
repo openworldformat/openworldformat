@@ -41,6 +41,37 @@ unit table, quantisation, block readers, the tangent-plane derivation
 of the core transform (`local_position`, `derive_transform`) and its
 outcome runner; the `schema` feature generates `world.schema.json`.
 
+## 0.5.0 (unreleased): pivots, the swing, and the behaviors a reader does not know
+
+Breaking for a consumer that matches `BehaviorDef` exhaustively or
+spells out `Spin` and `Pulse`: two variants and four fields are new —
+the compile error is the point, a renderer must decide what it draws
+for a swing and how it turns a thing about a pivot. The crate's `0.x`
+minor bump, as for 0.4.0.
+
+- **`Spin` and `Pulse` gain `phase` and `pivot`** (spec/world.md
+  "Behavior and triggers"): degrees added at time zero, and the local
+  point — metres in the shape's own frame, before scale — the entity
+  turns or scales about, the origin by default. A wheel is a spin about
+  its base; a thing that breathes on the ground is a pulse about its
+  base. Both fields write nothing at their defaults, so a world written
+  before them reads and writes back byte for byte.
+
+- **`BehaviorDef::Swing { axis, amplitude, frequency, phase, pivot }`**:
+  a pendulum — `amplitude × sin(2π × frequency × t + phase)` degrees
+  about `axis` through `pivot`. A hanging sign, a bell, a seat.
+
+- **`BehaviorDef::Other(Value)`**: a behavior kind this version does not
+  know reads as `Other`, folds through untouched, writes back as it
+  came, and never runs — the must-ignore rule applied to behaviors,
+  where an unknown tag used to refuse the whole manifest. `kind()` says
+  `"unknown"`; the schema does not list it. A consumer matching the
+  enum adds an arm for it.
+
+- **`MaterialDef::alpha_mode`'s rule, stated**: absent, a colour's
+  alpha below 1 draws blended and 1 draws opaque. The field is the same;
+  the schema's description now says what every renderer must do.
+
 ## 0.4.0 (unreleased): a globe producer's brief, and the geometry table
 
 Breaking for a consumer that matches `Shape` exhaustively or spells out

@@ -273,6 +273,8 @@ mod tests {
             entity.behaviors.push(crate::behavior::BehaviorDef::Spin {
                 axis: [0.0, 1.0, 0.0],
                 speed: 90.0,
+                phase: 0.0,
+                pivot: [0.0; 3],
             });
         }
 
