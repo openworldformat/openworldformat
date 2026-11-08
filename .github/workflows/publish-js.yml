@@ -35,7 +35,7 @@
 # emits the declarations the package ships — a stale dist/ cannot leak in.
 # npm refuses a version it already has, so a re-run of a published tag
 # fails loudly and overwrites nothing. The renderer the LocalGPT apps vendor
-# flows from this release (their scripts/sync-viewer.sh pins the version).
+# flows from this release (their `cargo xtask sync-viewer` pins the version).
 name: Publish JS
 
 on:

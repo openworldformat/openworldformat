@@ -3,13 +3,13 @@
 // Provenance: born as localgpt's crates/world-export/js/world-viewer.js
 // (Apache-2.0), which drew the conformance suite in production before this
 // repository existed. This file is upstream now — the LocalGPT apps vendor
-// it from the published package (their scripts/sync-viewer.sh, byte-checked
+// it from the published package (their `cargo xtask sync-viewer`, byte-checked
 // in their CI) and songworld assembles it from the tarball; renderer
 // changes release here first, on npm, and flow out. Keep it that way: one
 // renderer, released once, consumed everywhere.
 //
-// Input: a `WorldManifest` as JSON (crate `localgpt-world-types`; schema in
-// `crates/world-types/world.schema.json`). Output: a three.js scene that
+// Input: a `.world` manifest as JSON (the normative `schema/world.schema.json`
+// of this repository). Output: a three.js scene that
 // draws it the way the Bevy renderer (`localgpt-world-bevy`) does: colours are
 // RGBA in 0..1, sRGB-encoded except `emissive` (linear); rotations XYZ Euler
 // degrees; directional light intensity in lux, point and spot lights in
