@@ -19,7 +19,7 @@ too, with the same entity counts pinned in its tests.
 ```swift
 // Package.swift
 dependencies: [
-    .package(url: "https://github.com/openworldformat/openworldformat", from: "0.3.0")
+    .package(url: "https://github.com/openworldformat/openworldformat", from: "0.5.0")
 ],
 targets: [
     .target(name: "YourTarget", dependencies: [
@@ -58,6 +58,17 @@ let variant = try foldPath(package.base, package.entries, tip: "e5")
 
 // Save-game state: typed fields, folded over the declaration.
 let stateValues = package.stateValues().values       // ["score.tour": 1]
+
+// Behaviors: every entity posed at folded time, as the spec states it.
+let motion = WorldMotion(state.entities)             // decode once per fold
+for (id, pose) in motion.poses(at: 2.5) {            // seconds from load
+    pose.position                                    // relative to the parent
+    simd_quatd(vector: pose.rotation.vector)         // (x, y, z, w)
+    pose.scale
+}
+
+// The alpha rule: a translucent colour with no alpha_mode draws blended.
+state.entities[0].material?.drawnAlphaMode           // .blend, .opaque, .mask(cutoff: 0.5), …
 
 // Authoring: a batch by name, partial patches merged, refused whole.
 let batch = try JSONValue(parsing: #"""
@@ -108,6 +119,23 @@ references write.
   `foldPath`), the state fold (declared, dotted-map-subkey and
   undeclared keys), and the Authoring profile's batch ingestion
   (`ingest`, `mergePatch`) with the canonical head text (`manifestText`).
+- **Poses and behaviors** — the transform convention stated once
+  (`Pose`, `Quaternion`: intrinsic XYZ Euler degrees, R = Rx·Ry·Rz,
+  parent-relative), and all eight behaviors (`Behavior`, typed with the
+  schema's defaults) posed by `WorldMotion` as functions of folded
+  time: from the authored transform, in array order, `spin`, `pulse`
+  and `swing` about their pivot, a kind it doesn't know carried and
+  never run. The spin, swing, pulse, bob and pivot tests mirror the
+  reference renderer's (`js/test/behaviors.test.mjs`) number for
+  number. Where the spec leaves a motion to "as their fields say" —
+  orbit, look_at, path_follow, bounce — it follows that renderer, in
+  closed form where the renderer steps frame by frame, and the schema
+  where the two disagree (bounce's `damping` is energy); each case says
+  what it chose.
+- **The draw rules a renderer needs typed** — `drawnAlphaMode` (a
+  colour below 1 with no `alpha_mode` draws blended; spec/world.md
+  "Conventions"), `unlit`, `reflectance`, and a spot light's
+  `innerAngle` / `outerAngle` in radians.
 - **Doesn't** — the `ext-physics` solver (the Rust crate owns the
   reference one), schema validation (the JSON Schema is normative;
   AJV in CI is the checker), and any rendering, audio or asset

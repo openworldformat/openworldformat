@@ -69,7 +69,39 @@ public enum Shape: Equatable, Sendable {
     }
 }
 
-/// A surface: color (rgba, linear), emissive, and the PBR knobs.
+/// How a material draws its colour's alpha (`alpha_mode`).
+public enum AlphaMode: Equatable, Sendable {
+    /// The alpha is ignored: drawn opaque.
+    case opaque
+    /// Blended over what is behind it by its alpha.
+    case blend
+    /// Added to what is behind it.
+    case add
+    /// Multiplied with what is behind it.
+    case multiply
+    /// Cut at `cutoff`: opaque where the alpha reaches it, absent below.
+    case mask(cutoff: Double)
+
+    /// `"opaque"`, `"blend"`, `"add"`, `"multiply"` or `{"mask": cutoff}`;
+    /// nil for anything else — absent, null, or a mode this reader does
+    /// not know, where the colour's alpha decides (`drawnAlphaMode`).
+    public init?(json: JSONValue?) {
+        switch json {
+        case .string("opaque")?: self = .opaque
+        case .string("blend")?: self = .blend
+        case .string("add")?: self = .add
+        case .string("multiply")?: self = .multiply
+        case .object(let o)? where o.count == 1:
+            guard let cutoff = o["mask"]?.double else { return nil }
+            self = .mask(cutoff: cutoff)
+        default: return nil
+        }
+    }
+}
+
+/// A surface: colour, emissive, and the PBR knobs. `color` is
+/// sRGB-encoded RGBA in 0…1, its alpha the opacity; `emissive` is
+/// linear, and above 1 it glows (spec/world.md "Conventions").
 public struct MaterialDef: Equatable, Sendable {
     public var color: [Double]?
     public var emissive: [Double]?
@@ -77,6 +109,13 @@ public struct MaterialDef: Equatable, Sendable {
     public var metallic: Double?
     public var transparency: Double?
     public var doubleSided: Bool?
+    /// `alpha_mode` as declared: nil when absent, null, or a mode this
+    /// reader does not know. `drawnAlphaMode` is what to draw.
+    public var alphaMode: AlphaMode?
+    /// Ignores lighting: drawn flat in its colour.
+    public var unlit: Bool?
+    /// Reflectance at normal incidence, 0…1 (0.5 is 4%).
+    public var reflectance: Double?
     /// `base_color_texture` and friends: the asset-referencing fields an
     /// engine resolves against the package's content store.
     public var fields: [String: JSONValue]
@@ -89,7 +128,27 @@ public struct MaterialDef: Equatable, Sendable {
         metallic = o["metallic"]?.double
         transparency = o["transparency"]?.double
         doubleSided = o["double_sided"]?.bool
-        fields = o.filter { !["color", "emissive", "roughness", "metallic", "transparency", "double_sided"].contains($0.key) }
+        alphaMode = AlphaMode(json: o["alpha_mode"])
+        unlit = o["unlit"]?.bool
+        reflectance = o["reflectance"]?.double
+        fields = o.filter {
+            !["color", "emissive", "roughness", "metallic", "transparency", "double_sided",
+              "alpha_mode", "unlit", "reflectance"].contains($0.key)
+        }
+    }
+
+    /// The colour's alpha — its opacity — or 1 when the colour declares
+    /// none.
+    public var alpha: Double {
+        guard let color, color.count > 3 else { return 1 }
+        return color[3]
+    }
+
+    /// How the material draws (spec/world.md "Conventions"): `alpha_mode`
+    /// when declared; without it, a colour whose alpha is below 1 draws
+    /// blended, as `blend` would, and one at 1 is opaque.
+    public var drawnAlphaMode: AlphaMode {
+        alphaMode ?? (alpha < 1 ? .blend : .opaque)
     }
 }
 
@@ -101,6 +160,12 @@ public struct LightDef: Equatable, Sendable {
     public var direction: [Double]?
     public var range: Double?
     public var angleDegrees: Double?
+    /// A spot light's inner cone: radians from its direction, full
+    /// intensity inside it.
+    public var innerAngle: Double?
+    /// A spot light's outer cone: radians from its direction, no light
+    /// past it.
+    public var outerAngle: Double?
     public var shadows: Bool?
 
     public init(json: JSONValue) {
@@ -111,6 +176,8 @@ public struct LightDef: Equatable, Sendable {
         direction = o["direction"]?.array?.compactMap(\.double)
         range = o["range"]?.double
         angleDegrees = o["angle_degrees"]?.double
+        innerAngle = o["inner_angle"]?.double
+        outerAngle = o["outer_angle"]?.double
         shadows = o["shadows"]?.bool
     }
 }
