@@ -9,17 +9,16 @@
 //! Bevy, no async, no sockets.
 //!
 //! ```no_run
-//! use openworldformat::{WorldManifest, OpLogEntry};
+//! use openworldformat::WorldManifest;
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
-//! let manifest: WorldManifest = serde_json::from_str(
-//!     std::fs::read_to_string("world/manifest.json")?.as_str(),
+//! // The log folds over the oldest state, snapshots/base.json…
+//! let base: WorldManifest = serde_json::from_str(
+//!     std::fs::read_to_string("world/snapshots/base.json")?.as_str(),
 //! )?;
-//! let entries: Vec<OpLogEntry> = std::fs::read_to_string("world/ops.jsonl")?
-//!     .lines()
-//!     .filter(|l| !l.trim().is_empty())
-//!     .map(serde_json::from_str)
-//!     .collect::<Result<_, _>>()?;
-//! let doc = openworldformat::fold_log(&manifest.as_base()?, &entries)?;
+//! // …read as the spec reads it: a torn last line is skipped, an earlier
+//! // line that doesn't parse is an error.
+//! let log = openworldformat::decode_log(&std::fs::read_to_string("world/ops.jsonl")?)?;
+//! let doc = openworldformat::fold_log(&base.as_base()?, &log.entries)?;
 //! println!("{} entities at head", doc.len());
 //! # Ok(())
 //! # }
@@ -91,12 +90,17 @@ pub use instance::{
 pub use light::{LightDef, LightType};
 pub use material::{AlphaModeDef, MaterialDef, TextureSlot};
 pub use modulation::{ModulationDef, ModulationTarget, SignalSource, StemKind};
-pub use oplog::{OpLogEntry, canonical_json, compute_entry_id, decode_line, encode_line};
+pub use oplog::{
+    CorruptLine, DecodedLog, OpLogEntry, canonical_json, compute_entry_id, decode_line, decode_log,
+    encode_line,
+};
 pub use package::{
     BASE_SNAPSHOT, PACKAGE_FORMAT_VERSION, compact_plan, manifest_text, manifest_text_of,
     snapshot_filename,
 };
-pub use session::{MergedBranch, fold_log, fold_path, main_tip, merge_branch};
+pub use session::{
+    History, HistoryError, MergedBranch, build_history, fold_log, fold_path, main_tip, merge_branch,
+};
 pub use shape::{PrimitiveShapeKind, Shape};
 pub use soundtrack::{SoundtrackDef, StemCurves, curve_at};
 pub use spatial::ChunkCoord;

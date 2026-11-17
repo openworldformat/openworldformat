@@ -320,92 +320,210 @@ impl OpLogEntry {
     }
 }
 
-/// The history of a log with entry identity applied: every entry gets an
-/// id (its own, or `line-<n>`) and a parent (its own, or the previous
-/// entry). A log with no ids is a chain in file order.
-/// One entry of a log with its identity applied.
-struct Identified<'a> {
-    entry: &'a OpLogEntry,
-    id: String,
-    parent: Option<String>,
+/// Why a log doesn't read as a tree.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum HistoryError {
+    /// Two entries claim the same id.
+    DuplicateId(String),
+    /// An entry names a parent no earlier entry is. A log is append-only,
+    /// so a parent is always already written: a forward reference is
+    /// refused, not resolved.
+    UnknownParent { entry: String, parent: String },
+    /// A tip or a ref names an entry this log doesn't hold.
+    NoSuchEntry(String),
 }
 
-fn with_identity(entries: &[OpLogEntry]) -> Result<Vec<Identified<'_>>, ApplyError> {
-    let mut out: Vec<Identified<'_>> = Vec::with_capacity(entries.len());
-    let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
-    let mut previous: Option<String> = None;
+impl std::fmt::Display for HistoryError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::DuplicateId(id) => write!(f, "duplicate entry id '{id}'"),
+            Self::UnknownParent { entry, parent } => write!(
+                f,
+                "entry '{entry}' names parent '{parent}', which isn't in the log yet"
+            ),
+            Self::NoSuchEntry(id) => write!(f, "no entry '{id}' in this log"),
+        }
+    }
+}
+
+impl std::error::Error for HistoryError {}
+
+impl From<HistoryError> for ApplyError {
+    fn from(error: HistoryError) -> Self {
+        Self::Invalid(error.to_string())
+    }
+}
+
+/// A log read as a tree (spec/session.md, "Branches"): every entry's
+/// identity — its own `id`, else `line-<n>` for its index — and its parent
+/// — its own `parent`, else the entry before it, else the base — and the
+/// shape they make: children, tips, the path to any entry.
+///
+/// This is the one place the rule lives in Rust. [`fold_path`] walks it,
+/// so a tip it reports is a tip the fold reaches; the JS and Kotlin
+/// references build the same thing as `buildHistory`. It holds ids only —
+/// no entries, no document — so it is cheap to keep beside a log and ask
+/// often.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct History {
+    /// Each entry's id, in file order.
+    ids: Vec<String>,
+    /// Each entry's parent, by index; `None` builds on the base.
+    parents: Vec<Option<usize>>,
+    /// Each entry's children, by index, in file order.
+    children: Vec<Vec<usize>>,
+    index: std::collections::HashMap<String, usize>,
+}
+
+/// Read a log as a tree, refusing a duplicate id or a parent that isn't
+/// written yet — the identity rule [`fold_path`] folds by.
+pub fn build_history(entries: &[OpLogEntry]) -> Result<History, HistoryError> {
+    let mut history = History {
+        ids: Vec::with_capacity(entries.len()),
+        parents: Vec::with_capacity(entries.len()),
+        children: Vec::with_capacity(entries.len()),
+        index: std::collections::HashMap::with_capacity(entries.len()),
+    };
     for (n, entry) in entries.iter().enumerate() {
         let id = entry.id.clone().unwrap_or_else(|| format!("line-{n}"));
-        if !seen.insert(id.clone()) {
-            return Err(ApplyError::Invalid(format!("duplicate entry id '{id}'")));
+        if history.index.contains_key(&id) {
+            return Err(HistoryError::DuplicateId(id));
         }
-        if let Some(parent) = entry.parent.clone().or_else(|| previous.clone())
-            && !seen.contains(&parent)
-        {
-            return Err(ApplyError::Invalid(format!(
-                "entry '{id}' names parent '{parent}', which isn't in the log yet"
-            )));
+        let parent = match &entry.parent {
+            Some(parent) => {
+                Some(
+                    *history
+                        .index
+                        .get(parent)
+                        .ok_or_else(|| HistoryError::UnknownParent {
+                            entry: id.clone(),
+                            parent: parent.clone(),
+                        })?,
+                )
+            }
+            None => n.checked_sub(1),
+        };
+        if let Some(parent) = parent {
+            history.children[parent].push(n);
         }
-        let parent = entry.parent.clone().or_else(|| previous.clone());
-        out.push(Identified {
-            entry,
-            id: id.clone(),
-            parent,
-        });
-        previous = Some(id);
+        history.index.insert(id.clone(), n);
+        history.ids.push(id);
+        history.parents.push(parent);
+        history.children.push(Vec::new());
     }
-    Ok(out)
+    Ok(history)
+}
+
+impl History {
+    /// How many entries the log holds.
+    pub fn len(&self) -> usize {
+        self.ids.len()
+    }
+
+    /// Whether the log holds no entries: the base is the whole history.
+    pub fn is_empty(&self) -> bool {
+        self.ids.is_empty()
+    }
+
+    /// Every entry's id, in file order.
+    pub fn ids(&self) -> &[String] {
+        &self.ids
+    }
+
+    /// The id of the entry at `index` in file order.
+    pub fn id_at(&self, index: usize) -> Option<&str> {
+        self.ids.get(index).map(String::as_str)
+    }
+
+    /// Where the entry `id` sits in file order.
+    pub fn index_of(&self, id: &str) -> Option<usize> {
+        self.index.get(id).copied()
+    }
+
+    /// The last entry in file order — what [`fold_path`] folds when it is
+    /// given no tip.
+    pub fn last_id(&self) -> Option<&str> {
+        self.ids.last().map(String::as_str)
+    }
+
+    /// The entry `id` builds on; `None` when it builds on the base, or when
+    /// the log holds no `id`.
+    pub fn parent_of(&self, id: &str) -> Option<&str> {
+        let parent = self.parents[self.index_of(id)?]?;
+        Some(&self.ids[parent])
+    }
+
+    /// The entries that build on `id`, in file order: more than one is a
+    /// fork.
+    pub fn children_of(&self, id: &str) -> Vec<&str> {
+        self.index_of(id)
+            .map(|n| {
+                self.children[n]
+                    .iter()
+                    .map(|&c| self.ids[c].as_str())
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
+    /// The entries nothing builds on — where the branches end — in file
+    /// order. A linear log has one: its last entry.
+    pub fn tips(&self) -> Vec<&str> {
+        (0..self.ids.len())
+            .filter(|&n| self.children[n].is_empty())
+            .map(|n| self.ids[n].as_str())
+            .collect()
+    }
+
+    /// The path from the base to `tip`, oldest entry first: the chain
+    /// [`fold_path`] folds.
+    pub fn path_to(&self, tip: &str) -> Result<Vec<&str>, HistoryError> {
+        let at = self
+            .index_of(tip)
+            .ok_or_else(|| HistoryError::NoSuchEntry(tip.to_string()))?;
+        Ok(self
+            .path_indices(at)
+            .into_iter()
+            .map(|n| self.ids[n].as_str())
+            .collect())
+    }
+
+    /// The indices from the base to the entry at `at`, oldest first.
+    fn path_indices(&self, at: usize) -> Vec<usize> {
+        let mut path = Vec::new();
+        let mut cursor = Some(at);
+        while let Some(n) = cursor {
+            path.push(n);
+            cursor = self.parents[n];
+        }
+        path.reverse();
+        path
+    }
 }
 
 /// Fold one path of a branching history: the document at `tip` (an entry
 /// id; `None` folds the last entry in file order), plus the ids of the
 /// path folded. Entries without ids chain in file order, so a linear log
-/// is the degenerate branch.
+/// is the degenerate branch. The path is [`History::path_to`]'s.
 pub fn fold_path(
     base: &WorldDoc,
     entries: &[OpLogEntry],
     tip: Option<&str>,
 ) -> Result<(WorldDoc, Vec<String>), ApplyError> {
-    let identified = with_identity(entries)?;
+    let history = build_history(entries)?;
     let target = match tip {
-        Some(id) => identified
-            .iter()
-            .find(|e| e.id == id)
-            .map(|e| e.id.clone())
-            .ok_or_else(|| ApplyError::Invalid(format!("no entry '{id}' in this log")))?,
-        None => identified
-            .last()
-            .ok_or_else(|| ApplyError::Invalid("the log is empty".into()))?
-            .id
-            .clone(),
+        Some(id) => history
+            .index_of(id)
+            .ok_or_else(|| HistoryError::NoSuchEntry(id.to_string()))?,
+        None => history
+            .len()
+            .checked_sub(1)
+            .ok_or_else(|| ApplyError::Invalid("the log is empty".into()))?,
     };
-    // Walk parent links tip → base, then fold the chain forward.
-    let by_id: std::collections::HashMap<&str, usize> = identified
-        .iter()
-        .enumerate()
-        .map(|(i, e)| (e.id.as_str(), i))
-        .collect();
-    let mut chain_idx = Vec::new();
-    let mut cursor = Some(target);
-    while let Some(id) = cursor {
-        let idx = *by_id
-            .get(id.as_str())
-            .ok_or_else(|| ApplyError::Invalid(format!("no entry '{}' in this log", id)))?;
-        let parent = identified[idx].parent.clone();
-        chain_idx.push(idx);
-        cursor = parent;
-    }
-    chain_idx.reverse();
-    let chain: Vec<OpLogEntry> = chain_idx
-        .iter()
-        .map(|&i| identified[i].entry.clone())
-        .collect();
-    let path: Vec<String> = chain_idx
-        .iter()
-        .map(|&i| identified[i].id.clone())
-        .collect();
+    let path = history.path_indices(target);
+    let chain: Vec<OpLogEntry> = path.iter().map(|&n| entries[n].clone()).collect();
     let doc = fold_log(base, &chain)?;
-    Ok((doc, path))
+    Ok((doc, path.iter().map(|&n| history.ids[n].clone()).collect()))
 }
 
 /// Fold log entries onto a base document: the state at the last entry.
@@ -870,6 +988,87 @@ mod tests {
         let (last, _) = fold_path(&base, &entries, None).unwrap();
         assert!(last.get_by_name("moat").is_some());
         assert!(fold_path(&base, &entries, Some("e99")).is_err());
+    }
+
+    #[test]
+    fn the_history_reads_a_branched_log_as_a_tree() {
+        let history = build_history(&branched_entries()).unwrap();
+        assert_eq!(history.len(), 5);
+        assert_eq!(history.ids(), ["e1", "e2", "e3", "e4", "e5"]);
+        assert_eq!(history.tips(), ["e3", "e5"]);
+        assert_eq!(history.children_of("e2"), ["e3", "e4"]);
+        assert_eq!(
+            history.parent_of("e1"),
+            None,
+            "the first builds on the base"
+        );
+        assert_eq!(history.parent_of("e4"), Some("e2"));
+        assert_eq!(history.index_of("e4"), Some(3));
+        assert_eq!(history.last_id(), Some("e5"));
+        assert_eq!(history.path_to("e5").unwrap(), ["e1", "e2", "e4", "e5"]);
+        assert_eq!(
+            history.path_to("e9"),
+            Err(HistoryError::NoSuchEntry("e9".into()))
+        );
+        assert!(history.children_of("e9").is_empty());
+        // The fold walks the same path.
+        let (_, path) = fold_path(&WorldDoc::new("base"), &branched_entries(), Some("e5")).unwrap();
+        assert_eq!(path, history.path_to("e5").unwrap());
+    }
+
+    #[test]
+    fn a_log_without_ids_is_one_chain_of_line_ids() {
+        let entries: Vec<OpLogEntry> = (1..=3).map(|rev| bare_entry(None, rev)).collect();
+        let history = build_history(&entries).unwrap();
+        assert_eq!(history.ids(), ["line-0", "line-1", "line-2"]);
+        assert_eq!(history.parent_of("line-0"), None);
+        assert_eq!(history.parent_of("line-2"), Some("line-1"));
+        assert_eq!(history.tips(), ["line-2"]);
+        assert_eq!(
+            history.path_to("line-2").unwrap(),
+            ["line-0", "line-1", "line-2"]
+        );
+        assert!(build_history(&[]).unwrap().is_empty());
+    }
+
+    #[test]
+    fn the_history_refuses_what_the_fold_cannot_place() {
+        let mut entries = vec![bare_entry(Some("e1"), 1), bare_entry(Some("e1"), 2)];
+        assert_eq!(
+            build_history(&entries),
+            Err(HistoryError::DuplicateId("e1".into()))
+        );
+        // A parent written later is refused: the log is append-only.
+        entries[1].id = Some("e2".into());
+        entries[0].parent = Some("e2".into());
+        assert_eq!(
+            build_history(&entries),
+            Err(HistoryError::UnknownParent {
+                entry: "e1".into(),
+                parent: "e2".into()
+            })
+        );
+        // So is an entry that names itself, which the fold used to walk
+        // around forever.
+        let looped = vec![
+            bare_entry(Some("e1"), 1),
+            OpLogEntry {
+                parent: Some("e2".into()),
+                ..bare_entry(Some("e2"), 2)
+            },
+        ];
+        assert_eq!(
+            build_history(&looped),
+            Err(HistoryError::UnknownParent {
+                entry: "e2".into(),
+                parent: "e2".into()
+            })
+        );
+        let refused = fold_path(&WorldDoc::new("base"), &looped, Some("e2")).unwrap_err();
+        assert_eq!(
+            refused.to_string(),
+            "invalid: entry 'e2' names parent 'e2', which isn't in the log yet"
+        );
     }
 
     #[test]

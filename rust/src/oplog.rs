@@ -60,6 +60,82 @@ pub fn decode_line(line: &str) -> Result<OpLogEntry, serde_json::Error> {
     serde_json::from_str(line)
 }
 
+/// A session log as a reader takes it: its entries in file order, and the
+/// torn last line when one was skipped.
+#[derive(Debug, Clone, Default)]
+pub struct DecodedLog {
+    /// Every entry, in file order. Blank lines hold none.
+    pub entries: Vec<OpLogEntry>,
+    /// The last line, numbered from 1, when it didn't parse and was
+    /// skipped: a writer that crashed mid-append, not a broken log.
+    pub torn_line: Option<usize>,
+}
+
+/// A line before the last that doesn't parse. The last line may be torn
+/// mid-write; anything earlier is real corruption, and the entries after
+/// it can't be placed — their identity and their parents run through it.
+#[derive(Debug, Clone)]
+pub struct CorruptLine {
+    /// The line, numbered from 1 as an editor numbers it.
+    pub line: usize,
+    /// Why it doesn't parse.
+    pub error: String,
+    /// The entries above it, which did: what a reader can still show. An
+    /// authority refuses the log rather than append after it.
+    pub before: Vec<OpLogEntry>,
+}
+
+impl std::fmt::Display for CorruptLine {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "line {} of the log doesn't parse: {}",
+            self.line, self.error
+        )
+    }
+}
+
+impl std::error::Error for CorruptLine {}
+
+/// Read a whole `ops.jsonl` as the spec says a reader must
+/// (spec/package.md, "Integrity and tolerance"): blank lines are skipped, a
+/// torn last line loses at most itself and is counted, and any earlier
+/// line that doesn't parse is refused — the rule the Kotlin and Swift
+/// loaders apply.
+pub fn decode_log(text: &str) -> Result<DecodedLog, CorruptLine> {
+    let lines: Vec<(usize, &str)> = text
+        .lines()
+        .enumerate()
+        .filter(|(_, line)| !line.trim().is_empty())
+        .collect();
+    let mut log = DecodedLog::default();
+    for (k, &(n, line)) in lines.iter().enumerate() {
+        match decode_line(line) {
+            Ok(entry) => log.entries.push(entry),
+            Err(_) if k + 1 == lines.len() => log.torn_line = Some(n + 1),
+            Err(error) => {
+                return Err(CorruptLine {
+                    line: n + 1,
+                    error: describe(&error),
+                    before: log.entries,
+                });
+            }
+        }
+    }
+    Ok(log)
+}
+
+/// The parser's message with its position put the log's way: the line is
+/// the log's to name, so only the column is the parser's.
+fn describe(error: &serde_json::Error) -> String {
+    let message = error.to_string();
+    let position = format!(" at line {} column {}", error.line(), error.column());
+    match message.strip_suffix(&position) {
+        Some(what) => format!("{what} at column {}", error.column()),
+        None => message,
+    }
+}
+
 /// Canonical JSON — the one serialization writers hash
 /// (spec/session.md): no whitespace, object keys sorted, arrays in
 /// order. Two writers that agree on content agree on these bytes, so
@@ -134,6 +210,60 @@ mod tests {
         assert_eq!(back.revision, 7);
         assert_eq!(back.author.name, "maya");
         assert_eq!(back.ops.len(), 1);
+    }
+
+    fn line(revision: u64, id: &str) -> String {
+        format!(r#"{{"revision":{revision},"ops":[],"id":"{id}"}}"#)
+    }
+
+    #[test]
+    fn a_torn_last_line_loses_only_itself() {
+        let torn = r#"{"revision":3,"ops":[{"Spa"#;
+        let text = format!("{}\n\n{}\n{torn}", line(1, "e1"), line(2, "e2"));
+        let log = decode_log(&text).unwrap();
+        assert_eq!(log.entries.len(), 2);
+        assert_eq!(
+            log.torn_line,
+            Some(4),
+            "lines count as an editor counts them"
+        );
+        // Blank lines after it don't move the end: it is still the last.
+        assert_eq!(
+            decode_log(&format!("{text}\n\n")).unwrap().torn_line,
+            Some(4)
+        );
+        // A whole log tears nothing; CRLF and blank lines read as nothing.
+        let log = decode_log(&format!("{}\r\n\r\n{}\r\n", line(1, "e1"), line(2, "e2"))).unwrap();
+        assert_eq!(log.entries.len(), 2);
+        assert_eq!(log.torn_line, None);
+        assert!(decode_log("").unwrap().entries.is_empty());
+    }
+
+    #[test]
+    fn a_bad_line_before_the_last_is_corruption() {
+        let text = format!(
+            "{}\n{{\"revision\":2,\"op\n{}\n",
+            line(1, "e1"),
+            line(3, "e3")
+        );
+        let corrupt = decode_log(&text).unwrap_err();
+        assert_eq!(corrupt.line, 2);
+        assert_eq!(corrupt.before.len(), 1);
+        assert_eq!(corrupt.before[0].id.as_deref(), Some("e1"));
+        // The line is the log's to name; the parser only knows the column.
+        assert!(corrupt.error.contains("at column"), "{}", corrupt.error);
+        assert!(!corrupt.error.contains("line 1"), "{}", corrupt.error);
+        assert!(
+            corrupt
+                .to_string()
+                .starts_with("line 2 of the log doesn't parse: "),
+            "{corrupt}"
+        );
+        // JSON that isn't an entry is corruption too, not a torn write.
+        let corrupt = decode_log(&format!("{{\"revision\":1}}\n{}", line(2, "e2"))).unwrap_err();
+        assert_eq!(corrupt.line, 1);
+        assert!(corrupt.before.is_empty());
+        assert!(corrupt.error.contains("ops"), "{}", corrupt.error);
     }
 
     /// The cross-language golden: the same bytes, and the same digest,

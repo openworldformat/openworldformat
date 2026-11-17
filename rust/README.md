@@ -13,17 +13,17 @@ cargo add --path rust openworldformat
 ```
 
 ```rust
-use openworldformat::{WorldManifest, OpLogEntry, fold_log, fold_path};
+use openworldformat::{WorldManifest, build_history, decode_log, fold_log, fold_path};
 
 // A head-first package: manifest.json is the world now…
 let world: WorldManifest = serde_json::from_str(&manifest_text)?;
-// …and the log folds over snapshots/base.json back to it.
+// …and the log folds over snapshots/base.json back to it. A torn last
+// line is skipped and counted; an earlier one that doesn't parse refuses.
 let base: WorldManifest = serde_json::from_str(&base_text)?;
-let entries: Vec<OpLogEntry> = log_text.lines()
-    .filter(|l| !l.trim().is_empty())
-    .map(serde_json::from_str).collect::<Result<_, _>>()?;
+let entries = decode_log(&log_text)?.entries;
 
 let doc = fold_log(&base.as_base()?, &entries)?;      // the world at head
+let history = build_history(&entries)?;                // tips, children, paths
 let (doc, path) = fold_path(&base.as_base()?, &entries, Some("e3"))?; // or at any tip
 let same = doc.to_manifest();                          // a whole manifest again
 ```
@@ -40,6 +40,29 @@ origins through parents, aim and focus by entity (`view_in`,
 unit table, quantisation, block readers, the tangent-plane derivation
 of the core transform (`local_position`, `derive_transform`) and its
 outcome runner; the `schema` feature generates `world.schema.json`.
+
+## 0.5.1 (unreleased): the log as a reader takes it, and its history as a tree
+
+Additive: nothing a 0.5.0 consumer calls changes.
+
+- **`decode_log(text)`** reads a whole `ops.jsonl` the way spec/package.md
+  ("Integrity and tolerance") says a reader must — the rule the Kotlin
+  and Swift loaders already apply: blank lines skipped, a torn last line
+  skipped and counted (`DecodedLog::torn_line`), and any earlier line
+  that doesn't parse refused as a `CorruptLine`: its line number, why,
+  and the entries above it, which a reader can still show and an
+  authority must not append after. Readers that split the text by hand
+  skipped a bad line anywhere and folded around it.
+- **`build_history(entries)` → `History`**: every entry's identity (`id`,
+  else `line-<n>`) and parent (its own, else the entry before it, else
+  the base), its children, the tips, and `path_to` any entry — the JS and
+  Kotlin `buildHistory`. `fold_path` walks it, so a tip the history
+  reports is a tip the fold reaches; `HistoryError` names a duplicate id,
+  an unknown parent or a missing entry, in the words `fold_path` already
+  used.
+- **Fixed**: an entry naming itself as its parent sent `fold_path` round
+  that link forever. It is an unknown parent now, as in the JS and Kotlin
+  references.
 
 ## 0.5.0: pivots, the swing, and the behaviors a reader does not know
 
