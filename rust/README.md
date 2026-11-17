@@ -41,7 +41,7 @@ unit table, quantisation, block readers, the tangent-plane derivation
 of the core transform (`local_position`, `derive_transform`) and its
 outcome runner; the `schema` feature generates `world.schema.json`.
 
-## 0.5.1 (unreleased): the log as a reader takes it, and its history as a tree
+## 0.5.1: the log as a reader takes it, and its history as a tree
 
 Additive: nothing a 0.5.0 consumer calls changes.
 
