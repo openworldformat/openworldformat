@@ -8,13 +8,13 @@ import XCTest
 final class ConformanceTests: XCTestCase {
     /// (world, entity count) — pinned from conformance/*.json.
     static let counts: [String: Int] = [
-        "behaviors": 13,
+        "behaviors": 18,
         "h3": 6,
         "hierarchy_rotations": 9,
         "hierarchy_tours": 12,
         "instances": 7,
         "lights": 8,
-        "materials": 21,
+        "materials": 22,
         "physics": 5,
         "prism": 12,
         "shapes": 13,

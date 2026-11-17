@@ -13,13 +13,13 @@ import kotlin.test.assertTrue
 class ConformanceTests {
     /** (world, entity count) — pinned from the conformance worlds. */
     private val counts = mapOf(
-        "behaviors" to 13,
+        "behaviors" to 18,
         "h3" to 6,
         "hierarchy_rotations" to 9,
         "hierarchy_tours" to 12,
         "instances" to 7,
         "lights" to 8,
-        "materials" to 21,
+        "materials" to 22,
         "physics" to 5,
         "prism" to 12,
         "shapes" to 13,
