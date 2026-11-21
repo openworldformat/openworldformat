@@ -4,7 +4,7 @@ import PackageDescription
 // The Open World Format's Apple-surface package. The manifest lives at
 // the repository root because SwiftPM requires it at the checkout root
 // of anything resolved by tag; the sources and tests stay in swift/.
-// Releases are bare semver tags (v0.1.0) — the per-language js-v* and
+// Releases are bare semver tags (v0.3.5) — the per-language js-v* and
 // rust-v* tags don't parse as versions, so the bare v-namespace is
 // this package's.
 let package = Package(
