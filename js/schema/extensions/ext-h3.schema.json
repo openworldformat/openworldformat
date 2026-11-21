@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ExtH3",
+  "description": "The ext-h3 extension, version 0.1 (proposed): where an entity sits on a globe, as an H3 cell and an integer-only transform in that cell's frame, beside the core transform a reader without the extension draws. Everything rides under the namespaced 'ext-h3' key: on entities (the placement) and on the environment (the package's frame: the cell whose centre is the local origin). The core schema leaves room for the key (unknown fields are allowed and must-ignored); this schema pins the extension's own shape. The H3 fields are authoritative and the core transform is derived from them by the producer (spec/extensions/h3.md, 'The one invariant'). Spec: spec/extensions/h3.md.",
+  "type": "object",
+  "$defs": {
+    "Cell": {
+      "description": "An H3 cell index, as H3's 15-digit lowercase hexadecimal string.",
+      "type": "string",
+      "pattern": "^[0-9a-f]{15}$"
+    },
+    "Resolution": {
+      "description": "The cell's H3 resolution, 0 to 15. Stated so a reader without an H3 library knows the translation unit; it MUST equal what the index encodes.",
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 15
+    },
+    "Body": {
+      "description": "The body the grid is laid on. 'earth' is the default and the only body this version defines a unit table for; a reader that does not know the body draws the core transform.",
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*$",
+      "default": "earth"
+    },
+    "Int3": {
+      "type": "array",
+      "items": { "type": "integer" },
+      "minItems": 3,
+      "maxItems": 3
+    },
+    "Frame": {
+      "description": "The environment's ext-h3 block: the package's local frame. Its origin is the cell's centre on the body's sphere; +X east, +Y up, +Z south; metres (the core's conventions).",
+      "type": "object",
+      "properties": {
+        "cell": { "$ref": "#/$defs/Cell" },
+        "resolution": { "$ref": "#/$defs/Resolution" },
+        "body": { "$ref": "#/$defs/Body" }
+      },
+      "required": ["cell", "resolution"],
+      "additionalProperties": false
+    },
+    "Placement": {
+      "description": "An entity's ext-h3 block: its cell, and its transform relative to the cell's centre in the cell's own frame (+X east, +Y up, +Z south), as integers.",
+      "type": "object",
+      "properties": {
+        "cell": { "$ref": "#/$defs/Cell" },
+        "resolution": { "$ref": "#/$defs/Resolution" },
+        "body": { "$ref": "#/$defs/Body" },
+        "translation": {
+          "description": "Hundredths of the mean edge length of a cell at `resolution` (H3 4's getHexagonEdgeLengthAvgM: 0.584169 m at 15, so one unit is 5.84169 mm), along the cell frame's east, up and south.",
+          "$ref": "#/$defs/Int3",
+          "default": [0, 0, 0]
+        },
+        "rotation": {
+          "description": "Hundredths of a degree, intrinsic XYZ Euler like the core's rotation_degrees; each in -18000..=18000.",
+          "type": "array",
+          "items": { "type": "integer", "minimum": -18000, "maximum": 18000 },
+          "minItems": 3,
+          "maxItems": 3,
+          "default": [0, 0, 0]
+        },
+        "scale": {
+          "description": "Log2 fixed point per axis: round(log2(factor) * 1024). 0 is 1x, 1024 is 2x, -1024 is 0.5x.",
+          "$ref": "#/$defs/Int3",
+          "default": [0, 0, 0]
+        }
+      },
+      "required": ["cell", "resolution"],
+      "additionalProperties": false
+    },
+    "EntityBlock": {
+      "description": "What an entity carries under 'ext-h3'.",
+      "$ref": "#/$defs/Placement"
+    },
+    "EnvironmentBlock": {
+      "description": "What the environment carries under 'ext-h3'.",
+      "$ref": "#/$defs/Frame"
+    }
+  }
+}

@@ -25,12 +25,18 @@
     "./h3": {
       "types": "./dist/h3.d.ts",
       "default": "./src/h3.js"
-    }
+    },
+    "./schema/world.schema.json": "./schema/world.schema.json",
+    "./schema/state.schema.json": "./schema/state.schema.json",
+    "./schema/extensions/ext-physics.schema.json": "./schema/extensions/ext-physics.schema.json",
+    "./schema/extensions/ext-cinematography.schema.json": "./schema/extensions/ext-cinematography.schema.json",
+    "./schema/extensions/ext-h3.schema.json": "./schema/extensions/ext-h3.schema.json"
   },
   "files": [
     "README.md",
     "src",
-    "dist"
+    "dist",
+    "schema"
   ],
   "scripts": {
     "test": "node --test",
