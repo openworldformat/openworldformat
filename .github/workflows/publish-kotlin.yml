@@ -1,0 +1,128 @@
+# Publish the Kotlin package to Maven Central when a `kotlin-vX.Y.Z`
+# tag is pushed.
+#
+# No Trusted Publishing here: the Central Portal has no OIDC support,
+# so unlike publish-js/python/rust.yml this workflow authenticates
+# with credentials that live in this repository's secrets — a Central
+# Portal user token and a GPG key. Only the owner can create them
+# (kotlin/README.md's Releasing section holds the checklist):
+#   - a Central Portal account, and the `org.openworldformat`
+#     namespace verified on it (DNS TXT on openworldformat.org);
+#   - a Portal user token (a username/password pair);
+#   - a GPG key, published to a public keyserver (Central checks
+#     signatures against published keys);
+#   - the GitHub secrets MAVEN_CENTRAL_USERNAME, MAVEN_CENTRAL_PASSWORD
+#     (the token pair), MAVEN_GPG_PRIVATE_KEY (the armored private
+#     key) and MAVEN_GPG_PASSPHRASE — names only ever in this file.
+#
+# To release: drop the `-SNAPSHOT` from `version` in
+# kotlin/build.gradle.kts in a release commit (`chore(kotlin): 0.4.1`),
+# then
+#   git tag -a kotlin-v0.4.1 -m "openworldformat (Kotlin) 0.4.1 — <what>"
+#   git push origin kotlin-v0.4.1
+# and restore `-SNAPSHOT` for the next development cycle on main. The
+# build job refuses a tag whose number is not build.gradle.kts's, and
+# refuses any version still carrying `-SNAPSHOT`, so a stray tag on
+# main publishes nothing; it runs the CI job's checks plus a
+# publishToMavenLocal, which builds the exact artifact set Central
+# will judge (modules, sources and javadoc jars, POMs, module
+# metadata).
+#
+# The upload is two steps, because Gradle's maven-publish speaks the
+# OSSRH staging compatibility API, not the Portal's own API: the
+# publish job PUTs the artifacts to the staging service, then hands
+# the deployment to the Portal (`publishing_type=automatic`), which
+# validates and releases from there. Validation is asynchronous — a
+# failure parks the deployment in the Portal's publishing UI for the
+# owner to inspect, it does not go out. Central refuses a version it
+# already has, so a re-run of a published tag fails loudly and
+# overwrites nothing.
+name: Publish Kotlin
+
+on:
+  push:
+    tags: ["kotlin-v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Check and test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: kotlin
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - name: The tag names build.gradle.kts's version, not a snapshot
+        run: |
+          tag="${GITHUB_REF_NAME#kotlin-v}"
+          version="$(sed -n 's/^version = "\(.*\)"$/\1/p' build.gradle.kts)"
+          case "$version" in
+            *-SNAPSHOT)
+              echo "::error::$version still carries -SNAPSHOT — the release commit drops the suffix"
+              exit 1
+              ;;
+          esac
+          if [ "$tag" != "$version" ]; then
+            echo "::error::the tag says $tag, kotlin/build.gradle.kts says $version"
+            exit 1
+          fi
+      - run: ./gradlew jvmTest compileAndroidMain
+        env:
+          ANDROID_HOME: /usr/local/lib/android/sdk
+      # The artifact set Central will judge, built and inspected here
+      # first: the openworldformat, -jvm and -android modules with
+      # sources and javadoc jars, POMs and Gradle module metadata.
+      - run: ./gradlew publishToMavenLocal
+        env:
+          ANDROID_HOME: /usr/local/lib/android/sdk
+
+  publish:
+    name: Upload to Maven Central
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: maven-central
+      url: https://central.sonatype.com/search?q=org.openworldformat
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: kotlin
+    env:
+      MAVEN_CENTRAL_USERNAME: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
+      MAVEN_CENTRAL_PASSWORD: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
+      MAVEN_GPG_PRIVATE_KEY: ${{ secrets.MAVEN_GPG_PRIVATE_KEY }}
+      MAVEN_GPG_PASSPHRASE: ${{ secrets.MAVEN_GPG_PASSPHRASE }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - name: Refuse to run without the owner's credentials
+        run: |
+          for secret in MAVEN_CENTRAL_USERNAME MAVEN_CENTRAL_PASSWORD MAVEN_GPG_PRIVATE_KEY MAVEN_GPG_PASSPHRASE; do
+            if [ -z "${!secret:-}" ]; then
+              echo "::error::$secret is not set — see kotlin/README.md's Releasing section"
+              exit 1
+            fi
+          done
+      - name: Upload to the staging service, GPG-signed
+        run: ./gradlew publishAllPublicationsToCentralPortalRepository --stacktrace
+        env:
+          ANDROID_HOME: /usr/local/lib/android/sdk
+      # maven-publish can PUT but not finalize: without this call the
+      # deployment never appears in the Portal. The Bearer token is
+      # the base64 of the portal token's username:password.
+      - name: Hand the deployment to the Portal for validation and release
+        run: |
+          curl -sf -X POST \
+            -H "Authorization: Bearer $(printf '%s:%s' "$MAVEN_CENTRAL_USERNAME" "$MAVEN_CENTRAL_PASSWORD" | base64)" \
+            "https://ossrh-staging-api.central.sonatype.com/manual/upload/defaultRepository/org.openworldformat?publishing_type=automatic"
