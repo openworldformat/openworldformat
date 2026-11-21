@@ -24,6 +24,7 @@ import copy
 import hashlib
 import json
 import re
+from importlib.resources import files as _package_files
 from pathlib import Path
 from typing import Any
 
@@ -39,6 +40,7 @@ __all__ = [
     "EXT_PROVENANCE_FIELDS",
     "ENTITY_REFS",
     "WorldFormatError",
+    "schema_path",
     "parse_manifest",
     "classify_op",
     "op_kind_shape_ok",
@@ -1765,3 +1767,35 @@ def compact(world_dir, head_revision: int | None = None) -> Path:
         (world / "ops.archive.jsonl").write_text("\n".join(archived) + "\n")
     log_path.write_text("".join(line + "\n" for line in kept))
     return world
+
+
+# ---------------------------------------------------------------------------
+# The normative schemas (schema/, shipped as package data)
+# ---------------------------------------------------------------------------
+
+
+def schema_path(name: str) -> Any:
+    """The location of one of the normative JSON Schemas the package
+    ships — ``schema_path("world.schema.json")``,
+    ``schema_path("state.schema.json")`` and the extension schemas
+    (``"extensions/ext-physics.schema.json"``,
+    ``"extensions/ext-cinematography.schema.json"``,
+    ``"extensions/ext-h3.schema.json"``) — so a consumer validates a
+    ``.world`` against its installed dependency instead of a checkout of
+    the format repository. The name is the schema's path as the
+    repository's ``schema/`` holds it; the copies are byte-identical to
+    it, never hand-edited, and ``tests/test_schema_files.py`` fails when
+    one drifts.
+
+    The return is an ``importlib.resources`` traversable;
+    ``.read_text()`` is the schema, to hand to the validator of choice.
+
+    :param name: the schema's name, as the repository's schema/ holds it
+    :return: the schema's location
+    :raises FileNotFoundError: when the name is no schema this package
+        ships
+    """
+    path = _package_files("openworldformat").joinpath("schema").joinpath(name)
+    if not path.is_file():
+        raise FileNotFoundError(f"no schema '{name}' ships with this package")
+    return path

@@ -196,6 +196,30 @@ counts branches; fold each with `fold_path` and the counterfactuals
 come with the corpus. `summarize(dir)` gives the row as a dict for
 notebooks.
 
+## Schemas
+
+The normative JSON Schemas ship with the package, so a consumer
+validates against its installed dependency instead of a checkout of
+the format repository:
+
+```python
+import json
+from openworldformat import schema_path
+
+world = json.loads(schema_path("world.schema.json").read_text())
+jsonschema.validate(manifest, world)  # or the validator of your choice
+```
+
+`schema_path` takes the name as the repository's `schema/` holds it:
+`"state.schema.json"`, `"extensions/ext-physics.schema.json"`,
+`"extensions/ext-cinematography.schema.json"`,
+`"extensions/ext-h3.schema.json"`. They are byte-identical copies of
+the repository's [`schema/`](../schema/) — never hand-edited;
+`tests/test_schema_files.py` fails when they drift, so refresh them
+when the schema changes. (The entity-reference list,
+`schema/entity-refs.json`, is already embedded as source:
+`openworldformat.entity_refs`.)
+
 ## API
 
 | Export | What it does |
@@ -222,6 +246,7 @@ notebooks.
 | `merge_patch(current, change)` | JSON merge patch, RFC 7396 — the rule partial transforms merge by |
 | `compact(world_dir, head_revision=None)` | move the base up to the head (or a revision): `snapshots/base.json` rewritten, the entries it holds archived |
 | `ext_provenance(manifest)` | the provenance extension's five lineage fields, or None |
+| `schema_path(name)` | the location of a shipped normative schema — `schema_path("world.schema.json").read_text()`, then your validator |
 
 `openworldformat.physics` mirrors the npm package's
 `openworldformat/physics`: `collect_physics`, `simulate_physics`,

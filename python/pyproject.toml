@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "openworldformat"
-version = "0.4.5"
+version = "0.4.6"
 description = "The Open World Format research package: parse and fold a .world in pure Python, no engine required."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -39,3 +39,9 @@ urls = { Repository = "https://github.com/openworldformat/openworldformat", Docu
 
 [tool.setuptools]
 packages = ["openworldformat"]
+
+# The normative schemas, as package data: byte-identical copies of the
+# repository's schema/ (world, state, extensions/) that
+# openworldformat.schema_path resolves for consumers.
+[tool.setuptools.package-data]
+openworldformat = ["schema/*.json", "schema/extensions/*.json"]
