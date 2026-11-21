@@ -11,17 +11,27 @@ package folds too, with the same entity counts pinned in its tests.
 
 ## Add
 
+Not on Maven Central yet — the first release, 0.4.1, is prepared but
+unpublished (`org.openworldformat` doesn't exist there). Until it
+lands, consume a checkout: `./gradlew publishToMavenLocal` in `kotlin/`
+plus `mavenLocal()` in the consumer, or a Gradle source dependency on
+this repository. After that release the coordinates are:
+
 ```kotlin
 // build.gradle.kts
 repositories { mavenCentral() }
 dependencies {
-    implementation("org.openworldformat:openworldformat:0.2.0")
+    implementation("org.openworldformat:openworldformat:0.4.1")
 }
 ```
 
 Gradle's module metadata resolves `openworldformat` to the right
 variant (`-jvm` on desktop/tooling, `-android` in an app) — add the
-root coordinates, not a target suffix. Requires minSdk 26 on Android.
+root coordinates, not a target suffix. What publishToMavenLocal
+produces are the three modules the metadata picks from:
+`openworldformat` (the root), `openworldformat-jvm` and
+`openworldformat-android`, each with sources and javadoc jars, a POM
+and a `.module`. Requires minSdk 26 on Android.
 
 ## Use
 
@@ -139,13 +149,44 @@ with no `Context`. (The entity-reference list,
 
 ## Releasing (the Maven Central path)
 
-Unlike SPM (git tags) this one is an upload, not a tag. The POM
-metadata is already configured here; the remaining release-time
-steps: verify the `org.openworldformat` namespace on Central Portal
-(DNS TXT on openworldformat.org, which this project owns), GPG-sign,
-drop the `-SNAPSHOT`, and `publish…PublicationToCentralPortal`.
-Until then the version stays `0.4.1-SNAPSHOT` and consumers can use
-`mavenLocal()` or a Gradle sourceDependency on this repository. The
+Unlike SPM (git tags) this one is an upload, and unlike npm, PyPI and
+crates.io there is no trusted publishing: the Central Portal
+authenticates with a user token and a GPG key held in GitHub secrets.
+
+**What only the owner can do, once, before the first release:**
+
+1. Create a Central Portal account and verify the
+   `org.openworldformat` namespace on it — DNS TXT on
+   openworldformat.org, which this project owns.
+2. Generate a Portal user token (a username/password pair).
+3. Create a GPG key and publish its public half to a keyserver
+   (Central checks signatures against published keys).
+4. On GitHub, create the repository secrets the workflow reads —
+   `MAVEN_CENTRAL_USERNAME` and `MAVEN_CENTRAL_PASSWORD` (the token
+   pair), `MAVEN_GPG_PRIVATE_KEY` (the armored private key) and
+   `MAVEN_GPG_PASSPHRASE` — and, if a second look is wanted before an
+   upload, the `maven-central` environment with required reviewers.
+   Secret values live in GitHub, never in this repository.
+
+**The release flow** (`.github/workflows/publish-kotlin.yml`): main
+carries `0.4.1-SNAPSHOT`; a release commit drops the suffix
+(`chore(kotlin): 0.4.1`) and the tag points at it:
+
+```bash
+git tag -a kotlin-v0.4.1 -m "openworldformat (Kotlin) 0.4.1 — <what>"
+git push origin kotlin-v0.4.1
+```
+
+then main moves to `0.4.2-SNAPSHOT`. The workflow refuses a tag that
+doesn't name the build's version and refuses any version still
+carrying `-SNAPSHOT`, so a stray tag on main publishes nothing. It
+runs the CI checks plus a `publishToMavenLocal` (the artifact set
+Central will judge), then PUTs the signed artifacts to the staging
+service Gradle's maven-publish speaks and hands the deployment to the
+Portal, which validates and releases automatically — validation is
+asynchronous, and a failure parks the deployment in the Portal's UI
+for the owner rather than going out. Until the first release lands,
+consumers use `mavenLocal()` or a source dependency as above. The
 package's 0.x minor is its own binding-compatibility line, not the
 spec draft's number ([versioning policy](../spec/versioning.md)).
 
