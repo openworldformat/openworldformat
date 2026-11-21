@@ -110,6 +110,29 @@ world (a behavior whose target the batch deleted) — and `manifestText`
 writes the head's canonical bytes, the same bytes the Rust and JS
 references write.
 
+## Schemas
+
+The normative JSON Schemas ship with the package as SwiftPM
+resources, so a consumer validates against its installed dependency
+instead of a checkout of the format repository:
+
+```swift
+if let url = schemaURL("world.schema.json") {
+    let schema = try String(contentsOf: url, encoding: .utf8)
+    // hand it to the JSON Schema validator of choice; the package
+    // itself stays a reader, not a checker
+}
+```
+
+`schemaURL` takes the name as the repository's `schema/` holds it:
+`"state.schema.json"`, `"extensions/ext-physics.schema.json"`,
+`"extensions/ext-cinematography.schema.json"`,
+`"extensions/ext-h3.schema.json"` — byte-identical copies, never
+hand-edited; `SchemaFilesTests` fails when they drift, so refresh them
+when the schema changes. (The entity-reference list,
+`schema/entity-refs.json`, is already embedded as source:
+`EntityRefs.swift`.)
+
 ## What it carries, what it doesn't
 
 - **Carries** — the document types (identity typed, components and
@@ -137,9 +160,10 @@ references write.
   "Conventions"), `unlit`, `reflectance`, and a spot light's
   `innerAngle` / `outerAngle` in radians.
 - **Doesn't** — the `ext-physics` solver (the Rust crate owns the
-  reference one), schema validation (the JSON Schema is normative;
-  AJV in CI is the checker), and any rendering, audio or asset
-  resolution. The viewer profile's must-ignore is the reader's side.
+  reference one), schema validation (the schemas themselves ship —
+  `schemaURL`; the checker is the consumer's, AJV in CI here), and any
+  rendering, audio or asset resolution. The viewer profile's
+  must-ignore is the reader's side.
 
 ## License
 

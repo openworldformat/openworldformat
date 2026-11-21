@@ -20,7 +20,15 @@ let package = Package(
     targets: [
         .target(
             name: "OpenWorldFormat",
-            path: "swift/Sources/OpenWorldFormat"
+            path: "swift/Sources/OpenWorldFormat",
+            // The normative schemas, shipped as SwiftPM resources: the
+            // `.copy` rule is byte-identical by construction, and
+            // Schemas.swift resolves them from Bundle.module (see
+            // swift/Tests/OpenWorldFormatTests/SchemaFilesTests.swift
+            // for the drift test that keeps them the repository's).
+            resources: [
+                .copy("Resources/schemas")
+            ]
         ),
         .testTarget(
             name: "OpenWorldFormatTests",
