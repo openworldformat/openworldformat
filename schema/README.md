@@ -41,4 +41,9 @@ Validate a manifest before rendering:
 npx ajv-cli validate -s world.schema.json -d ../conformance/shapes.json
 ```
 
+The npm package ships these schema files
+(`require.resolve("openworldformat/schema/world.schema.json")` —
+`js/README.md` lists them all), so consumers validate against their
+installed dependency rather than a checkout of this repository.
+
 License: Apache-2.0, generated from the LocalGPT reference types.

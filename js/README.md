@@ -73,6 +73,28 @@ Checking code that uses `openworldformat/render`'s types also needs
 `@types/three` (a dev dependency, like it is here); the runtime is
 unchanged — peer `three`, nothing else.
 
+## Schemas
+
+The normative JSON Schemas ship with the package, so a consumer
+validates against its installed dependency instead of a checkout of
+the format repository:
+
+```js
+const worldSchema = require.resolve("openworldformat/schema/world.schema.json");
+const stateSchema = require.resolve("openworldformat/schema/state.schema.json");
+// …and the extension schemas:
+// openworldformat/schema/extensions/ext-physics.schema.json
+// openworldformat/schema/extensions/ext-cinematography.schema.json
+// openworldformat/schema/extensions/ext-h3.schema.json
+```
+
+They are byte-identical copies of the repository's
+[`schema/`](../schema/) — never hand-edited;
+`js/test/schema-files.test.mjs` fails when they drift, so refresh them
+when the schema changes. (The entity-reference list,
+`schema/entity-refs.json`, is already embedded as generated source:
+`src/entity-refs.mjs`.)
+
 ## API
 
 | Export | What it does |
