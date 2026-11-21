@@ -145,7 +145,9 @@ steps: verify the `org.openworldformat` namespace on Central Portal
 (DNS TXT on openworldformat.org, which this project owns), GPG-sign,
 drop the `-SNAPSHOT`, and `publish…PublicationToCentralPortal`.
 Until then the version stays `0.4.1-SNAPSHOT` and consumers can use
-`mavenLocal()` or a Gradle sourceDependency on this repository.
+`mavenLocal()` or a Gradle sourceDependency on this repository. The
+package's 0.x minor is its own binding-compatibility line, not the
+spec draft's number ([versioning policy](../spec/versioning.md)).
 
 ## License
 

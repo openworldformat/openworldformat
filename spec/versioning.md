@@ -37,10 +37,14 @@ These numbers are intentionally unaligned with each other and with the spec/libr
    registered, its spec page and conformance cases remain permanently.
    Claiming version N of an extension means passing its version N cases
    forever.
-6. **Library Versioning.** While the format is in draft (0.x), language
-   bindings SHOULD align their SemVer major/minor numbers with the spec
-   draft. After 1.0, bindings SHOULD use the schema version as their
-   major version.
+6. **Library Versioning.** While the format is in draft (0.x), a
+   binding's minor version is its own compatibility line: under 0.x
+   SemVer, a breaking change to the binding itself takes a minor bump.
+   Bindings SHOULD align their minor with the spec draft's number, but
+   that SHOULD yields when a binding's breaking changes outrun the
+   draft — no binding's minor implies that a spec draft with that
+   number exists. After 1.0, bindings SHOULD use the schema version as
+   their major version.
 
 ## What implementers may rely on
 

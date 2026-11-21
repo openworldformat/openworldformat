@@ -100,8 +100,8 @@ minor bump, as for 0.4.0.
 Breaking for a consumer that matches `Shape` exhaustively or spells out
 `Author`: the new variant and the new field — the compile error is the
 point, a renderer must decide what it draws for a prism. The spec draft
-stays 0.3; the versioning policy's alignment is a SHOULD, and a breaking
-binding change takes its own minor bump under cargo's 0.x rules.
+stays 0.3; the crate's minor is its own binding-compatibility line
+(spec/versioning.md, rule 6).
 
 - **The geometry of every shape** is stated in spec/world.md and pinned
   by `conformance/geometry/shapes.json`; `tests/geometry.rs` checks that

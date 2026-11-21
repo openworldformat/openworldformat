@@ -32,7 +32,9 @@ or Xcode → File → Add Package Dependencies → the same URL, then
 `import OpenWorldFormat`. The manifest lives at the repository root
 (SwiftPM requires it at the checkout root); the sources and tests are
 this directory. Releases are bare semver tags (`v0.3.0` on) — the
-`js-v*`/`rust-v*` tags don't parse as versions. Consumers need
+`js-v*`/`rust-v*` tags don't parse as versions. The package's 0.x
+minor is its own binding-compatibility line, not the spec draft's
+number ([versioning policy](../spec/versioning.md)). Consumers need
 macOS 14 / iOS 17 / visionOS 1 or later.
 
 ## Use
