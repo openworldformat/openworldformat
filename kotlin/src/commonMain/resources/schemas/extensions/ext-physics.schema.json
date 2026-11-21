@@ -1,0 +1,84 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ExtPhysics",
+  "description": "The ext-physics extension, version 0.1 (experimental). Everything rides under the namespaced 'ext-physics' key: on entities (the body component), on the environment (gravity), and as a log op kind (sampled trajectories). The core schema leaves room for these keys (unknown fields are allowed and must-ignored); this schema pins the extension's own shape. Spec: spec/extensions/physics.md.",
+  "type": "object",
+  "$defs": {
+    "Collider": {
+      "description": "The collision volume: derived from the entity's parametric shape, or an explicit primitive.",
+      "anyOf": [
+        { "const": "shape" },
+        {
+          "type": "object",
+          "properties": {
+            "sphere": { "type": "number", "exclusiveMinimum": 0 },
+            "cuboid": {
+              "type": "array",
+              "items": { "type": "number", "exclusiveMinimum": 0 },
+              "minItems": 3,
+              "maxItems": 3
+            }
+          },
+          "additionalProperties": false,
+          "minProperties": 1,
+          "maxProperties": 1
+        }
+      ]
+    },
+    "BodyComponent": {
+      "description": "An entity's ext-physics component: what the body is, never how it moves.",
+      "type": "object",
+      "properties": {
+        "body": { "enum": ["static", "kinematic", "dynamic"] },
+        "mass": { "type": "number", "exclusiveMinimum": 0, "default": 1.0 },
+        "collider": { "$ref": "#/$defs/Collider", "default": "shape" },
+        "restitution": { "type": "number", "minimum": 0, "maximum": 1, "default": 0.5 },
+        "friction": { "type": "number", "minimum": 0, "maximum": 1, "default": 0.5 },
+        "gravity_scale": { "type": "number", "default": 1.0 },
+        "linear_damping": { "type": "number", "minimum": 0, "default": 0.0 }
+      },
+      "required": ["body"],
+      "additionalProperties": false
+    },
+    "EnvironmentBlock": {
+      "description": "The environment's ext-physics block.",
+      "type": "object",
+      "properties": {
+        "gravity": {
+          "type": "array",
+          "items": { "type": "number" },
+          "minItems": 3,
+          "maxItems": 3,
+          "default": [0.0, -9.81, 0.0]
+        }
+      },
+      "additionalProperties": false
+    },
+    "TrajectoryOp": {
+      "description": "The extension's op kind: sampled transforms of dynamic bodies. Folds to nothing for the document fold; readers interpolate. Writers sample at or below 10 Hz.",
+      "type": "object",
+      "properties": {
+        "t_s": {
+          "type": "array",
+          "items": { "type": "number", "minimum": 0 },
+          "minItems": 1
+        },
+        "bodies": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": { "type": "number" },
+              "minItems": 3,
+              "maxItems": 3
+            }
+          },
+          "minProperties": 1
+        }
+      },
+      "required": ["t_s", "bodies"],
+      "additionalProperties": false
+    }
+  }
+}

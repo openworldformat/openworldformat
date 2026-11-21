@@ -88,6 +88,30 @@ other references write.
 On Android, content-URI sources go through the app's own copy layer,
 then the same `loadWorldPackage(File)`.
 
+## Schemas
+
+The normative JSON Schemas ship with the package, as KMP resources
+in `commonMain`, so a consumer validates against its installed
+dependency instead of a checkout of the format repository:
+
+```kotlin
+val world = OWF_JSON.parseToJsonElement(schemaText("world.schema.json"))
+// or keep the text, and hand it to the JSON Schema validator of
+// choice — the package itself stays a reader, not a checker
+```
+
+`schemaText` takes the name as the repository's `schema/` holds it:
+`"state.schema.json"`, `"extensions/ext-physics.schema.json"`,
+`"extensions/ext-cinematography.schema.json"`,
+`"extensions/ext-h3.schema.json"` — byte-identical copies, never
+hand-edited; `SchemaFilesTests` fails when they drift, so refresh
+them when the schema changes. The copies ride at the classpath root
+(`schemas/…`): the JVM jar carries them, and the Android artifact's
+`classes.jar` does too, so `schemaText` reads them on either target
+with no `Context`. (The entity-reference list,
+`schema/entity-refs.json`, is already embedded as source:
+`EntityRefs.kt`.)
+
 ## What it carries, what it doesn't
 
 - **Carries** — the document types (identity typed, components and
@@ -100,14 +124,15 @@ then the same `loadWorldPackage(File)`.
   ingestion (`ingest`, `mergePatch`) with the canonical head text
   (`manifestText`).
 - **Doesn't** — the `ext-physics` solver (the Rust crate owns the
-  reference one), schema validation (the JSON Schema is normative;
-  AJV in CI is the checker), and any rendering, audio or asset
-  resolution. The viewer profile's must-ignore is the reader's side.
+  reference one), schema validation (the schemas themselves ship —
+  `schemaText`; the checker is the consumer's, AJV in CI here), and
+  any rendering, audio or asset resolution. The viewer profile's
+  must-ignore is the reader's side.
 
 ## Build and test
 
 ```bash
-./gradlew jvmTest            # 75 tests: examples, conformance worlds, the shared merge corpus, authoring
+./gradlew jvmTest            # 78 tests: examples, conformance worlds, the shared merge corpus, authoring, the schemas
 ./gradlew compileAndroidMain # the Android target compiles
 ./gradlew publishToMavenLocal
 ```
@@ -119,7 +144,7 @@ metadata is already configured here; the remaining release-time
 steps: verify the `org.openworldformat` namespace on Central Portal
 (DNS TXT on openworldformat.org, which this project owns), GPG-sign,
 drop the `-SNAPSHOT`, and `publish…PublicationToCentralPortal`.
-Until then the version stays `0.4.0-SNAPSHOT` and consumers can use
+Until then the version stays `0.4.1-SNAPSHOT` and consumers can use
 `mavenLocal()` or a Gradle sourceDependency on this repository.
 
 ## License
