@@ -41,9 +41,13 @@ Validate a manifest before rendering:
 npx ajv-cli validate -s world.schema.json -d ../conformance/shapes.json
 ```
 
-The npm package ships these schema files
-(`require.resolve("openworldformat/schema/world.schema.json")` —
-`js/README.md` lists them all), so consumers validate against their
-installed dependency rather than a checkout of this repository.
+The language packages ship these schema files, so consumers validate
+against their installed dependency rather than a checkout of this
+repository: npm resolves the paths
+(`require.resolve("openworldformat/schema/world.schema.json")`),
+Python reads them through `openworldformat.schema_path`, Swift
+through `schemaURL`, Kotlin through `schemaText` — each package's
+README lists them all, and each package's tests fail when its copies
+drift from these.
 
 License: Apache-2.0, generated from the LocalGPT reference types.
