@@ -117,7 +117,10 @@ those shapes rather than more shapes, so the prism is not a one-off.
   the Rust reference carries a behavior kind it does not know instead
   of refusing the world. A colour's alpha below 1 with no `alpha_mode`
   draws blended ("Conventions"), pinned by `conformance/materials.json`
-  — the two shipping renderers had read it two ways.
+  — the two shipping renderers had read it two ways. The RFC is
+  accepted (2026-11-22), LocalGPT's Bevy renderer and worldwalk 0.5.0
+  drawing the pivots and the swing beside the reference three.js
+  viewer.
 - The state document is now pinned with its own
   [`schema/state.schema.json`](../schema/state.schema.json); it joins
   `world.schema.json` in the generated core.

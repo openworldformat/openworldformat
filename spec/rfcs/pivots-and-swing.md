@@ -1,9 +1,12 @@
 # RFC: Pivots, phases and the swing — and what a translucent colour means
 
-**Status:** proposed, implemented in the JS renderer and the Rust
-reference's types; it lands when a second renderer draws the pivots and
-the swing, per [CONTRIBUTING](../../CONTRIBUTING.md). The normative text
-is in [the world document](../world.md) ("Conventions", "Behavior and
+**Status:** accepted (2026-11-22). It landed when a second renderer drew
+the pivots and the swing, per [CONTRIBUTING](../../CONTRIBUTING.md):
+LocalGPT's Bevy renderer and worldwalk 0.5.0 draw them beside the
+reference three.js viewer. The references carry them — the Rust crate
+since 0.5.0, the Swift package since 0.5.0 (behaviors posed at folded
+time), the Kotlin side current. The normative text is in
+[the world document](../world.md) ("Conventions", "Behavior and
 triggers"); `conformance/behaviors.json` and `conformance/materials.json`
 pin it.
 
