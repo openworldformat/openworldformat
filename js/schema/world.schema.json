@@ -608,7 +608,7 @@
                   "x-entity-ref": "bindable"
                 },
                 "center_point": {
-                  "description": "Fixed point to orbit around [x,y,z] (used if `center` is None).",
+                  "description": "Fixed point to orbit around `[x,y,z]` (used if `center` is None).",
                   "type": [
                     "array",
                     "null"
@@ -846,7 +846,7 @@
                   "default": 2.0
                 },
                 "waypoints": {
-                  "description": "Ordered waypoints [[x,y,z], ...].",
+                  "description": "Ordered waypoints `[[x,y,z], ...]`.",
                   "type": "array",
                   "items": {
                     "type": "array",
