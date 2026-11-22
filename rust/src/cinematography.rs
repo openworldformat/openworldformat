@@ -78,8 +78,17 @@ impl CameraComponent {
     /// absent field (`{}` is a 35 mm on Super 35). `None` when the
     /// entity declares no camera.
     pub fn of(entity: &wt::WorldEntity) -> Option<Self> {
-        let camera = entity.extra.get(EXTENSION_NAME)?.get("camera")?.as_object()?;
-        let num = |k: &str, d: f64| camera.get(k).and_then(serde_json::Value::as_f64).unwrap_or(d);
+        let camera = entity
+            .extra
+            .get(EXTENSION_NAME)?
+            .get("camera")?
+            .as_object()?;
+        let num = |k: &str, d: f64| {
+            camera
+                .get(k)
+                .and_then(serde_json::Value::as_f64)
+                .unwrap_or(d)
+        };
         let opt = |k: &str| camera.get(k).and_then(serde_json::Value::as_f64);
         let vec2 = |k: &str| -> Option<[f64; 2]> {
             let a: Vec<f64> = camera
@@ -144,10 +153,7 @@ pub fn frame_of(camera: &CameraComponent) -> CameraFrame {
     let f = camera.focal_length_mm;
     let a = w * s / h;
     let (width_mm, height_mm) = match camera.aspect_ratio {
-        Some(aspect) if aspect != 0.0 => (
-            w * s * (aspect / a).min(1.0),
-            h * (a / aspect).min(1.0),
-        ),
+        Some(aspect) if aspect != 0.0 => (w * s * (aspect / a).min(1.0), h * (a / aspect).min(1.0)),
         _ => (w * s, h),
     };
     let deg = |rad: f64| rad * 180.0 / std::f64::consts::PI;
@@ -282,7 +288,10 @@ pub fn focus_distance_of(
         .as_ref()
         .and_then(|reference| entity_of(reference, manifest))
     {
-        let d = sub(world_origin(target, manifest), world_origin(entity, manifest));
+        let d = sub(
+            world_origin(target, manifest),
+            world_origin(entity, manifest),
+        );
         return Some(dot(d, d).sqrt());
     }
     camera.focus_distance_m
@@ -305,7 +314,11 @@ pub fn view_in(
     camera: &CameraComponent,
     manifest: &wt::WorldManifest,
 ) -> CameraView {
-    view_from(entity, world_origin(entity, manifest), aim_point_of(camera, manifest))
+    view_from(
+        entity,
+        world_origin(entity, manifest),
+        aim_point_of(camera, manifest),
+    )
 }
 
 fn view_from(entity: &wt::WorldEntity, position: [f64; 3], aim: Option<[f64; 3]>) -> CameraView {
@@ -394,8 +407,12 @@ pub fn shot_list(manifest: &wt::WorldManifest) -> Vec<ShotEntry> {
             })
         })
         .collect();
-    let rank =
-        |s: &ShotEntry| s.shot.get("order").and_then(serde_json::Value::as_f64).unwrap_or(f64::MAX);
+    let rank = |s: &ShotEntry| {
+        s.shot
+            .get("order")
+            .and_then(serde_json::Value::as_f64)
+            .unwrap_or(f64::MAX)
+    };
     shots.sort_by(|a, b| {
         rank(a)
             .partial_cmp(&rank(b))
@@ -612,7 +629,9 @@ pub fn run_outcomes(manifest: &wt::WorldManifest, outcomes: &OutcomesDoc) -> Out
                     Some(_) => {}
                 }
             }
-            Assertion::ShotList { shot_list: expected } => {
+            Assertion::ShotList {
+                shot_list: expected,
+            } => {
                 let shots = shot_list(manifest);
                 let actual: Vec<&str> = shots.iter().map(|s| s.name.as_str()).collect();
                 let expected: Vec<&str> = expected.iter().map(String::as_str).collect();
@@ -637,7 +656,12 @@ fn camera_setup<'a>(
     manifest: &'a wt::WorldManifest,
     name: &str,
     failures: &mut Vec<String>,
-) -> Option<(&'a wt::WorldEntity, CameraComponent, CameraFrame, CameraView)> {
+) -> Option<(
+    &'a wt::WorldEntity,
+    CameraComponent,
+    CameraFrame,
+    CameraView,
+)> {
     let entity = manifest.entities.iter().find(|e| e.name.as_str() == name);
     let camera = entity.and_then(CameraComponent::of);
     let (Some(entity), Some(camera)) = (entity, camera) else {
@@ -756,7 +780,10 @@ mod tests {
         // yawed 90° right (intrinsic XYZ) looks down −X.
         let mut turned_entity = entity(9, "t", serde_json::json!({"camera": {}}));
         turned_entity.transform.rotation_degrees = [0.0, 90.0, 0.0];
-        let turned = view_of(&turned_entity, &CameraComponent::of(&turned_entity).unwrap());
+        let turned = view_of(
+            &turned_entity,
+            &CameraComponent::of(&turned_entity).unwrap(),
+        );
         assert!(
             (turned.forward[0] + 1.0).abs() < 1e-9
                 && turned.forward[1].abs() < 1e-9
@@ -783,9 +810,18 @@ mod tests {
         // The mug sits on a tray turned 30° on the counter: its origin
         // is its local position rotated and carried, not as written.
         let mug = world_origin(by_name(&manifest, "mug"), &manifest);
-        let expected = [0.8 + 0.3 * 30f64.to_radians().cos(), 1.05, -1.0 - 0.3 * 30f64.to_radians().sin()];
+        let expected = [
+            0.8 + 0.3 * 30f64.to_radians().cos(),
+            1.05,
+            -1.0 - 0.3 * 30f64.to_radians().sin(),
+        ];
         for i in 0..3 {
-            assert!((mug[i] - expected[i]).abs() < 1e-5, "axis {i}: {} vs {}", mug[i], expected[i]);
+            assert!(
+                (mug[i] - expected[i]).abs() < 1e-5,
+                "axis {i}: {} vs {}",
+                mug[i],
+                expected[i]
+            );
         }
         // An unparented entity's origin is its position.
         let maya = world_origin(by_name(&manifest, "maya"), &manifest);
@@ -810,7 +846,12 @@ mod tests {
         let insert = by_name(&manifest, "insert");
         let camera = CameraComponent::of(insert).unwrap();
         let view = view_in(insert, &camera, &manifest);
-        let p = project(&view, &frame_of(&camera), &camera, world_origin(by_name(&manifest, "mug"), &manifest));
+        let p = project(
+            &view,
+            &frame_of(&camera),
+            &camera,
+            world_origin(by_name(&manifest, "mug"), &manifest),
+        );
         assert!(p.x.abs() < 1e-6 && p.y.abs() < 1e-6 && p.z > 0.0);
         let focus = focus_distance_of(insert, &camera, &manifest).unwrap();
         assert!((focus - 1.4956).abs() < 1e-3, "{focus}");
@@ -830,7 +871,10 @@ mod tests {
         assert_eq!(aim_point_of(&camera, &manifest), Some([0.0, 1.0, 0.0]));
         assert_eq!(focus_distance_of(&orphan, &camera, &manifest), Some(2.5));
         let view = view_in(&orphan, &camera, &manifest);
-        assert!((view.forward[2] + 1.0).abs() < 1e-9, "looks down −Z at the aim point");
+        assert!(
+            (view.forward[2] + 1.0).abs() < 1e-9,
+            "looks down −Z at the aim point"
+        );
     }
 
     #[test]
@@ -841,8 +885,12 @@ mod tests {
         assert_eq!(names, ["1A", "2A", "2B", "3A", "4A"]); // bts and insert carry no shot
         // Absent orders sort last; ties break by id.
         let mut world = WorldManifest::new("t");
-        world.entities.push(entity(7, "b", serde_json::json!({"shot": {}})));
-        world.entities.push(entity(3, "a", serde_json::json!({"shot": {}})));
+        world
+            .entities
+            .push(entity(7, "b", serde_json::json!({"shot": {}})));
+        world
+            .entities
+            .push(entity(3, "a", serde_json::json!({"shot": {}})));
         world
             .entities
             .push(entity(5, "c", serde_json::json!({"shot": {"order": 1}})));

@@ -223,9 +223,8 @@ impl State {
                     // bind like any other — a name where an entity id
                     // goes resolves at intake (spec/world.md,
                     // "Identity": refs MUST resolve at ingestion).
-                    if let Some(avatar) = patch
-                        .get_mut("avatar")
-                        .filter(|avatar| avatar.is_object())
+                    if let Some(avatar) =
+                        patch.get_mut("avatar").filter(|avatar| avatar.is_object())
                     {
                         for field in refs_of(EntityRefScope::Avatar) {
                             walk_ref_path(avatar, field.path, &mut |reference| {

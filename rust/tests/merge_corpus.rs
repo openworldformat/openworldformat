@@ -16,7 +16,9 @@
 
 use std::path::PathBuf;
 
-use openworldformat::{OpLogEntry, WorldManifest as Manifest, fold_log, manifest_text_of, merge_branch};
+use openworldformat::{
+    OpLogEntry, WorldManifest as Manifest, fold_log, manifest_text_of, merge_branch,
+};
 
 fn repo(relative: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -90,14 +92,20 @@ fn the_merge_corpus_is_present_and_covers_the_hand_written_rules() {
             "missing hand-written case {required}"
         );
     }
-    assert!(cases.len() >= 100, "the corpus holds the generated cases too");
+    assert!(
+        cases.len() >= 100,
+        "the corpus holds the generated cases too"
+    );
 }
 
 #[test]
 fn every_merge_case_matches_the_committed_expected_results() {
     for case in cases() {
         let name = &case.name;
-        let base = case.base.as_base().unwrap_or_else(|e| panic!("{name}: base: {e}"));
+        let base = case
+            .base
+            .as_base()
+            .unwrap_or_else(|e| panic!("{name}: base: {e}"));
         let main = fold_log(&base, &case.main).unwrap_or_else(|e| panic!("{name}: main: {e}"));
 
         let merged = merge_branch(&main, &case.branch).unwrap_or_else(|e| panic!("{name}: {e}"));

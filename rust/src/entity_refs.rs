@@ -354,9 +354,14 @@ fn behavior_slot<'a>(
     leaf: &str,
 ) -> Option<RefSlot<'a>> {
     match (variant, leaf, behavior) {
-        ("Orbit", "center", BehaviorDef::Orbit { center: Some(center), .. }) => {
-            Some(RefSlot::Ref(center))
-        }
+        (
+            "Orbit",
+            "center",
+            BehaviorDef::Orbit {
+                center: Some(center),
+                ..
+            },
+        ) => Some(RefSlot::Ref(center)),
         ("LookAt", "target", BehaviorDef::LookAt { target }) => Some(RefSlot::Ref(target)),
         _ => None,
     }
@@ -386,8 +391,7 @@ mod tests {
         }
 
         // The extension block every `ext-cinematography` path lands in.
-        let camera_block =
-            serde_json::json!({"camera": {"aim_entity": 2, "focus_entity": 2}});
+        let camera_block = serde_json::json!({"camera": {"aim_entity": 2, "focus_entity": 2}});
 
         let mut entity = WorldEntity::new(1, "e");
         entity.parent = Some(EntityId(2));
@@ -466,12 +470,19 @@ mod tests {
             "behaviors": [{"Orbit": {"center": "sun"}}, {"Spin": {}}],
             "parent": "sun",
         });
-        walk_ref_path(&mut value, &["behaviors", "*", "Orbit", "center"], &mut |leaf| {
-            *leaf = serde_json::json!(1);
-            Ok::<(), Infallible>(())
-        })
+        walk_ref_path(
+            &mut value,
+            &["behaviors", "*", "Orbit", "center"],
+            &mut |leaf| {
+                *leaf = serde_json::json!(1);
+                Ok::<(), Infallible>(())
+            },
+        )
         .unwrap_or_else(|never| match never {});
-        walk_ref_path(&mut value, &["missing", "key"], &mut |_| -> Result<(), Infallible> {
+        walk_ref_path(&mut value, &["missing", "key"], &mut |_| -> Result<
+            (),
+            Infallible,
+        > {
             panic!("a missing key walks to nothing")
         })
         .unwrap_or_else(|never| match never {});

@@ -633,7 +633,10 @@ fn touched_ids(ops: &[EditOp]) -> Vec<u64> {
 /// (`parent`), which bind at op intake before the op applies — a string
 /// there never reaches the typed model — so only the deeper refs (the
 /// behavior refs, the extension refs) resolve here.
-fn bind_deep_refs<R: RefWalk>(root: &mut R, names: &HashMap<String, u64>) -> Result<(), ApplyError> {
+fn bind_deep_refs<R: RefWalk>(
+    root: &mut R,
+    names: &HashMap<String, u64>,
+) -> Result<(), ApplyError> {
     for field in refs_of_kind(EntityRefScope::Entity, EntityRefKind::Bindable) {
         if field.path.len() == 1 {
             continue;

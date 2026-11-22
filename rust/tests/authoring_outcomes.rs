@@ -4,7 +4,7 @@
 
 use std::path::PathBuf;
 
-use openworldformat::authoring::{ingest, Refused};
+use openworldformat::authoring::{Refused, ingest};
 use openworldformat::{WorldDoc, WorldManifest};
 use serde_json::Value;
 

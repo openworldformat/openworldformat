@@ -7,7 +7,7 @@ use std::path::PathBuf;
 
 use openworldformat::session::SessionOp;
 use openworldformat::{
-    AvatarDef, BehaviorDef, CreationDef, CreationId, EditOp, EntityId, EntityRef, ENTITY_REFS,
+    AvatarDef, BehaviorDef, CreationDef, CreationId, ENTITY_REFS, EditOp, EntityId, EntityRef,
     OpLogEntry, WorldDoc, WorldEntity, WorldManifest, WorldPatch, ingest, merge_branch,
 };
 use serde_json::{Value, json};
@@ -78,7 +78,10 @@ fn an_extensions_marked_refs_bind_at_ingestion_by_name() {
     let EditOp::SpawnEntity { entity } = &done.ops[0] else {
         panic!("a spawn")
     };
-    assert_eq!(entity.extra["ext-cinematography"]["camera"]["aim_entity"], 1);
+    assert_eq!(
+        entity.extra["ext-cinematography"]["camera"]["aim_entity"],
+        1
+    );
     let EditOp::ModifyEntity { patch, .. } = &done.ops[1] else {
         panic!("a patch")
     };
@@ -105,10 +108,9 @@ fn merge_rewriting_walks_the_extensions_marked_refs() {
         "ext-cinematography".into(),
         json!({"camera": {"aim_entity": 1, "focus_entity": 1}}),
     );
-    let patch: openworldformat::EntityPatch = serde_json::from_value(
-        json!({"ext-cinematography": {"camera": {"aim_entity": 1}}}),
-    )
-    .unwrap();
+    let patch: openworldformat::EntityPatch =
+        serde_json::from_value(json!({"ext-cinematography": {"camera": {"aim_entity": 1}}}))
+            .unwrap();
     let branch = vec![entry(
         2,
         vec![
@@ -118,18 +120,21 @@ fn merge_rewriting_walks_the_extensions_marked_refs() {
         ],
     )];
     let merged = merge_branch(&main, &branch).unwrap();
-    assert_eq!(
-        merged.remapped.iter().collect::<Vec<_>>(),
-        vec![(&1, &3)]
-    );
+    assert_eq!(merged.remapped.iter().collect::<Vec<_>>(), vec![(&1, &3)]);
     let SessionOp::Edit(spawn) = &merged.entries[0].ops[1] else {
         panic!("an edit")
     };
     let EditOp::SpawnEntity { entity } = &**spawn else {
         panic!("a spawn")
     };
-    assert_eq!(entity.extra["ext-cinematography"]["camera"]["aim_entity"], 3);
-    assert_eq!(entity.extra["ext-cinematography"]["camera"]["focus_entity"], 3);
+    assert_eq!(
+        entity.extra["ext-cinematography"]["camera"]["aim_entity"],
+        3
+    );
+    assert_eq!(
+        entity.extra["ext-cinematography"]["camera"]["focus_entity"],
+        3
+    );
     let SessionOp::Edit(modify) = &merged.entries[0].ops[2] else {
         panic!("an edit")
     };
@@ -299,10 +304,7 @@ fn merge_rewriting_walks_the_list_for_every_scope() {
     )];
 
     let merged = merge_branch(&main, &branch).unwrap();
-    assert_eq!(
-        merged.remapped.iter().collect::<Vec<_>>(),
-        vec![(&1, &2)]
-    );
+    assert_eq!(merged.remapped.iter().collect::<Vec<_>>(), vec![(&1, &2)]);
 
     let SessionOp::Edit(spawn) = &merged.entries[0].ops[0] else {
         panic!("an edit")

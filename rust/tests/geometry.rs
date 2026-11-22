@@ -10,7 +10,8 @@ use std::path::PathBuf;
 use openworldformat::Shape;
 
 fn fixture() -> serde_json::Value {
-    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../conformance/geometry/shapes.json");
+    let path =
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../conformance/geometry/shapes.json");
     serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap()
 }
 
@@ -44,7 +45,10 @@ fn the_fixtures_half_extents_are_the_crates_and_the_bounds_fit_inside() {
                 max[axis] <= half[axis] + 1e-6 && -min[axis] <= half[axis] + 1e-6,
                 "{name}: the exact bounds {min:?}..{max:?} leave the box {half:?}"
             );
-            assert!(min[axis] <= max[axis], "{name}: bounds inverted on axis {axis}");
+            assert!(
+                min[axis] <= max[axis],
+                "{name}: bounds inverted on axis {axis}"
+            );
         }
     }
     kinds.sort_unstable();
