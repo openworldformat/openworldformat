@@ -19,7 +19,7 @@ pub enum BehaviorDef {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         #[cfg_attr(feature = "schema", schemars(extend("x-entity-ref" = "bindable")))]
         center: Option<EntityRef>,
-        /// Fixed point to orbit around [x,y,z] (used if `center` is None).
+        /// Fixed point to orbit around `[x,y,z]` (used if `center` is None).
         #[serde(default, skip_serializing_if = "Option::is_none")]
         center_point: Option<[f32; 3]>,
         /// Orbit radius.
@@ -103,7 +103,7 @@ pub enum BehaviorDef {
     },
     /// Follow a path of waypoints in sequence.
     PathFollow {
-        /// Ordered waypoints [[x,y,z], ...].
+        /// Ordered waypoints `[[x,y,z], ...]`.
         waypoints: Vec<[f32; 3]>,
         /// Movement speed in units per second.
         #[serde(default = "default_path_speed")]

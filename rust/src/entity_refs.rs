@@ -12,9 +12,9 @@
 //! patch, the same fields), the manifest's avatar, or one creation in
 //! `creations[]`. `"*"` walks every array element.
 //!
-//! Two walks read the table: [`walk_ref_path`] over the raw op JSON
+//! Two walks read the table: `walk_ref_path` over the raw op JSON
 //! (the authoring pass binds names before the typed read) and
-//! [`RefWalk`] over the typed model (name binding after apply, merge
+//! `RefWalk` over the typed model (name binding after apply, merge
 //! rewriting) — the same list either way, so the three passes can
 //! never drift apart over hand-written field mentions.
 
