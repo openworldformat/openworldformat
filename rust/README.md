@@ -41,6 +41,22 @@ unit table, quantisation, block readers, the tangent-plane derivation
 of the core transform (`local_position`, `derive_transform`) and its
 outcome runner; the `schema` feature generates `world.schema.json`.
 
+## 0.5.2: a clean strict-docs build, and the wording the generated schema carries
+
+Nothing a consumer calls changes: no API, no schema semantics, schema
+version 3 untouched. For a consumer that pins the generated
+`world.schema.json`, two behavior descriptions gained code-span
+backticks.
+
+- **Fixed**: the strict rustdoc build is clean — unescaped `[x,y,z]`
+  brackets in the behavior docs, and links to private items made plain
+  code spans instead.
+- **Regenerated**: `world.schema.json` rebuilt from those docs
+  (schemars embeds them as descriptions); the shipped copies in the
+  js, python, swift and kotlin packages refreshed to match, drift
+  tests green.
+- `cargo fmt` applied across the crate.
+
 ## 0.5.1: the log as a reader takes it, and its history as a tree
 
 Additive: nothing a 0.5.0 consumer calls changes.
