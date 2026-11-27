@@ -36,22 +36,25 @@
       "notes": "Allows authors to conditionally hide entities (e.g. traps, GM secrets) from specific profiles until revealed."
     },
     "ext-cinematography": {
-      "version": "0.3.0",
+      "version": "0.4.0",
       "status": "experimental",
       "spec": "spec/extensions/cinematography.md",
       "rfc": "spec/rfcs/ext-cinematography.md",
+      "track_rfc": "spec/rfcs/ext-cinematography-track.md",
       "schema": "schema/extensions/ext-cinematography.schema.json",
       "implementations": [
-        "js/src/cinematography.js (npm openworldformat/cinematography)",
-        "rust/src/cinematography.rs (crates.io openworldformat::cinematography)",
-        "python/openworldformat/cinematography.py (PyPI openworldformat)",
-        "swift/Sources/OpenWorldFormat/Cinematography.swift (SwiftPM OpenWorldFormat)"
+        "js/src/cinematography.js (npm openworldformat/cinematography; 0.3 camera/shot outcomes, no 0.4 track evaluator)",
+        "rust/src/cinematography.rs (crates.io openworldformat::cinematography; 0.4 camera/shot/track outcomes)",
+        "python/openworldformat/cinematography.py (PyPI openworldformat; 0.3 camera/shot outcomes, no 0.4 track evaluator)",
+        "swift/Sources/OpenWorldFormat/Cinematography.swift (SwiftPM OpenWorldFormat; 0.3 camera/shot outcomes, no 0.4 track evaluator)"
       ],
       "conformance": [
         "conformance/cinematography.json",
-        "conformance/outcomes/cinematography.json"
+        "conformance/outcomes/cinematography.json",
+        "conformance/cinematography-tracks.json",
+        "conformance/outcomes/cinematography-tracks.json"
       ],
-      "notes": "Cameras as entities with a filmback and a lens; shots as ordered setups on the clock; 0.3 adds aim_entity and focus_entity — a camera that aims and focuses on an actor by entity reference, marked x-entity-ref in the extension's schema so the one generated list carries them and every reference binds, rewrites and validates them like parent. Four implementations, all running the same outcome assertions — derived FOV, frame membership, centring and focus by entity through parents, the shot list — in their own CI; the JS renderer looks through a shot letterboxed to its frame (world.html?shot=). Version 0.1 promised splines and keyframed tracks and implemented nothing; 0.2 scoped to cameras and shots — tracks return as ext-cinematography.track when a producer needs animatics. Still experimental until a producer outside this repository ships a package using it."
+      "notes": "Cameras as entities with a filmback and a lens; shots as ordered setups on the clock; 0.3 adds aim_entity and focus_entity as marked references. Version 0.4 adds one entity-local timed translation/rotation/scale track per actor or camera, with strict pointer-validated authoring, pure f64 sampling, and pose/origin/view plus timed framing/focus outcomes. Rust is the only 0.4 track evaluator in this slice; JS, Python and Swift remain 0.3 evaluators and all strict authorities validate known tracks without claiming sampling support. The original and new track outcomes both remain required. Tracks add no entity references, world schema version 3 and package format 2 stay unchanged, and no pixel comparison is a gate. Still experimental until a producer outside this repository ships a package using it."
     },
     "ext-provenance": {
       "version": "0.1.0",

@@ -110,6 +110,187 @@
         "errors_contain": ["nobody"],
         "world": [{"entity": "post", "absent": true}]
       }
+    },
+    {
+      "name": "a valid cinematography track commits without changing the authored base transform",
+      "batch": [{"ModifyEntity": {"id": "crate", "patch": {"ext-cinematography": {"track": {"channels": {"translation": [
+        {"time_s": 0, "value": [0, 0.5, 0]},
+        {"time_s": 4, "value": [4, 0.5, 0]}
+      ]}}}}}}],
+      "expect": {
+        "result": "committed",
+        "ops": [{"op": 0, "path": "/ModifyEntity/patch/ext-cinematography/track/channels/translation/1/value", "equals": [4, 0.5, 0]}],
+        "world": [
+          {"entity": "crate", "path": "/transform/position", "equals": [0, 0.5, 0]},
+          {"entity": "crate", "path": "/ext-cinematography/track/channels/translation/0/time_s", "equals": 0}
+        ]
+      }
+    },
+    {
+      "name": "a malformed known track type refuses",
+      "batch": [{"ModifyEntity": {"id": "crate", "patch": {"ext-cinematography": {"track": []}}}}],
+      "expect": {"result": "refused", "errors_contain": ["/ext-cinematography/track"]}
+    },
+    {
+      "name": "a track requires channels",
+      "batch": [{"ModifyEntity": {"id": "crate", "patch": {"ext-cinematography": {"track": {}}}}}],
+      "expect": {"result": "refused", "errors_contain": ["/ext-cinematography/track/channels"]}
+    },
+    {
+      "name": "malformed channels refuse",
+      "batch": [{"ModifyEntity": {"id": "crate", "patch": {"ext-cinematography": {"track": {"channels": []}}}}}],
+      "expect": {"result": "refused", "errors_contain": ["/ext-cinematography/track/channels"]}
+    },
+    {
+      "name": "empty channels refuse",
+      "batch": [{"ModifyEntity": {"id": "crate", "patch": {"ext-cinematography": {"track": {"channels": {}}}}}}],
+      "expect": {"result": "refused", "errors_contain": ["/ext-cinematography/track/channels"]}
+    },
+    {
+      "name": "a malformed channel type refuses",
+      "batch": [{"ModifyEntity": {"id": "crate", "patch": {"ext-cinematography": {"track": {"channels": {"translation": {}}}}}}}],
+      "expect": {"result": "refused", "errors_contain": ["/ext-cinematography/track/channels/translation"]}
+    },
+    {
+      "name": "an empty key array refuses",
+      "batch": [{"ModifyEntity": {"id": "crate", "patch": {"ext-cinematography": {"track": {"channels": {"translation": []}}}}}}],
+      "expect": {"result": "refused", "errors_contain": ["/ext-cinematography/track/channels/translation"]}
+    },
+    {
+      "name": "a malformed key type refuses",
+      "batch": [{"ModifyEntity": {"id": "crate", "patch": {"ext-cinematography": {"track": {"channels": {"translation": [[]]}}}}}}],
+      "expect": {"result": "refused", "errors_contain": ["/ext-cinematography/track/channels/translation/0"]}
+    },
+    {
+      "name": "an unknown track field refuses at its pointer",
+      "batch": [{"ModifyEntity": {"id": "crate", "patch": {"ext-cinematography": {"track": {"channels": {"translation": [{"time_s": 0, "value": [0, 0, 0]}]}, "target": 2}}}}}],
+      "expect": {"result": "refused", "errors_contain": ["/ext-cinematography/track/target"]}
+    },
+    {
+      "name": "an unknown channel refuses at its pointer",
+      "batch": [{"ModifyEntity": {"id": "crate", "patch": {"ext-cinematography": {"track": {"channels": {"position": [{"time_s": 0, "value": [0, 0, 0]}]}}}}}}],
+      "expect": {"result": "refused", "errors_contain": ["/ext-cinematography/track/channels/position"]}
+    },
+    {
+      "name": "an unknown key field refuses at its pointer",
+      "batch": [{"ModifyEntity": {"id": "crate", "patch": {"ext-cinematography": {"track": {"channels": {"translation": [{"time_s": 0, "value": [0, 0, 0], "tangent": []}]}}}}}}],
+      "expect": {"result": "refused", "errors_contain": ["/ext-cinematography/track/channels/translation/0/tangent"]}
+    },
+    {
+      "name": "an unknown clip field refuses at its pointer",
+      "batch": [{"ModifyEntity": {"id": "crate", "patch": {"ext-cinematography": {"track": {"clip": {"start_s": 0, "end_s": 4, "cycles": 2}, "channels": {"translation": [{"time_s": 0, "value": [0, 0, 0]}]}}}}}}],
+      "expect": {"result": "refused", "errors_contain": ["/ext-cinematography/track/clip/cycles"]}
+    },
+    {
+      "name": "a malformed clip type refuses",
+      "batch": [{"ModifyEntity": {"id": "crate", "patch": {"ext-cinematography": {"track": {"clip": [], "channels": {"translation": [{"time_s": 0, "value": [0, 0, 0]}]}}}}}}],
+      "expect": {"result": "refused", "errors_contain": ["/ext-cinematography/track/clip"]}
+    },
+    {
+      "name": "a clip requires both endpoints",
+      "batch": [{"ModifyEntity": {"id": "crate", "patch": {"ext-cinematography": {"track": {"clip": {"start_s": 0}, "channels": {"translation": [{"time_s": 0, "value": [0, 0, 0]}]}}}}}}],
+      "expect": {"result": "refused", "errors_contain": ["/ext-cinematography/track/clip/end_s"]}
+    },
+    {
+      "name": "a reversed clip refuses at end_s",
+      "batch": [{"ModifyEntity": {"id": "crate", "patch": {"ext-cinematography": {"track": {"clip": {"start_s": 4, "end_s": 0}, "channels": {"translation": [{"time_s": 0, "value": [0, 0, 0]}]}}}}}}],
+      "expect": {"result": "refused", "errors_contain": ["/ext-cinematography/track/clip/end_s"]}
+    },
+    {
+      "name": "a key requires time_s",
+      "batch": [{"ModifyEntity": {"id": "crate", "patch": {"ext-cinematography": {"track": {"channels": {"translation": [{"value": [0, 0, 0]}]}}}}}}],
+      "expect": {"result": "refused", "errors_contain": ["/ext-cinematography/track/channels/translation/0/time_s"]}
+    },
+    {
+      "name": "a key time must be numeric",
+      "batch": [{"ModifyEntity": {"id": "crate", "patch": {"ext-cinematography": {"track": {"channels": {"translation": [{"time_s": "0", "value": [0, 0, 0]}]}}}}}}],
+      "expect": {"result": "refused", "errors_contain": ["/ext-cinematography/track/channels/translation/0/time_s"]}
+    },
+    {
+      "name": "a key requires value",
+      "batch": [{"ModifyEntity": {"id": "crate", "patch": {"ext-cinematography": {"track": {"channels": {"translation": [{"time_s": 0}]}}}}}}],
+      "expect": {"result": "refused", "errors_contain": ["/ext-cinematography/track/channels/translation/0/value"]}
+    },
+    {
+      "name": "a key value must be an array",
+      "batch": [{"ModifyEntity": {"id": "crate", "patch": {"ext-cinematography": {"track": {"channels": {"translation": [{"time_s": 0, "value": {}}]}}}}}}],
+      "expect": {"result": "refused", "errors_contain": ["/ext-cinematography/track/channels/translation/0/value"]}
+    },
+    {
+      "name": "a key value must have exactly three components",
+      "batch": [{"ModifyEntity": {"id": "crate", "patch": {"ext-cinematography": {"track": {"channels": {"translation": [{"time_s": 0, "value": [0, 0]}]}}}}}}],
+      "expect": {"result": "refused", "errors_contain": ["/ext-cinematography/track/channels/translation/0/value"]}
+    },
+    {
+      "name": "key vector components must be numeric",
+      "batch": [{"ModifyEntity": {"id": "crate", "patch": {"ext-cinematography": {"track": {"channels": {"translation": [{"time_s": 0, "value": [0, "y", 0]}]}}}}}}],
+      "expect": {"result": "refused", "errors_contain": ["/ext-cinematography/track/channels/translation/0/value/1"]}
+    },
+    {
+      "name": "duplicate key times refuse at the second key",
+      "batch": [{"ModifyEntity": {"id": "crate", "patch": {"ext-cinematography": {"track": {"channels": {"translation": [
+        {"time_s": 0, "value": [99, 0, 0]}, {"time_s": 0, "value": [100, 0, 0]}
+      ]}}}}}}],
+      "expect": {"result": "refused", "errors_contain": ["/ext-cinematography/track/channels/translation/1/time_s"]}
+    },
+    {
+      "name": "decreasing key times refuse at the second key",
+      "batch": [{"ModifyEntity": {"id": "crate", "patch": {"ext-cinematography": {"track": {"channels": {"translation": [
+        {"time_s": 2, "value": [0, 0, 0]}, {"time_s": 1, "value": [1, 0, 0]}
+      ]}}}}}}],
+      "expect": {"result": "refused", "errors_contain": ["/ext-cinematography/track/channels/translation/1/time_s"]}
+    },
+    {
+      "name": "an invalid interpolation refuses",
+      "batch": [{"ModifyEntity": {"id": "crate", "patch": {"ext-cinematography": {"track": {"channels": {"translation": [{"time_s": 0, "value": [0, 0, 0], "interpolation": "spline"}]}}}}}}],
+      "expect": {"result": "refused", "errors_contain": ["/ext-cinematography/track/channels/translation/0/interpolation"]}
+    },
+    {
+      "name": "an invalid easing refuses",
+      "batch": [{"ModifyEntity": {"id": "crate", "patch": {"ext-cinematography": {"track": {"channels": {"translation": [{"time_s": 0, "value": [0, 0, 0], "easing": "bounce"}]}}}}}}],
+      "expect": {"result": "refused", "errors_contain": ["/ext-cinematography/track/channels/translation/0/easing"]}
+    },
+    {
+      "name": "an invalid pre mode refuses",
+      "batch": [{"ModifyEntity": {"id": "crate", "patch": {"ext-cinematography": {"track": {"pre": "ping_pong", "channels": {"translation": [{"time_s": 0, "value": [0, 0, 0]}]}}}}}}],
+      "expect": {"result": "refused", "errors_contain": ["/ext-cinematography/track/pre"]}
+    },
+    {
+      "name": "an invalid post mode refuses",
+      "batch": [{"ModifyEntity": {"id": "crate", "patch": {"ext-cinematography": {"track": {"post": "ping_pong", "channels": {"translation": [{"time_s": 0, "value": [0, 0, 0]}]}}}}}}],
+      "expect": {"result": "refused", "errors_contain": ["/ext-cinematography/track/post"]}
+    },
+    {
+      "name": "pre-loop over a zero-length clip refuses",
+      "batch": [{"ModifyEntity": {"id": "crate", "patch": {"ext-cinematography": {"track": {"clip": {"start_s": 2, "end_s": 2}, "pre": "loop", "channels": {"translation": [{"time_s": 2, "value": [0, 0, 0]}]}}}}}}],
+      "expect": {"result": "refused", "errors_contain": ["/ext-cinematography/track/pre"]}
+    },
+    {
+      "name": "post-loop over a zero-length clip refuses",
+      "batch": [{"ModifyEntity": {"id": "crate", "patch": {"ext-cinematography": {"track": {"clip": {"start_s": 2, "end_s": 2}, "post": "loop", "channels": {"translation": [{"time_s": 2, "value": [0, 0, 0]}]}}}}}}],
+      "expect": {"result": "refused", "errors_contain": ["/ext-cinematography/track/post"]}
+    },
+    {
+      "name": "loop over an inferred zero-length clip refuses",
+      "batch": [{"ModifyEntity": {"id": "crate", "patch": {"ext-cinematography": {"track": {"pre": "loop", "channels": {"translation": [{"time_s": 2, "value": [0, 0, 0]}]}}}}}}],
+      "expect": {"result": "refused", "errors_contain": ["/ext-cinematography/track/pre"]}
+    },
+    {
+      "name": "an invalid key refuses a valid sibling op without changing the base world",
+      "batch": [
+        {"ModifyEntity": {"id": "crate", "patch": {"material": {"roughness": 0.1}}}},
+        {"ModifyEntity": {"id": "crate", "patch": {"ext-cinematography": {"track": {"channels": {"translation": [
+          {"time_s": 0, "value": [99, 0, 0]}, {"time_s": 0, "value": [100, 0, 0]}
+        ]}}}}}}
+      ],
+      "expect": {
+        "result": "refused",
+        "errors_contain": ["op 1", "/ext-cinematography/track/channels/translation/1/time_s"],
+        "world": [
+          {"entity": "crate", "path": "/material/roughness", "equals": 0.8},
+          {"entity": "crate", "path": "/transform/position", "equals": [0, 0.5, 0]}
+        ]
+      }
     }
   ]
 }

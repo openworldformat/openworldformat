@@ -343,6 +343,92 @@ private val ENVIRONMENT_KEYS: Set<String> = setOf(
 )
 private val CAMERA_KEYS: Set<String> = setOf("fov_degrees", "look_at", "position")
 
+/** Strict authoring for a known 0.4 track, not a track evaluator. */
+private fun validateCinematographyTrack(block: JsonElement?) {
+    val blockObject = block?.obj ?: return
+    val trackValue = blockObject["track"] ?: return
+    val root = "/ext-cinematography/track"
+    fun fail(path: String, message: String): Nothing =
+        throw WorldFormatException.invalid("$path: $message")
+    fun obj(value: JsonElement?, path: String): JsonObject = value?.obj ?: fail(path, "expected an object")
+    fun known(value: JsonObject, allowed: Set<String>, path: String) {
+        for (key in value.keys) if (key !in allowed) fail("$path/$key", "unknown track field")
+    }
+    fun number(value: JsonObject, field: String, path: String): Double {
+        val pointer = "$path/$field"
+        val element = value[field] ?: fail(pointer, "$field is required")
+        val number = element.dbl.takeIf { (element as? JsonPrimitive)?.isString == false }
+        if (number == null || !number.isFinite()) fail(pointer, "expected a finite number")
+        return number
+    }
+    fun enumValue(value: JsonObject, field: String, path: String, allowed: Set<String>, fallback: String): String {
+        val element = value[field] ?: return fallback
+        val pointer = "$path/$field"
+        val string = element.str ?: fail(pointer, "expected a string enum")
+        if (string !in allowed) fail(pointer, "expected ${allowed.sorted().joinToString(", ")}")
+        return string
+    }
+
+    val track = obj(trackValue, root)
+    known(track, setOf("clip", "pre", "post", "channels"), root)
+    var start: Double? = null
+    var end: Double? = null
+    val explicitClip = track["clip"] != null
+    track["clip"]?.let { clipValue ->
+        val path = "$root/clip"
+        val clip = obj(clipValue, path)
+        known(clip, setOf("start_s", "end_s"), path)
+        val clipStart = number(clip, "start_s", path)
+        val clipEnd = number(clip, "end_s", path)
+        if (clipStart > clipEnd) fail("$path/end_s", "clip end_s must not precede start_s")
+        start = clipStart
+        end = clipEnd
+    }
+    val pre = enumValue(track, "pre", root, setOf("hold", "base", "loop"), "hold")
+    val post = enumValue(track, "post", root, setOf("hold", "base", "loop"), "hold")
+    val channelsPath = "$root/channels"
+    val channelsValue = track["channels"] ?: fail(channelsPath, "channels is required")
+    val channels = obj(channelsValue, channelsPath)
+    known(channels, setOf("translation", "rotation", "scale"), channelsPath)
+    if (channels.isEmpty()) fail(channelsPath, "at least one channel is required")
+    for (name in listOf("translation", "rotation", "scale")) {
+        val keysValue = channels[name] ?: continue
+        val channelPath = "$channelsPath/$name"
+        val keys = keysValue.arr ?: fail(channelPath, "a channel must be an array of keys")
+        if (keys.isEmpty()) fail(channelPath, "a channel must contain at least one key")
+        var previous: Double? = null
+        for ((index, keyValue) in keys.withIndex()) {
+            val keyPath = "$channelPath/$index"
+            val key = obj(keyValue, keyPath)
+            known(key, setOf("time_s", "value", "interpolation", "easing"), keyPath)
+            val time = number(key, "time_s", keyPath)
+            if (!explicitClip) {
+                start = start?.let { minOf(it, time) } ?: time
+                end = end?.let { maxOf(it, time) } ?: time
+            }
+            if (previous != null && time <= previous) fail("$keyPath/time_s", "key times must be strictly increasing")
+            previous = time
+            val valuePath = "$keyPath/value"
+            val vectorValue = key["value"] ?: fail(valuePath, "value is required")
+            val vector = vectorValue.arr ?: fail(valuePath, "value must be an array of three numbers")
+            if (vector.size != 3) fail(valuePath, "value must contain exactly three numbers")
+            for ((axis, component) in vector.withIndex()) {
+                val number = component.dbl.takeIf { (component as? JsonPrimitive)?.isString == false }
+                if (number == null || !number.isFinite()) {
+                    fail("$valuePath/$axis", "value components must be finite numbers")
+                }
+            }
+            enumValue(key, "interpolation", keyPath, setOf("linear", "step"), "linear")
+            enumValue(key, "easing", keyPath,
+                setOf("linear", "ease_in", "ease_out", "ease_in_out"), "linear")
+        }
+    }
+    if (start != null && start == end) {
+        if (pre == "loop") fail("$root/pre", "loop requires a nonzero clip duration")
+        if (post == "loop") fail("$root/post", "loop requires a nonzero clip duration")
+    }
+}
+
 /**
  * Refuse keys the format would drop, with a path to each. Explicit
  * nulls are fine (they clear).
@@ -376,10 +462,12 @@ internal fun strictOp(op: JsonElement) {
         "SpawnEntity" -> {
             check(body, setOf("entity"), "/$kind")
             checkEntity(b["entity"], "/$kind/entity", isPatch = false)
+            validateCinematographyTrack(b["entity"]?.obj["ext-cinematography"])
         }
         "ModifyEntity" -> {
             check(body, setOf("id", "patch"), "/$kind")
             checkEntity(b["patch"], "/$kind/patch", isPatch = true)
+            validateCinematographyTrack(b["patch"]?.obj["ext-cinematography"])
         }
         "DeleteEntity" -> check(body, setOf("id"), "/$kind")
         "SetEnvironment" -> check(b["env"], ENVIRONMENT_KEYS, "/$kind/env")

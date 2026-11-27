@@ -107,6 +107,7 @@ jobs:
               .map(f => "conformance/" + f),
             "conformance/outcomes/physics.json",
             "conformance/outcomes/cinematography.json",
+            "conformance/outcomes/cinematography-tracks.json",
             "conformance/outcomes/h3.json",
             "conformance/geometry/shapes.json",
             "examples/hello-world/manifest.json",

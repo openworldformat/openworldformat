@@ -92,6 +92,14 @@ engine's.
    package](package.md) "Exports from other systems"). RFCs:
    [`rfcs/ext-h3.md`](rfcs/ext-h3.md),
    [`rfcs/history-exports.md`](rfcs/history-exports.md).
+6. ~~Entity-local actor and camera tracks~~ — **done** (2026-11-25):
+   [`ext-cinematography`](extensions/cinematography.md) 0.4 adds one timed
+   translation/rotation/scale track per entity, strict authoring and pure
+   time-addressed `pose`, `origin` and `view` outcomes. The Rust reference
+   implements and passes the new suite; the other bindings retain their 0.3
+   camera/shot evaluators and validate known tracks at strict authoring
+   without advertising 0.4 sampling. RFC:
+   [`rfcs/ext-cinematography-track.md`](rfcs/ext-cinematography-track.md).
 
 **Deferred until a producer needs them:** collision-free ids, an `id` and
 `parent` on every entry, and timed input samples (a breaking bundle, for git

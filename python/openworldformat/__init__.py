@@ -23,6 +23,7 @@ from __future__ import annotations
 import copy
 import hashlib
 import json
+import math
 import re
 from importlib.resources import files as _package_files
 from pathlib import Path
@@ -1133,6 +1134,107 @@ def _bind_op(trial: dict, op: dict, spawned: dict) -> None:
         )
 
 
+def _validate_cinematography_track(block: Any) -> None:
+    """Strict authoring for a known 0.4 track, not a track evaluator."""
+    if not isinstance(block, dict) or "track" not in block:
+        return
+    root = "/ext-cinematography/track"
+
+    def fail(path: str, message: str):
+        raise _invalid(f"{path}: {message}")
+
+    def obj(value: Any, path: str) -> dict:
+        if not isinstance(value, dict):
+            fail(path, "expected an object")
+        return value
+
+    def known(value: dict, allowed: tuple, path: str) -> None:
+        for key in value:
+            if key not in allowed:
+                fail(f"{path}/{key}", "unknown track field")
+
+    def number(value: dict, field: str, path: str) -> float:
+        pointer = f"{path}/{field}"
+        if field not in value:
+            fail(pointer, f"{field} is required")
+        number_ = value[field]
+        if not _is_num(number_) or not math.isfinite(number_):
+            fail(pointer, "expected a finite number")
+        return number_
+
+    def enum(value: dict, field: str, path: str, allowed: tuple, default: str) -> str:
+        if field not in value:
+            return default
+        pointer = f"{path}/{field}"
+        if not isinstance(value[field], str):
+            fail(pointer, "expected a string enum")
+        if value[field] not in allowed:
+            fail(pointer, f"expected {', '.join(allowed)}")
+        return value[field]
+
+    track = obj(block["track"], root)
+    known(track, ("clip", "pre", "post", "channels"), root)
+    start = end = None
+    explicit_clip = "clip" in track
+    if explicit_clip:
+        path = f"{root}/clip"
+        clip = obj(track["clip"], path)
+        known(clip, ("start_s", "end_s"), path)
+        start = number(clip, "start_s", path)
+        end = number(clip, "end_s", path)
+        if start > end:
+            fail(f"{path}/end_s", "clip end_s must not precede start_s")
+    pre = enum(track, "pre", root, ("hold", "base", "loop"), "hold")
+    post = enum(track, "post", root, ("hold", "base", "loop"), "hold")
+    channels_path = f"{root}/channels"
+    if "channels" not in track:
+        fail(channels_path, "channels is required")
+    channels = obj(track["channels"], channels_path)
+    known(channels, ("translation", "rotation", "scale"), channels_path)
+    if not channels:
+        fail(channels_path, "at least one channel is required")
+    for name in ("translation", "rotation", "scale"):
+        if name not in channels:
+            continue
+        channel_path = f"{channels_path}/{name}"
+        keys = channels[name]
+        if not isinstance(keys, list):
+            fail(channel_path, "a channel must be an array of keys")
+        if not keys:
+            fail(channel_path, "a channel must contain at least one key")
+        previous = None
+        for index, key_value in enumerate(keys):
+            key_path = f"{channel_path}/{index}"
+            key = obj(key_value, key_path)
+            known(key, ("time_s", "value", "interpolation", "easing"), key_path)
+            time = number(key, "time_s", key_path)
+            if not explicit_clip:
+                start = time if start is None else min(start, time)
+                end = time if end is None else max(end, time)
+            if previous is not None and time <= previous:
+                fail(f"{key_path}/time_s", "key times must be strictly increasing")
+            previous = time
+            value_path = f"{key_path}/value"
+            if "value" not in key:
+                fail(value_path, "value is required")
+            vector = key["value"]
+            if not isinstance(vector, list):
+                fail(value_path, "value must be an array of three numbers")
+            if len(vector) != 3:
+                fail(value_path, "value must contain exactly three numbers")
+            for axis, component in enumerate(vector):
+                if not _is_num(component) or not math.isfinite(component):
+                    fail(f"{value_path}/{axis}", "value components must be finite numbers")
+            enum(key, "interpolation", key_path, ("linear", "step"), "linear")
+            enum(key, "easing", key_path,
+                 ("linear", "ease_in", "ease_out", "ease_in_out"), "linear")
+    if start is not None and start == end:
+        if pre == "loop":
+            fail(f"{root}/pre", "loop requires a nonzero clip duration")
+        if post == "loop":
+            fail(f"{root}/post", "loop requires a nonzero clip duration")
+
+
 def _strict_op(op: dict) -> None:
     """Refuse keys the format would drop, with a path to each — the
     authoring side of must-ignore: a tolerant fold would silently lose
@@ -1161,6 +1263,8 @@ def _strict_op(op: dict) -> None:
         check(material, _MATERIAL_KEYS, f"{path}/material")
         light = entity.get("light") if isinstance(entity, dict) else None
         check(light, _LIGHT_KEYS, f"{path}/light")
+        if isinstance(entity, dict):
+            _validate_cinematography_track(entity.get("ext-cinematography"))
 
     kind = next(iter(op))
     body = op[kind]

@@ -21,3 +21,18 @@ fn generated_schema_is_the_published_one() {
          reconcile with LocalGPT's world-types"
     );
 }
+
+#[test]
+fn generated_cinematography_schema_is_the_published_one() {
+    let generated =
+        serde_json::to_string_pretty(&openworldformat::cinematography::extension_schema()).unwrap();
+    let path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../schema/extensions/ext-cinematography.schema.json");
+    let committed = std::fs::read_to_string(&path).unwrap_or_default();
+    assert_eq!(
+        committed.trim_end(),
+        generated.trim_end(),
+        "ext-cinematography.schema.json is stale; regenerate with \
+         cargo run --example cinematography-schema --features schema"
+    );
+}

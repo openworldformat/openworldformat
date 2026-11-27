@@ -119,7 +119,8 @@ reader that predates it stays conforming by ignoring it:
   own live truth can export a world with the history that built it
   ([the package](spec/package/#exports-from-other-systems)).
 - **Extensions.** [`ext-cinematography`](https://github.com/openworldformat/openworldformat/blob/main/spec/extensions/cinematography.md)
-  is experimental at 0.3 — cameras with a filmback and a lens, shots
-  aimed and focused by entity — in four references;
+  is experimental at 0.4 — cameras with a filmback and a lens, shots
+  aimed and focused by entity, and entity-local timed TRS tracks with a
+  Rust reference evaluator;
   [`ext-h3`](https://github.com/openworldformat/openworldformat/blob/main/spec/extensions/h3.md),
   a geo frame for worlds that live on a globe, is proposed.

@@ -30,3 +30,9 @@ The first cases are the class a cold agent run found a live authority
 getting wrong — a behavior target sent by name committed as the name, and
 the package stopped verifying against its own history — which no earlier
 suite could have caught, since none exercised authoring.
+
+The `ext-cinematography.track` cases are validation-only for every strict
+authority: a valid track preserves the authored base transform, every 0.4
+malformed shape and semantic rule refuses at its field pointer, and one
+invalid key refuses a valid sibling op without changing the base. They do
+not require JS, Python, Swift or Kotlin to evaluate tracks.

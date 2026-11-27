@@ -11,6 +11,19 @@ prose gets fixed.
 - Draft spec: **0.3** (the manifest gained an optional `ambience`, so the
   fold's state is always a whole manifest)
 
+The cinematography extension schema is likewise generated from the Rust
+reference types, including its 0.4 track definitions:
+
+```bash
+cd ../rust
+cargo run --example cinematography-schema --features schema > ../schema/extensions/ext-cinematography.schema.json
+cd ../schema
+```
+
+Its snapshot test fails when the committed schema drifts. This extension
+change does not alter `world.schema.json`, schema version 3 or package
+format 2.
+
 ## The entity-reference marker
 
 Fields that hold an entity reference carry an `x-entity-ref` annotation

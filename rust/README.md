@@ -35,11 +35,42 @@ reference solver, trajectory write/fold, and the conformance outcome
 runner; `openworldformat::cinematography` carries the
 `ext-cinematography` extension's crop math, view and projection, entity
 origins through parents, aim and focus by entity (`view_in`,
-`aim_point_of`, `focus_distance_of`), shot list, and outcome runner;
+`aim_point_of`, `focus_distance_of`), shot list, and outcome runner. At
+extension 0.4 it also carries typed entity-local tracks, strict pointer
+errors, pure `f64` sampling (`track_of`, `transform_at`, `sample_world_at`)
+and timed pose/origin/view, framing and focus outcomes;
 `openworldformat::ext_h3` carries the `ext-h3` geo frame extension's
 unit table, quantisation, block readers, the tangent-plane derivation
 of the core transform (`local_position`, `derive_transform`) and its
 outcome runner; the `schema` feature generates `world.schema.json`.
+
+## 0.5.3: entity-local cinematography tracks
+
+Additive: existing camera/shot APIs, world schema version 3 and package format
+2 are unchanged.
+
+- **`ext-cinematography` 0.4** adds one parent-local timed TRS track per
+  entity, with strict track/key validation, whole-batch authoring refusal and
+  pure `f64` time-addressed world sampling. `track_of`, `transform_at` and
+  `sample_world_at` expose the track-only API; timed outcomes cover local
+  pose, composed origins, camera view, framing and focus with `1e-6` default
+  tolerance for the new numeric assertions.
+- **The sampled world still runs existing behaviors afterward** and preserves
+  visibility, components, references and opaque extension data. Clip,
+  interpolation, easing and hold/base/loop semantics follow the normative
+  extension contract; no wall clock, frame index or previous result enters
+  evaluation.
+- **Rust is the reference track evaluator.** JS, Python, Swift and Kotlin
+  validate known tracks at strict authoring but do not advertise track
+  evaluators. The generated extension schema and its shipped copies include
+  the 0.4 vocabulary, and the new conformance world pins the outcomes.
+
+The extension schema now has a generator beside the core one:
+
+```bash
+cargo run --example cinematography-schema --features schema \
+  > ../schema/extensions/ext-cinematography.schema.json
+```
 
 ## 0.5.2: a clean strict-docs build, and the wording the generated schema carries
 

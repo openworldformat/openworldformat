@@ -1719,6 +1719,96 @@ function bindOp(trial, op, spawned) {
   }
 }
 
+/** Strict authoring validation for a known ext-cinematography 0.4 track.
+ * This deliberately does not evaluate tracks; runtime readers still preserve
+ * and ignore them when they do not implement the extension.
+ * @param {any} block */
+function validateCinematographyTrack(block) {
+  if (block === null || typeof block !== "object" || Array.isArray(block) || !("track" in block)) return;
+  const root = "/ext-cinematography/track";
+  /** @type {(path: string, message: string) => never} */
+  const fail = (path, message) => { throw new Error(`${path}: ${message}`); };
+  /** @type {(value: any, path: string) => any} */
+  const object = (value, path) => {
+    if (value === null || typeof value !== "object" || Array.isArray(value)) fail(path, "expected an object");
+    return value;
+  };
+  /** @type {(value: any, allowed: string[], path: string) => void} */
+  const known = (value, allowed, path) => {
+    for (const key of Object.keys(value)) if (!allowed.includes(key)) fail(`${path}/${key}`, "unknown track field");
+  };
+  /** @type {(value: any, field: string, path: string) => number} */
+  const number = (value, field, path) => {
+    const pointer = `${path}/${field}`;
+    if (!(field in value)) fail(pointer, `${field} is required`);
+    if (typeof value[field] !== "number" || !Number.isFinite(value[field])) fail(pointer, "expected a finite number");
+    return value[field];
+  };
+  /** @type {(value: any, field: string, path: string, allowed: string[], fallback: string) => string} */
+  const enumValue = (value, field, path, allowed, fallback) => {
+    if (value[field] === undefined) return fallback;
+    const pointer = `${path}/${field}`;
+    if (typeof value[field] !== "string") fail(pointer, "expected a string enum");
+    if (!allowed.includes(value[field])) fail(pointer, `expected ${allowed.join(", ")}`);
+    return value[field];
+  };
+  const track = object(block.track, root);
+  known(track, ["clip", "pre", "post", "channels"], root);
+  /** @type {number|undefined} */
+  let start;
+  /** @type {number|undefined} */
+  let end;
+  const explicitClip = track.clip !== undefined;
+  if (explicitClip) {
+    const path = `${root}/clip`;
+    const clip = object(track.clip, path);
+    known(clip, ["start_s", "end_s"], path);
+    start = number(clip, "start_s", path);
+    end = number(clip, "end_s", path);
+    if (start > end) fail(`${path}/end_s`, "clip end_s must not precede start_s");
+  }
+  const pre = enumValue(track, "pre", root, ["hold", "base", "loop"], "hold");
+  const post = enumValue(track, "post", root, ["hold", "base", "loop"], "hold");
+  const channelsPath = `${root}/channels`;
+  if (!("channels" in track)) fail(channelsPath, "channels is required");
+  const channels = object(track.channels, channelsPath);
+  known(channels, ["translation", "rotation", "scale"], channelsPath);
+  if (Object.keys(channels).length === 0) fail(channelsPath, "at least one channel is required");
+  for (const name of ["translation", "rotation", "scale"]) {
+    if (channels[name] === undefined) continue;
+    const channelPath = `${channelsPath}/${name}`;
+    if (!Array.isArray(channels[name])) fail(channelPath, "a channel must be an array of keys");
+    if (channels[name].length === 0) fail(channelPath, "a channel must contain at least one key");
+    /** @type {number|undefined} */
+    let previous;
+    channels[name].forEach((/** @type {any} */ keyValue, /** @type {number} */ index) => {
+      const keyPath = `${channelPath}/${index}`;
+      const key = object(keyValue, keyPath);
+      known(key, ["time_s", "value", "interpolation", "easing"], keyPath);
+      const time = number(key, "time_s", keyPath);
+      if (!explicitClip) {
+        start = start === undefined ? time : Math.min(start, time);
+        end = end === undefined ? time : Math.max(end, time);
+      }
+      if (previous !== undefined && time <= previous) fail(`${keyPath}/time_s`, "key times must be strictly increasing");
+      previous = time;
+      const valuePath = `${keyPath}/value`;
+      if (!("value" in key)) fail(valuePath, "value is required");
+      if (!Array.isArray(key.value)) fail(valuePath, "value must be an array of three numbers");
+      if (key.value.length !== 3) fail(valuePath, "value must contain exactly three numbers");
+      key.value.forEach((/** @type {any} */ component, /** @type {number} */ axis) => {
+        if (typeof component !== "number" || !Number.isFinite(component)) fail(`${valuePath}/${axis}`, "value components must be finite numbers");
+      });
+      enumValue(key, "interpolation", keyPath, ["linear", "step"], "linear");
+      enumValue(key, "easing", keyPath, ["linear", "ease_in", "ease_out", "ease_in_out"], "linear");
+    });
+  }
+  if (start === end && start !== undefined) {
+    if (pre === "loop") fail(`${root}/pre`, "loop requires a nonzero clip duration");
+    if (post === "loop") fail(`${root}/post`, "loop requires a nonzero clip duration");
+  }
+}
+
 /** Refuse keys the format would drop, with a path to each.
  * @param {any} op */
 function strictOp(op) {
@@ -1741,6 +1831,7 @@ function strictOp(op) {
     check(entity?.transform, TRANSFORM_KEYS, `${path}/transform`);
     check(entity?.material, MATERIAL_KEYS, `${path}/material`);
     check(entity?.light, LIGHT_KEYS, `${path}/light`);
+    validateCinematographyTrack(entity?.["ext-cinematography"]);
   };
   const [kind] = Object.keys(op);
   const body = op[kind];

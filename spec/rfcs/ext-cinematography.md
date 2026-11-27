@@ -1,9 +1,10 @@
 # RFC: The cinematography extension (`ext-cinematography`)
 
-**Status:** proposed (version 0.3). The normative text is
+**Status:** proposed (versions 0.2–0.4). The normative text is
 [`spec/extensions/cinematography.md`](../extensions/cinematography.md);
-this note states the problem, the alternatives and the cost, per
-[CONTRIBUTING](../../CONTRIBUTING.md).
+this note states the original camera/shot problem, the alternatives and the
+cost, per [CONTRIBUTING](../../CONTRIBUTING.md). Version 0.4's entity-local
+tracks have their own [track RFC](ext-cinematography-track.md).
 
 ## The problem
 
@@ -21,8 +22,9 @@ Version 0.1 of this page promised the whole editor — spline paths,
 keyframed tracks, focus targets — and implemented none of it. The
 scoping lesson from [ext-physics](ext-physics.md) applies: state what a
 thing *is*, in fields that are pure functions to check, and leave
-motion and rendering to the engine. So 0.2 is cameras and shots; tracks
-come back when a producer needs animatics.
+motion and rendering to the engine. So 0.2 is cameras and shots; version
+0.4 brings tracks back for a producer's animatics in the deliberately small
+[entity-local track RFC](ext-cinematography-track.md).
 
 ## The alternatives
 
