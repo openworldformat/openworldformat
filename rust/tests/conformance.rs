@@ -158,6 +158,21 @@ fn the_cinematography_conformance_outcomes_pass_under_the_reference_math() {
 }
 
 #[test]
+fn the_cinematography_track_outcomes_pass_under_the_reference_sampler() {
+    let manifest: Manifest = serde_json::from_str(
+        &std::fs::read_to_string(repo("conformance/cinematography-tracks.json")).unwrap(),
+    )
+    .unwrap();
+    let outcomes: openworldformat::cinematography::OutcomesDoc = serde_json::from_str(
+        &std::fs::read_to_string(repo("conformance/outcomes/cinematography-tracks.json")).unwrap(),
+    )
+    .unwrap();
+    let result = openworldformat::cinematography::run_outcomes(&manifest, &outcomes);
+    assert_eq!(result.failures, Vec::<String>::new());
+    assert!(result.ok);
+}
+
+#[test]
 fn the_h3_conformance_outcomes_pass_under_the_reference_derivation() {
     let manifest: Manifest =
         serde_json::from_str(&std::fs::read_to_string(repo("conformance/h3.json")).unwrap())

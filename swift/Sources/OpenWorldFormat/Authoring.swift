@@ -332,6 +332,107 @@ private let environmentKeys: Set<String> = [
 ]
 private let cameraKeys: Set<String> = ["fov_degrees", "look_at", "position"]
 
+/// Strict authoring for a known ext-cinematography 0.4 track. This is
+/// validation only; it does not advertise or perform track evaluation.
+private func validateCinematographyTrack(_ block: JSONValue?) throws {
+    guard let block, block.object != nil, let trackValue = block["track"] else { return }
+    let root = "/ext-cinematography/track"
+    func fail(_ path: String, _ message: String) throws -> Never {
+        throw OpenWorldFormatError.invalid("\(path): \(message)")
+    }
+    func object(_ value: JSONValue?, _ path: String) throws -> [String: JSONValue] {
+        guard let object = value?.object else { try fail(path, "expected an object") }
+        return object
+    }
+    func known(_ object: [String: JSONValue], _ allowed: Set<String>, _ path: String) throws {
+        for key in object.keys where !allowed.contains(key) {
+            try fail("\(path)/\(key)", "unknown track field")
+        }
+    }
+    func number(_ object: [String: JSONValue], _ field: String, _ path: String) throws -> Double {
+        let pointer = "\(path)/\(field)"
+        guard let value = object[field] else { try fail(pointer, "\(field) is required") }
+        guard let number = value.double, number.isFinite else {
+            try fail(pointer, "expected a finite number")
+        }
+        return number
+    }
+    func enumValue(_ object: [String: JSONValue], _ field: String, _ path: String,
+                   _ allowed: Set<String>, _ fallback: String) throws -> String {
+        guard let value = object[field] else { return fallback }
+        let pointer = "\(path)/\(field)"
+        guard let string = value.string else { try fail(pointer, "expected a string enum") }
+        guard allowed.contains(string) else {
+            try fail(pointer, "expected \(allowed.sorted().joined(separator: ", "))")
+        }
+        return string
+    }
+
+    let track = try object(trackValue, root)
+    try known(track, ["clip", "pre", "post", "channels"], root)
+    var start: Double?
+    var end: Double?
+    let explicitClip = track["clip"] != nil
+    if let clipValue = track["clip"] {
+        let path = "\(root)/clip"
+        let clip = try object(clipValue, path)
+        try known(clip, ["start_s", "end_s"], path)
+        let clipStart = try number(clip, "start_s", path)
+        let clipEnd = try number(clip, "end_s", path)
+        if clipStart > clipEnd { try fail("\(path)/end_s", "clip end_s must not precede start_s") }
+        start = clipStart
+        end = clipEnd
+    }
+    let pre = try enumValue(track, "pre", root, ["hold", "base", "loop"], "hold")
+    let post = try enumValue(track, "post", root, ["hold", "base", "loop"], "hold")
+    let channelsPath = "\(root)/channels"
+    guard let channelsValue = track["channels"] else { try fail(channelsPath, "channels is required") }
+    let channels = try object(channelsValue, channelsPath)
+    try known(channels, ["translation", "rotation", "scale"], channelsPath)
+    if channels.isEmpty { try fail(channelsPath, "at least one channel is required") }
+    for name in ["translation", "rotation", "scale"] {
+        guard let keysValue = channels[name] else { continue }
+        let channelPath = "\(channelsPath)/\(name)"
+        guard let keys = keysValue.array else {
+            try fail(channelPath, "a channel must be an array of keys")
+        }
+        if keys.isEmpty { try fail(channelPath, "a channel must contain at least one key") }
+        var previous: Double?
+        for (index, keyValue) in keys.enumerated() {
+            let keyPath = "\(channelPath)/\(index)"
+            let key = try object(keyValue, keyPath)
+            try known(key, ["time_s", "value", "interpolation", "easing"], keyPath)
+            let time = try number(key, "time_s", keyPath)
+            if !explicitClip {
+                start = start.map { min($0, time) } ?? time
+                end = end.map { max($0, time) } ?? time
+            }
+            if let previous, time <= previous {
+                try fail("\(keyPath)/time_s", "key times must be strictly increasing")
+            }
+            previous = time
+            let valuePath = "\(keyPath)/value"
+            guard let vectorValue = key["value"] else { try fail(valuePath, "value is required") }
+            guard let vector = vectorValue.array else {
+                try fail(valuePath, "value must be an array of three numbers")
+            }
+            if vector.count != 3 { try fail(valuePath, "value must contain exactly three numbers") }
+            for (axis, component) in vector.enumerated() {
+                guard let number = component.double, number.isFinite else {
+                    try fail("\(valuePath)/\(axis)", "value components must be finite numbers")
+                }
+            }
+            _ = try enumValue(key, "interpolation", keyPath, ["linear", "step"], "linear")
+            _ = try enumValue(key, "easing", keyPath,
+                              ["linear", "ease_in", "ease_out", "ease_in_out"], "linear")
+        }
+    }
+    if let start, let end, start == end {
+        if pre == "loop" { try fail("\(root)/pre", "loop requires a nonzero clip duration") }
+        if post == "loop" { try fail("\(root)/post", "loop requires a nonzero clip duration") }
+    }
+}
+
 /// Refuse keys the format would drop, with a path to each. Explicit
 /// nulls are fine (they clear).
 func strictOp(_ op: JSONValue) throws {
@@ -359,9 +460,11 @@ func strictOp(_ op: JSONValue) throws {
     case "SpawnEntity":
         check(body, ["entity"], "/\(kind)")
         checkEntity(body["entity"], "/\(kind)/entity", isPatch: false)
+        try validateCinematographyTrack(body["entity"]?["ext-cinematography"])
     case "ModifyEntity":
         check(body, ["id", "patch"], "/\(kind)")
         checkEntity(body["patch"], "/\(kind)/patch", isPatch: true)
+        try validateCinematographyTrack(body["patch"]?["ext-cinematography"])
     case "DeleteEntity":
         check(body, ["id"], "/\(kind)")
     case "SetEnvironment":

@@ -121,6 +121,7 @@ struct State {
 impl State {
     fn op(&mut self, mut raw: Value) -> Result<EditOp, String> {
         self.bind(&mut raw)?;
+        validate_tracks(&raw)?;
         let mut op: EditOp = serde_json::from_value(raw.clone()).map_err(|e| e.to_string())?;
         let mut unknown = Vec::new();
         dropped_keys(
@@ -290,6 +291,36 @@ impl State {
         }
         Ok(())
     }
+}
+
+fn validate_tracks(raw: &Value) -> Result<(), String> {
+    let Some((kind, body)) = raw.as_object().and_then(|object| object.iter().next()) else {
+        return Ok(());
+    };
+    match kind.as_str() {
+        "SpawnEntity" => validate_entity_track(body.get("entity")),
+        "ModifyEntity" => validate_entity_track(body.get("patch")),
+        "Batch" => {
+            for op in body
+                .get("ops")
+                .and_then(Value::as_array)
+                .into_iter()
+                .flatten()
+            {
+                validate_tracks(op)?;
+            }
+            Ok(())
+        }
+        _ => Ok(()),
+    }
+}
+
+fn validate_entity_track(entity: Option<&Value>) -> Result<(), String> {
+    let Some(block) = entity.and_then(|entity| entity.get(crate::cinematography::EXTENSION_NAME))
+    else {
+        return Ok(());
+    };
+    crate::cinematography::validate_block(block).map_err(|error| error.to_string())
 }
 
 /// Merge each named object field of `patch` into `current`'s value.

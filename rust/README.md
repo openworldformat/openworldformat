@@ -35,11 +35,31 @@ reference solver, trajectory write/fold, and the conformance outcome
 runner; `openworldformat::cinematography` carries the
 `ext-cinematography` extension's crop math, view and projection, entity
 origins through parents, aim and focus by entity (`view_in`,
-`aim_point_of`, `focus_distance_of`), shot list, and outcome runner;
+`aim_point_of`, `focus_distance_of`), shot list, and outcome runner. At
+extension 0.4 it also carries typed entity-local tracks, strict pointer
+errors, pure `f64` sampling (`track_of`, `transform_at`, `sample_world_at`)
+and timed pose/origin/view, framing and focus outcomes;
 `openworldformat::ext_h3` carries the `ext-h3` geo frame extension's
 unit table, quantisation, block readers, the tangent-plane derivation
 of the core transform (`local_position`, `derive_transform`) and its
 outcome runner; the `schema` feature generates `world.schema.json`.
+
+## Unreleased: entity-local cinematography tracks
+
+`ext-cinematography` 0.4 adds one parent-local timed TRS track per entity,
+with strict track/key validation, whole-batch authoring refusal and pure
+time-addressed world sampling. Existing behaviors still run afterward; the
+sampler does not apply them or alter visibility. The original camera/shot
+API and world schema version 3 are unchanged. JS, Python, Swift and Kotlin
+validate known tracks at strict authoring but do not advertise track
+evaluators.
+
+The extension schema now has a generator beside the core one:
+
+```bash
+cargo run --example cinematography-schema --features schema \
+  > ../schema/extensions/ext-cinematography.schema.json
+```
 
 ## 0.5.2: a clean strict-docs build, and the wording the generated schema carries
 

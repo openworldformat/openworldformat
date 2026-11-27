@@ -30,3 +30,7 @@ ron = "0.12"
 [[example]]
 name = "schema"
 required-features = ["schema"]
+
+[[example]]
+name = "cinematography-schema"
+required-features = ["schema"]

@@ -1,0 +1,274 @@
+{
+  "version": 3,
+  "meta": {
+    "name": "conformance-cinematography-tracks",
+    "description": "ext-cinematography 0.4 entity-local timed TRS tracks. The outcomes exercise exact keys, linear and step interpolation, every easing, inferred and explicit clips, hold/base/loop extrapolation, partial channels, animated parents, moving cameras and entity targets, and repeatable sampling. Readers without 0.4 preserve the tracks and draw the authored base transforms."
+  },
+  "environment": {
+    "background_color": [0.1, 0.11, 0.14, 1],
+    "ambient_light": { "color": [1, 1, 1, 1], "intensity": 0.5 }
+  },
+  "camera": {
+    "position": [10, 8, 16],
+    "look_at": [1, 1, 0],
+    "fov_degrees": 50
+  },
+  "entities": [
+    {
+      "id": 1,
+      "name": "ground",
+      "shape": { "Plane": { "x": 30, "z": 30 } },
+      "material": { "color": [0.25, 0.28, 0.32, 1], "roughness": 0.9 }
+    },
+    {
+      "id": 2,
+      "name": "linear",
+      "shape": { "Cuboid": { "x": 0.4, "y": 0.4, "z": 0.4 } },
+      "ext-cinematography": {
+        "track": {
+          "channels": {
+            "translation": [
+              { "time_s": 0, "value": [0, 0, 0] },
+              { "time_s": 2, "value": [2, 4, 6] },
+              { "time_s": 4, "value": [4, 8, 12] }
+            ],
+            "rotation": [
+              { "time_s": 0, "value": [0, 0, 0] },
+              { "time_s": 2, "value": [30, 60, 90] },
+              { "time_s": 4, "value": [60, 120, 180] }
+            ],
+            "scale": [
+              { "time_s": 0, "value": [1, 1, 1] },
+              { "time_s": 2, "value": [1.5, 2, 2.5] },
+              { "time_s": 4, "value": [2, 3, 4] }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 3,
+      "name": "step",
+      "ext-cinematography": {
+        "track": {
+          "channels": {
+            "translation": [
+              { "time_s": 0, "value": [0, 0, 0], "interpolation": "step", "easing": "ease_in_out" },
+              { "time_s": 4, "value": [4, 0, 0] }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 4,
+      "name": "ease_linear",
+      "ext-cinematography": {
+        "track": { "channels": { "translation": [
+          { "time_s": 0, "value": [0, 0, 0], "easing": "linear" },
+          { "time_s": 4, "value": [4, 0, 0] }
+        ] } }
+      }
+    },
+    {
+      "id": 5,
+      "name": "ease_in",
+      "ext-cinematography": {
+        "track": { "channels": { "translation": [
+          { "time_s": 0, "value": [0, 0, 0], "easing": "ease_in" },
+          { "time_s": 4, "value": [4, 0, 0] }
+        ] } }
+      }
+    },
+    {
+      "id": 6,
+      "name": "ease_out",
+      "ext-cinematography": {
+        "track": { "channels": { "translation": [
+          { "time_s": 0, "value": [0, 0, 0], "easing": "ease_out" },
+          { "time_s": 4, "value": [4, 0, 0] }
+        ] } }
+      }
+    },
+    {
+      "id": 7,
+      "name": "ease_in_out",
+      "ext-cinematography": {
+        "track": { "channels": { "translation": [
+          { "time_s": 0, "value": [0, 0, 0], "easing": "ease_in_out" },
+          { "time_s": 4, "value": [4, 0, 0] }
+        ] } }
+      }
+    },
+    {
+      "id": 8,
+      "name": "trimmed",
+      "ext-cinematography": {
+        "track": {
+          "clip": { "start_s": 1, "end_s": 5 },
+          "channels": { "translation": [
+            { "time_s": 0, "value": [0, 0, 0] },
+            { "time_s": 2, "value": [2, 0, 0] },
+            { "time_s": 4, "value": [4, 0, 0] },
+            { "time_s": 6, "value": [6, 0, 0] }
+          ] }
+        }
+      }
+    },
+    {
+      "id": 9,
+      "name": "partial",
+      "transform": {
+        "position": [10, 20, 30],
+        "rotation_degrees": [5, 10, 15],
+        "scale": [2, 3, 4],
+        "visible": false
+      },
+      "ext-cinematography": {
+        "track": { "channels": { "rotation": [
+          { "time_s": 0, "value": [0, 0, 0] },
+          { "time_s": 4, "value": [0, 90, 0] }
+        ] } }
+      }
+    },
+    {
+      "id": 10,
+      "name": "base_mode",
+      "transform": {
+        "position": [10, 20, 30],
+        "rotation_degrees": [5, 10, 15],
+        "scale": [2, 3, 4]
+      },
+      "ext-cinematography": {
+        "track": {
+          "pre": "base",
+          "post": "base",
+          "channels": { "translation": [
+            { "time_s": 2, "value": [2, 0, 0] },
+            { "time_s": 4, "value": [4, 0, 0] }
+          ] }
+        }
+      }
+    },
+    {
+      "id": 11,
+      "name": "looping",
+      "ext-cinematography": {
+        "track": {
+          "clip": { "start_s": 0, "end_s": 4 },
+          "pre": "loop",
+          "post": "loop",
+          "channels": { "translation": [
+            { "time_s": 0, "value": [0, 0, 0] },
+            { "time_s": 4, "value": [4, 0, 0] }
+          ] }
+        }
+      }
+    },
+    {
+      "id": 12,
+      "name": "parent",
+      "shape": { "Cuboid": { "x": 0.5, "y": 0.5, "z": 0.5 } },
+      "ext-cinematography": {
+        "track": {
+          "channels": {
+            "translation": [
+              { "time_s": 0, "value": [1, 0, 0] },
+              { "time_s": 4, "value": [5, 0, 0] }
+            ],
+            "rotation": [
+              { "time_s": 0, "value": [0, 0, 0] },
+              { "time_s": 4, "value": [0, 90, 0] }
+            ],
+            "scale": [
+              { "time_s": 0, "value": [1, 1, 1] },
+              { "time_s": 4, "value": [2, 2, 2] }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 13,
+      "name": "child",
+      "parent": 12,
+      "transform": { "position": [1, 0, 0] },
+      "shape": { "Sphere": { "radius": 0.2 } }
+    },
+    {
+      "id": 14,
+      "name": "target",
+      "shape": { "Sphere": { "radius": 0.25 } },
+      "ext-cinematography": {
+        "track": { "channels": { "translation": [
+          { "time_s": 0, "value": [0, 1, 0] },
+          { "time_s": 4, "value": [4, 1, 0] }
+        ] } }
+      }
+    },
+    {
+      "id": 15,
+      "name": "camera_mover",
+      "ext-cinematography": {
+        "camera": { "aim_entity": 14, "focus_entity": 14 },
+        "shot": { "scene": "tracks", "order": 1, "in_s": 0, "out_s": 4 },
+        "track": { "channels": { "translation": [
+          { "time_s": 0, "value": [-2, 1, 6] },
+          { "time_s": 4, "value": [2, 1, 6] }
+        ] } }
+      }
+    },
+    {
+      "id": 16,
+      "name": "free_camera",
+      "ext-cinematography": {
+        "camera": {},
+        "shot": { "scene": "tracks", "order": 2, "in_s": 4, "out_s": 8 },
+        "track": { "channels": {
+          "translation": [
+            { "time_s": 0, "value": [0, 2, 6] },
+            { "time_s": 4, "value": [2, 2, 6] }
+          ],
+          "rotation": [
+            { "time_s": 0, "value": [0, 0, 0] },
+            { "time_s": 4, "value": [0, 90, 0] }
+          ]
+        } }
+      }
+    },
+    {
+      "id": 17,
+      "name": "far",
+      "transform": { "position": [100, 0, 0] }
+    },
+    {
+      "id": 18,
+      "name": "zero_clip",
+      "ext-cinematography": {
+        "track": {
+          "clip": { "start_s": 2, "end_s": 2 },
+          "channels": { "translation": [
+            { "time_s": 2, "value": [3, 4, 5] }
+          ] }
+        }
+      }
+    },
+    {
+      "id": 19,
+      "name": "preserved",
+      "transform": { "position": [7, 8, 9], "rotation_degrees": [1, 2, 3], "scale": [2, 2, 2] },
+      "ext-cinematography": {
+        "track": {
+          "pre": "base",
+          "post": "base",
+          "channels": { "translation": [
+            { "time_s": 0, "value": [0, 0, 0] },
+            { "time_s": 4, "value": [4, 0, 0] }
+          ] }
+        }
+      },
+      "ext-future-opaque": { "keep": [1, { "nested": true }] }
+    }
+  ],
+  "next_entity_id": 20
+}

@@ -18,13 +18,15 @@
 //!   `aim_entity` and `focus_entity` resolve to ([`aim_point_of`],
 //!   [`focus_distance_of`]);
 //! - [`shot_list`] — the setups, ordered for the clock;
+//! - [`track_of`] / [`transform_at`] / [`sample_world_at`] — strict 0.4
+//!   entity-local tracks and pure `f64` time-addressed TRS sampling;
 //! - [`run_outcomes`] — the conformance outcome runner: one assertion
 //!   file, any implementation, the same predicates.
 //!
 //! Conformance is math, not pixels: implementations agree on the
 //! numbers, within the stated tolerance — never on rendered output.
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use crate as wt;
 
@@ -32,7 +34,7 @@ use crate as wt;
 pub const EXTENSION_NAME: &str = "ext-cinematography";
 
 /// The extension version this module implements.
-pub const EXTENSION_VERSION: &str = "0.3.0";
+pub const EXTENSION_VERSION: &str = "0.4.0";
 
 /// The default sensor (filmback): Super 35, `[w, h]` in mm.
 pub const DEFAULT_SENSOR: [f64; 2] = [24.89, 18.66];
@@ -41,21 +43,543 @@ pub const DEFAULT_SENSOR: [f64; 2] = [24.89, 18.66];
 pub const DEFAULT_FOCAL_LENGTH: f64 = 35.0;
 
 // ---------------------------------------------------------------------------
+// Entity-local tracks
+// ---------------------------------------------------------------------------
+
+const TRACK_PATH: &str = "/ext-cinematography/track";
+
+/// A malformed known track, with a JSON pointer to the offending field.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TrackError {
+    /// JSON pointer rooted at the entity, or empty for an evaluation argument.
+    pub pointer: String,
+    /// What the field violates.
+    pub message: String,
+}
+
+impl TrackError {
+    fn new(pointer: impl Into<String>, message: impl Into<String>) -> Self {
+        Self {
+            pointer: pointer.into(),
+            message: message.into(),
+        }
+    }
+}
+
+impl std::fmt::Display for TrackError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.pointer.is_empty() {
+            f.write_str(&self.message)
+        } else {
+            write!(f, "{}: {}", self.pointer, self.message)
+        }
+    }
+}
+
+impl std::error::Error for TrackError {}
+
+/// A track's explicit time clip, in seconds.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct TrackClip {
+    /// Inclusive clip start.
+    pub start_s: f64,
+    /// Inclusive clip end; must not precede `start_s`.
+    pub end_s: f64,
+}
+
+/// Interpolation from one key to the next.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub enum Interpolation {
+    /// Component-wise linear interpolation, after easing.
+    #[default]
+    Linear,
+    /// Hold the interval's first value until its next key.
+    Step,
+}
+
+/// Easing applied to a linear interval's normalized time.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub enum Easing {
+    /// No easing.
+    #[default]
+    Linear,
+    /// `u²`.
+    EaseIn,
+    /// `1 - (1-u)²`.
+    EaseOut,
+    /// Quadratic acceleration and deceleration.
+    EaseInOut,
+}
+
+/// Evaluation outside the clip.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub enum Extrapolation {
+    /// Clamp to the clip endpoint.
+    #[default]
+    Hold,
+    /// Return the entity's authored local transform, skipping every channel.
+    Base,
+    /// Repeat the clip with Euclidean time wrapping.
+    Loop,
+}
+
+/// One vec3 key. Interpolation and easing govern the interval to the next key.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct TrackKey {
+    /// Finite key time in seconds.
+    pub time_s: f64,
+    /// Translation, intrinsic XYZ Euler degrees, or component-wise scale.
+    pub value: [f64; 3],
+    /// Interval interpolation; linear by default.
+    #[serde(default)]
+    pub interpolation: Interpolation,
+    /// Interval easing; linear by default and ignored by `step`.
+    #[serde(default)]
+    pub easing: Easing,
+}
+
+/// The three independent channels. At least one must be present and nonempty.
+#[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+#[cfg_attr(feature = "schema", schemars(transform = at_least_one_channel))]
+pub struct TrackChannels {
+    /// Parent-local translation in world units/metres.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "schema", schemars(length(min = 1)))]
+    pub translation: Option<Vec<TrackKey>>,
+    /// Intrinsic XYZ Euler degrees, interpolated without angle wrapping.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "schema", schemars(length(min = 1)))]
+    pub rotation: Option<Vec<TrackKey>>,
+    /// Component-wise scale, including zero and negative values.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "schema", schemars(length(min = 1)))]
+    pub scale: Option<Vec<TrackKey>>,
+}
+
+/// One entity-local timed translation/rotation/scale track.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct Track {
+    /// Explicit inclusive clip; absent uses the minimum and maximum key times.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub clip: Option<TrackClip>,
+    /// Evaluation strictly before the clip.
+    #[serde(default)]
+    pub pre: Extrapolation,
+    /// Evaluation strictly after the clip.
+    #[serde(default)]
+    pub post: Extrapolation,
+    /// At least one nonempty channel, with strictly increasing key times.
+    pub channels: TrackChannels,
+}
+
+#[cfg(feature = "schema")]
+fn at_least_one_channel(schema: &mut schemars::Schema) {
+    schema.insert("minProperties".to_string(), serde_json::json!(1));
+}
+
+/// Parse an entity's known track strictly, or return `None` when it has none.
+/// Unknown and malformed track data is an error with its entity-rooted pointer.
+pub fn track_of(entity: &wt::WorldEntity) -> Result<Option<Track>, TrackError> {
+    let Some(block) = entity.extra.get(EXTENSION_NAME) else {
+        return Ok(None);
+    };
+    let Some(track) = block.get("track") else {
+        return Ok(None);
+    };
+    parse_track(track).map(Some)
+}
+
+pub(crate) fn validate_block(block: &serde_json::Value) -> Result<(), TrackError> {
+    let Some(track) = block.get("track") else {
+        return Ok(());
+    };
+    parse_track(track).map(|_| ())
+}
+
+fn parse_track(value: &serde_json::Value) -> Result<Track, TrackError> {
+    let object = track_object(value, TRACK_PATH)?;
+    known_fields(object, &["clip", "pre", "post", "channels"], TRACK_PATH)?;
+    let clip = match object.get("clip") {
+        None => None,
+        Some(value) => {
+            let path = format!("{TRACK_PATH}/clip");
+            let clip = track_object(value, &path)?;
+            known_fields(clip, &["start_s", "end_s"], &path)?;
+            let start_s = required_number(clip, "start_s", &path)?;
+            let end_s = required_number(clip, "end_s", &path)?;
+            if start_s > end_s {
+                return Err(TrackError::new(
+                    format!("{path}/end_s"),
+                    "clip end_s must not precede start_s",
+                ));
+            }
+            Some(TrackClip { start_s, end_s })
+        }
+    };
+    let pre = parse_extrapolation(object.get("pre"), "pre")?;
+    let post = parse_extrapolation(object.get("post"), "post")?;
+
+    let path = format!("{TRACK_PATH}/channels");
+    let channels_value = object
+        .get("channels")
+        .ok_or_else(|| TrackError::new(&path, "channels is required"))?;
+    let channels = track_object(channels_value, &path)?;
+    known_fields(channels, &["translation", "rotation", "scale"], &path)?;
+    if channels.is_empty() {
+        return Err(TrackError::new(&path, "at least one channel is required"));
+    }
+    let mut parsed = TrackChannels::default();
+    for (name, slot) in [
+        ("translation", &mut parsed.translation),
+        ("rotation", &mut parsed.rotation),
+        ("scale", &mut parsed.scale),
+    ] {
+        let Some(value) = channels.get(name) else {
+            continue;
+        };
+        let channel_path = format!("{path}/{name}");
+        let keys = value
+            .as_array()
+            .ok_or_else(|| TrackError::new(&channel_path, "a channel must be an array of keys"))?;
+        if keys.is_empty() {
+            return Err(TrackError::new(
+                &channel_path,
+                "a channel must contain at least one key",
+            ));
+        }
+        let mut parsed_keys = Vec::with_capacity(keys.len());
+        let mut previous = None;
+        for (index, value) in keys.iter().enumerate() {
+            let key_path = format!("{channel_path}/{index}");
+            let key = track_object(value, &key_path)?;
+            known_fields(
+                key,
+                &["time_s", "value", "interpolation", "easing"],
+                &key_path,
+            )?;
+            let time_s = required_number(key, "time_s", &key_path)?;
+            if previous.is_some_and(|previous| time_s <= previous) {
+                return Err(TrackError::new(
+                    format!("{key_path}/time_s"),
+                    "key times must be strictly increasing",
+                ));
+            }
+            previous = Some(time_s);
+            let value_path = format!("{key_path}/value");
+            let value = key
+                .get("value")
+                .ok_or_else(|| TrackError::new(&value_path, "value is required"))?;
+            let components = value.as_array().ok_or_else(|| {
+                TrackError::new(&value_path, "value must be an array of three numbers")
+            })?;
+            if components.len() != 3 {
+                return Err(TrackError::new(
+                    &value_path,
+                    "value must contain exactly three numbers",
+                ));
+            }
+            let mut vector = [0.0; 3];
+            for (axis, component) in components.iter().enumerate() {
+                vector[axis] = component
+                    .as_f64()
+                    .filter(|n| n.is_finite())
+                    .ok_or_else(|| {
+                        TrackError::new(
+                            format!("{value_path}/{axis}"),
+                            "value components must be finite numbers",
+                        )
+                    })?;
+            }
+            parsed_keys.push(TrackKey {
+                time_s,
+                value: vector,
+                interpolation: parse_interpolation(key.get("interpolation"), &key_path)?,
+                easing: parse_easing(key.get("easing"), &key_path)?,
+            });
+        }
+        *slot = Some(parsed_keys);
+    }
+    let track = Track {
+        clip,
+        pre,
+        post,
+        channels: parsed,
+    };
+    let effective_clip = track.clip.unwrap_or_else(|| inferred_clip(&track));
+    if effective_clip.start_s == effective_clip.end_s {
+        if pre == Extrapolation::Loop {
+            return Err(TrackError::new(
+                format!("{TRACK_PATH}/pre"),
+                "loop requires a nonzero clip duration",
+            ));
+        }
+        if post == Extrapolation::Loop {
+            return Err(TrackError::new(
+                format!("{TRACK_PATH}/post"),
+                "loop requires a nonzero clip duration",
+            ));
+        }
+    }
+    Ok(track)
+}
+
+fn track_object<'a>(
+    value: &'a serde_json::Value,
+    path: &str,
+) -> Result<&'a serde_json::Map<String, serde_json::Value>, TrackError> {
+    value
+        .as_object()
+        .ok_or_else(|| TrackError::new(path, "expected an object"))
+}
+
+fn known_fields(
+    object: &serde_json::Map<String, serde_json::Value>,
+    allowed: &[&str],
+    path: &str,
+) -> Result<(), TrackError> {
+    for field in object.keys() {
+        if !allowed.contains(&field.as_str()) {
+            return Err(TrackError::new(
+                format!("{path}/{field}"),
+                "unknown track field",
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn required_number(
+    object: &serde_json::Map<String, serde_json::Value>,
+    field: &str,
+    path: &str,
+) -> Result<f64, TrackError> {
+    let pointer = format!("{path}/{field}");
+    object
+        .get(field)
+        .ok_or_else(|| TrackError::new(&pointer, format!("{field} is required")))?
+        .as_f64()
+        .filter(|n| n.is_finite())
+        .ok_or_else(|| TrackError::new(pointer, "expected a finite number"))
+}
+
+fn enum_string<'a>(
+    value: Option<&'a serde_json::Value>,
+    field: &str,
+    path: &str,
+) -> Result<Option<&'a str>, TrackError> {
+    value
+        .map(|value| {
+            value
+                .as_str()
+                .ok_or_else(|| TrackError::new(format!("{path}/{field}"), "expected a string enum"))
+        })
+        .transpose()
+}
+
+fn parse_extrapolation(
+    value: Option<&serde_json::Value>,
+    field: &str,
+) -> Result<Extrapolation, TrackError> {
+    match enum_string(value, field, TRACK_PATH)? {
+        None | Some("hold") => Ok(Extrapolation::Hold),
+        Some("base") => Ok(Extrapolation::Base),
+        Some("loop") => Ok(Extrapolation::Loop),
+        Some(_) => Err(TrackError::new(
+            format!("{TRACK_PATH}/{field}"),
+            "expected hold, base, or loop",
+        )),
+    }
+}
+
+fn parse_interpolation(
+    value: Option<&serde_json::Value>,
+    path: &str,
+) -> Result<Interpolation, TrackError> {
+    match enum_string(value, "interpolation", path)? {
+        None | Some("linear") => Ok(Interpolation::Linear),
+        Some("step") => Ok(Interpolation::Step),
+        Some(_) => Err(TrackError::new(
+            format!("{path}/interpolation"),
+            "expected linear or step",
+        )),
+    }
+}
+
+fn parse_easing(value: Option<&serde_json::Value>, path: &str) -> Result<Easing, TrackError> {
+    match enum_string(value, "easing", path)? {
+        None | Some("linear") => Ok(Easing::Linear),
+        Some("ease_in") => Ok(Easing::EaseIn),
+        Some("ease_out") => Ok(Easing::EaseOut),
+        Some("ease_in_out") => Ok(Easing::EaseInOut),
+        Some(_) => Err(TrackError::new(
+            format!("{path}/easing"),
+            "expected linear, ease_in, ease_out, or ease_in_out",
+        )),
+    }
+}
+
+/// Sample an entity's authored local transform plus its track at `time_s`.
+/// Behaviors are deliberately not applied; visibility always remains authored.
+pub fn transform_at(
+    entity: &wt::WorldEntity,
+    time_s: f64,
+) -> Result<wt::WorldTransform, TrackError> {
+    if !time_s.is_finite() {
+        return Err(TrackError::new("", "evaluation time_s must be finite"));
+    }
+    let base = entity.transform.clone();
+    let Some(track) = track_of(entity)? else {
+        return Ok(base);
+    };
+    let clip = track.clip.unwrap_or_else(|| inferred_clip(&track));
+    let resolved = if time_s >= clip.start_s && time_s <= clip.end_s {
+        Some(time_s)
+    } else {
+        let (mode, endpoint) = if time_s < clip.start_s {
+            (track.pre, clip.start_s)
+        } else {
+            (track.post, clip.end_s)
+        };
+        match mode {
+            Extrapolation::Base => None,
+            Extrapolation::Hold => Some(endpoint),
+            Extrapolation::Loop => {
+                let duration = clip.end_s - clip.start_s;
+                Some(clip.start_s + (time_s - clip.start_s).rem_euclid(duration))
+            }
+        }
+    };
+    let Some(time_s) = resolved else {
+        return Ok(base);
+    };
+    let position = track
+        .channels
+        .translation
+        .as_deref()
+        .map(|keys| sample_channel(keys, time_s))
+        .unwrap_or_else(|| base.position.map(f64::from));
+    let rotation_degrees = track
+        .channels
+        .rotation
+        .as_deref()
+        .map(|keys| sample_channel(keys, time_s))
+        .unwrap_or_else(|| base.rotation_degrees.map(f64::from));
+    let scale = track
+        .channels
+        .scale
+        .as_deref()
+        .map(|keys| sample_channel(keys, time_s))
+        .unwrap_or_else(|| base.scale.map(f64::from));
+    Ok(wt::WorldTransform {
+        position: position.map(|value| value as f32),
+        rotation_degrees: rotation_degrees.map(|value| value as f32),
+        scale: scale.map(|value| value as f32),
+        visible: base.visible,
+    })
+}
+
+fn inferred_clip(track: &Track) -> TrackClip {
+    let mut times = [
+        track.channels.translation.as_deref(),
+        track.channels.rotation.as_deref(),
+        track.channels.scale.as_deref(),
+    ]
+    .into_iter()
+    .flatten()
+    .flatten()
+    .map(|key| key.time_s);
+    let first = times.next().expect("a parsed track has a key");
+    let (minimum, maximum) = times.fold((first, first), |(minimum, maximum), time| {
+        (minimum.min(time), maximum.max(time))
+    });
+    TrackClip {
+        start_s: minimum,
+        end_s: maximum,
+    }
+}
+
+fn sample_channel(keys: &[TrackKey], time_s: f64) -> [f64; 3] {
+    if time_s <= keys[0].time_s {
+        return keys[0].value;
+    }
+    if time_s >= keys[keys.len() - 1].time_s {
+        return keys[keys.len() - 1].value;
+    }
+    let next = keys
+        .iter()
+        .position(|key| key.time_s >= time_s)
+        .expect("an internal time has a next key");
+    let b = &keys[next];
+    if time_s == b.time_s {
+        return b.value;
+    }
+    let a = &keys[next - 1];
+    if a.interpolation == Interpolation::Step {
+        return a.value;
+    }
+    let u = (time_s - a.time_s) / (b.time_s - a.time_s);
+    let e = match a.easing {
+        Easing::Linear => u,
+        Easing::EaseIn => u * u,
+        Easing::EaseOut => 1.0 - (1.0 - u) * (1.0 - u),
+        Easing::EaseInOut if u < 0.5 => 2.0 * u * u,
+        Easing::EaseInOut => 1.0 - 2.0 * (1.0 - u) * (1.0 - u),
+    };
+    std::array::from_fn(|axis| a.value[axis] + (b.value[axis] - a.value[axis]) * e)
+}
+
+/// Sample every entity independently at one time, preserving the rest of the
+/// document and every entity's ids, parents, components and opaque extensions.
+pub fn sample_world_at(
+    manifest: &wt::WorldManifest,
+    time_s: f64,
+) -> Result<wt::WorldManifest, TrackError> {
+    if !time_s.is_finite() {
+        return Err(TrackError::new("", "evaluation time_s must be finite"));
+    }
+    let mut sampled = manifest.clone();
+    for entity in &mut sampled.entities {
+        entity.transform = transform_at(entity, time_s)?;
+    }
+    Ok(sampled)
+}
+
+// ---------------------------------------------------------------------------
 // The camera, the frame, the view
 // ---------------------------------------------------------------------------
 
 /// One entity's `ext-cinematography.camera` component, parsed from
 /// `WorldEntity::extra` with every default applied.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct CameraComponent {
     /// Sensor (filmback) `[w, h]`, mm.
+    #[cfg_attr(feature = "schema", schemars(schema_with = "positive_pair_schema"))]
     pub sensor_mm: [f64; 2],
     /// The lens, mm.
+    #[cfg_attr(feature = "schema", schemars(schema_with = "positive_number_schema"))]
     pub focal_length_mm: f64,
     /// Crop to this frame aspect (w/h); absent keeps the desqueezed
     /// sensor's.
+    #[cfg_attr(feature = "schema", schemars(schema_with = "positive_number_schema"))]
     pub aspect_ratio: Option<f64>,
     /// Anamorphic desqueeze.
+    #[cfg_attr(feature = "schema", schemars(schema_with = "positive_number_schema"))]
     pub squeeze: f64,
     /// Look at this world point, +Y up; absent looks down the entity's
     /// local −Z (the glTF / three.js / Bevy convention).
@@ -63,14 +587,176 @@ pub struct CameraComponent {
     /// Look at this entity's origin, over `aim`, while it exists — an
     /// entity reference: the id in a document, a name at intake (bound
     /// at ingestion, rewritten at merge, like `parent`).
+    #[cfg_attr(feature = "schema", schemars(schema_with = "entity_reference_schema"))]
     pub aim_entity: Option<wt::EntityRef>,
     /// Focus distance, m.
+    #[cfg_attr(feature = "schema", schemars(schema_with = "positive_number_schema"))]
     pub focus_distance_m: Option<f64>,
     /// Focus on this entity: the focus distance is the distance to its
     /// origin, over `focus_distance_m`, while it exists.
+    #[cfg_attr(feature = "schema", schemars(schema_with = "entity_reference_schema"))]
     pub focus_entity: Option<wt::EntityRef>,
     /// The f-stop.
+    #[cfg_attr(feature = "schema", schemars(schema_with = "positive_number_schema"))]
     pub f_stop: Option<f64>,
+}
+
+impl Default for CameraComponent {
+    fn default() -> Self {
+        Self {
+            sensor_mm: DEFAULT_SENSOR,
+            focal_length_mm: DEFAULT_FOCAL_LENGTH,
+            aspect_ratio: None,
+            squeeze: 1.0,
+            aim: None,
+            aim_entity: None,
+            focus_distance_m: None,
+            focus_entity: None,
+            f_stop: None,
+        }
+    }
+}
+
+/// An entity's shot component, as declared on the clock.
+#[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct ShotComponent {
+    /// Scene slug, free text.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub scene: Option<String>,
+    /// Shot list sort key; ties break by entity id.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub order: Option<i64>,
+    /// Setup start in seconds; must not exceed `out_s`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub in_s: Option<f64>,
+    /// Setup end in seconds.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub out_s: Option<f64>,
+    /// Shot size, free text.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub size: Option<String>,
+    /// What the setup is, free text.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+}
+
+/// An entity's cinematography block: a camera, shot, and/or entity-local track.
+#[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+#[cfg_attr(feature = "schema", schemars(transform = at_least_one_channel))]
+pub struct EntityBlock {
+    /// A filmback and lens.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub camera: Option<CameraComponent>,
+    /// A setup in the shot list.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub shot: Option<ShotComponent>,
+    /// One entity-local timed TRS track.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub track: Option<Track>,
+}
+
+#[cfg(feature = "schema")]
+fn positive_number_schema(_gen: &mut schemars::SchemaGenerator) -> schemars::Schema {
+    schemars::json_schema!({ "type": "number", "exclusiveMinimum": 0 })
+}
+
+#[cfg(feature = "schema")]
+fn positive_pair_schema(_gen: &mut schemars::SchemaGenerator) -> schemars::Schema {
+    schemars::json_schema!({
+        "type": "array",
+        "items": { "type": "number", "exclusiveMinimum": 0 },
+        "minItems": 2,
+        "maxItems": 2
+    })
+}
+
+#[cfg(feature = "schema")]
+fn entity_reference_schema(_gen: &mut schemars::SchemaGenerator) -> schemars::Schema {
+    schemars::json_schema!({
+        "x-entity-ref": "bindable",
+        "oneOf": [
+            { "type": "integer", "minimum": 0 },
+            { "type": "string", "minLength": 1 }
+        ]
+    })
+}
+
+/// Generate the normative extension schema from these reference types.
+#[cfg(feature = "schema")]
+pub fn extension_schema() -> serde_json::Value {
+    let generated = schemars::schema_for!(EntityBlock);
+    let mut root = serde_json::to_value(generated).expect("extension schema JSON");
+    reject_nulls(&mut root);
+    let object = root.as_object_mut().expect("extension schema object");
+    let mut definitions = object
+        .remove("$defs")
+        .and_then(|value| value.as_object().cloned())
+        .unwrap_or_default();
+    let mut block = serde_json::Map::new();
+    for key in [
+        "description",
+        "type",
+        "properties",
+        "additionalProperties",
+        "minProperties",
+    ] {
+        if let Some(value) = object.remove(key) {
+            block.insert(key.to_string(), value);
+        }
+    }
+    definitions.insert("EntityBlock".to_string(), serde_json::Value::Object(block));
+    serde_json::json!({
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "title": "ExtCinematography",
+        "description": "The ext-cinematography extension, version 0.4 (experimental). Everything rides under the namespaced 'ext-cinematography' key on entities: 'camera' makes an entity a camera, 'shot' makes it a setup in the shot list, and 'track' animates that entity's parent-local translation, rotation and scale. The core schema leaves room for the key (unknown fields are allowed and must-ignored); this schema pins the extension's own shape. The camera's aim_entity and focus_entity are entity references in the core sense — marked x-entity-ref here, so the generated schema/entity-refs.json carries them. Spec: spec/extensions/cinematography.md.",
+        "type": "object",
+        "$defs": definitions
+    })
+}
+
+#[cfg(feature = "schema")]
+fn reject_nulls(value: &mut serde_json::Value) {
+    if let Some(object) = value.as_object_mut() {
+        if object
+            .get("default")
+            .is_some_and(serde_json::Value::is_null)
+        {
+            object.remove("default");
+        }
+        if let Some(types) = object
+            .get_mut("type")
+            .and_then(|value| value.as_array_mut())
+        {
+            types.retain(|kind| kind != "null");
+        }
+        let single_non_null = object
+            .get("anyOf")
+            .and_then(serde_json::Value::as_array)
+            .and_then(|choices| {
+                let mut choices = choices.iter().filter(|choice| {
+                    choice.get("type") != Some(&serde_json::Value::String("null".to_string()))
+                });
+                let only = choices.next()?;
+                choices.next().is_none().then_some(only.clone())
+            });
+        if let Some(serde_json::Value::Object(replacement)) = single_non_null {
+            object.remove("anyOf");
+            for (key, value) in replacement {
+                object.entry(key).or_insert(value);
+            }
+        }
+        for value in object.values_mut() {
+            reject_nulls(value);
+        }
+    } else if let Some(array) = value.as_array_mut() {
+        for value in array {
+            reject_nulls(value);
+        }
+    }
 }
 
 impl CameraComponent {
@@ -438,11 +1124,26 @@ pub struct OutcomesDoc {
     pub expect: Vec<Assertion>,
 }
 
-/// One assertion. The shapes match the conformance JSON: `fov`,
-/// `in_frame`, `out_of_frame`, `centred`, `focus`, `shot_list`.
+/// One assertion. The shapes match the conformance JSON: `pose`, `origin`,
+/// `view`, `fov`, `in_frame`, `out_of_frame`, `centred`, `focus`, `shot_list`.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(untagged)]
 pub enum Assertion {
+    /// An entity's sampled local TRS at one time.
+    Pose {
+        /// The pose assertion.
+        pose: PoseAssertion,
+    },
+    /// An entity's sampled origin, composed through its parents.
+    Origin {
+        /// The origin assertion.
+        origin: OriginAssertion,
+    },
+    /// A camera's resolved view at one time.
+    View {
+        /// The view assertion.
+        view: ViewAssertion,
+    },
     /// A camera's derived FOVs and frame aspect, within `tolerance`.
     Fov {
         /// The fov assertion.
@@ -479,6 +1180,56 @@ pub enum Assertion {
     Unknown(serde_json::Value),
 }
 
+/// The `pose` assertion's payload.
+#[derive(Debug, Clone, Deserialize)]
+pub struct PoseAssertion {
+    /// The entity's name.
+    pub entity: String,
+    /// Evaluation time in seconds.
+    pub time_s: f64,
+    /// Expected parent-local position.
+    pub position: [f64; 3],
+    /// Expected parent-local intrinsic XYZ Euler degrees.
+    pub rotation_degrees: [f64; 3],
+    /// Expected parent-local scale.
+    pub scale: [f64; 3],
+    /// Component tolerance; defaults to `1e-6`.
+    #[serde(default)]
+    pub tolerance: Option<f64>,
+}
+
+/// The `origin` assertion's payload.
+#[derive(Debug, Clone, Deserialize)]
+pub struct OriginAssertion {
+    /// The entity's name.
+    pub entity: String,
+    /// Evaluation time in seconds.
+    pub time_s: f64,
+    /// Expected world-space origin.
+    pub position: [f64; 3],
+    /// Component tolerance; defaults to `1e-6`.
+    #[serde(default)]
+    pub tolerance: Option<f64>,
+}
+
+/// The `view` assertion's payload.
+#[derive(Debug, Clone, Deserialize)]
+pub struct ViewAssertion {
+    /// The camera entity's name.
+    pub camera: String,
+    /// Evaluation time in seconds.
+    pub time_s: f64,
+    /// Expected world-space camera position.
+    pub position: [f64; 3],
+    /// Expected unit forward vector.
+    pub forward: [f64; 3],
+    /// Expected unit up vector.
+    pub up: [f64; 3],
+    /// Component tolerance; defaults to `1e-6`.
+    #[serde(default)]
+    pub tolerance: Option<f64>,
+}
+
 /// The `fov` assertion's payload.
 #[derive(Debug, Clone, Deserialize)]
 pub struct FovAssertion {
@@ -502,6 +1253,9 @@ pub struct FrameAssertion {
     pub camera: String,
     /// The entity whose origin projects (or not).
     pub entity: String,
+    /// Optional evaluation time; absent preserves static-world behavior.
+    #[serde(default)]
+    pub time_s: Option<f64>,
 }
 
 /// The `centred` assertion's payload.
@@ -511,6 +1265,9 @@ pub struct CentredAssertion {
     pub camera: String,
     /// The entity whose origin projects at the centre.
     pub entity: String,
+    /// Optional evaluation time; absent preserves static-world behavior.
+    #[serde(default)]
+    pub time_s: Option<f64>,
     /// The tolerance, frame-half units (default 0.001).
     #[serde(default)]
     pub tolerance: Option<f64>,
@@ -523,6 +1280,9 @@ pub struct FocusAssertion {
     pub camera: String,
     /// Expected focus distance, metres.
     pub distance_m: f64,
+    /// Optional evaluation time; absent preserves static-world behavior.
+    #[serde(default)]
+    pub time_s: Option<f64>,
     /// The tolerance, metres (default 0.001).
     #[serde(default)]
     pub tolerance: Option<f64>,
@@ -544,6 +1304,81 @@ pub fn run_outcomes(manifest: &wt::WorldManifest, outcomes: &OutcomesDoc) -> Out
     let mut failures = Vec::new();
     for assertion in &outcomes.expect {
         match assertion {
+            Assertion::Pose { pose } => {
+                let Some(manifest) = sampled_manifest(manifest, Some(pose.time_s), &mut failures)
+                else {
+                    continue;
+                };
+                let Some(entity) = manifest
+                    .entities
+                    .iter()
+                    .find(|entity| entity.name.as_str() == pose.entity)
+                else {
+                    failures.push(format!("no entity named {}", pose.entity));
+                    continue;
+                };
+                let tolerance = pose.tolerance.unwrap_or(1e-6);
+                for (field, actual, expected) in [
+                    ("position", entity.transform.position, pose.position),
+                    (
+                        "rotation_degrees",
+                        entity.transform.rotation_degrees,
+                        pose.rotation_degrees,
+                    ),
+                    ("scale", entity.transform.scale, pose.scale),
+                ] {
+                    compare_components(
+                        &pose.entity,
+                        field,
+                        actual,
+                        expected,
+                        tolerance,
+                        &mut failures,
+                    );
+                }
+            }
+            Assertion::Origin { origin } => {
+                let Some(manifest) = sampled_manifest(manifest, Some(origin.time_s), &mut failures)
+                else {
+                    continue;
+                };
+                let actual = origin_of(&manifest, &origin.entity, &mut failures);
+                compare_components(
+                    &origin.entity,
+                    "origin",
+                    actual,
+                    origin.position,
+                    origin.tolerance.unwrap_or(1e-6),
+                    &mut failures,
+                );
+            }
+            Assertion::View { view: expected } => {
+                let Some(manifest) =
+                    sampled_manifest(manifest, Some(expected.time_s), &mut failures)
+                else {
+                    continue;
+                };
+                let Some((_, _, _, actual)) =
+                    camera_setup(&manifest, &expected.camera, &mut failures)
+                else {
+                    continue;
+                };
+                let tolerance = expected.tolerance.unwrap_or(1e-6);
+                for (field, actual, wanted) in [
+                    ("position", actual.position, expected.position),
+                    ("forward", actual.forward, expected.forward),
+                    ("up", actual.up, expected.up),
+                ] {
+                    compare_components(
+                        &expected.camera,
+                        field,
+                        actual,
+                        wanted,
+                        tolerance,
+                        &mut failures,
+                    );
+                }
+            }
             Assertion::Fov { fov } => {
                 let Some((_, _, frame, _)) = camera_setup(manifest, &fov.camera, &mut failures)
                 else {
@@ -574,12 +1409,16 @@ pub fn run_outcomes(manifest: &wt::WorldManifest, outcomes: &OutcomesDoc) -> Out
                 out_of_frame: target,
             } => {
                 let expect_inside = matches!(assertion, Assertion::InFrame { .. });
-                let Some((_, camera, frame, view)) =
-                    camera_setup(manifest, &target.camera, &mut failures)
+                let Some(manifest) = sampled_manifest(manifest, target.time_s, &mut failures)
                 else {
                     continue;
                 };
-                let origin = origin_of(manifest, &target.entity, &mut failures);
+                let Some((_, camera, frame, view)) =
+                    camera_setup(&manifest, &target.camera, &mut failures)
+                else {
+                    continue;
+                };
+                let origin = origin_of(&manifest, &target.entity, &mut failures);
                 let p = project(&view, &frame, &camera, origin);
                 let inside = p.z > 0.0 && p.x.abs() <= 1.0 && p.y.abs() <= 1.0;
                 if expect_inside && !inside {
@@ -596,13 +1435,17 @@ pub fn run_outcomes(manifest: &wt::WorldManifest, outcomes: &OutcomesDoc) -> Out
                 }
             }
             Assertion::Centred { centred } => {
+                let Some(manifest) = sampled_manifest(manifest, centred.time_s, &mut failures)
+                else {
+                    continue;
+                };
                 let Some((_, camera, frame, view)) =
-                    camera_setup(manifest, &centred.camera, &mut failures)
+                    camera_setup(&manifest, &centred.camera, &mut failures)
                 else {
                     continue;
                 };
                 let tolerance = centred.tolerance.unwrap_or(0.001);
-                let origin = origin_of(manifest, &centred.entity, &mut failures);
+                let origin = origin_of(&manifest, &centred.entity, &mut failures);
                 let p = project(&view, &frame, &camera, origin);
                 if !(p.z > 0.0 && p.x.abs() <= tolerance && p.y.abs() <= tolerance) {
                     failures.push(format!(
@@ -612,13 +1455,16 @@ pub fn run_outcomes(manifest: &wt::WorldManifest, outcomes: &OutcomesDoc) -> Out
                 }
             }
             Assertion::Focus { focus } => {
+                let Some(manifest) = sampled_manifest(manifest, focus.time_s, &mut failures) else {
+                    continue;
+                };
                 let Some((entity, camera, _, _)) =
-                    camera_setup(manifest, &focus.camera, &mut failures)
+                    camera_setup(&manifest, &focus.camera, &mut failures)
                 else {
                     continue;
                 };
                 let tolerance = focus.tolerance.unwrap_or(0.001);
-                match focus_distance_of(entity, &camera, manifest) {
+                match focus_distance_of(entity, &camera, &manifest) {
                     None => failures.push(format!("{}: no focus distance", focus.camera)),
                     Some(actual) if (actual - focus.distance_m).abs() > tolerance => {
                         failures.push(format!(
@@ -647,6 +1493,42 @@ pub fn run_outcomes(manifest: &wt::WorldManifest, outcomes: &OutcomesDoc) -> Out
     OutcomeResult {
         ok: failures.is_empty(),
         failures,
+    }
+}
+
+fn sampled_manifest<'a>(
+    manifest: &'a wt::WorldManifest,
+    time_s: Option<f64>,
+    failures: &mut Vec<String>,
+) -> Option<std::borrow::Cow<'a, wt::WorldManifest>> {
+    match time_s {
+        None => Some(std::borrow::Cow::Borrowed(manifest)),
+        Some(time_s) => match sample_world_at(manifest, time_s) {
+            Ok(sampled) => Some(std::borrow::Cow::Owned(sampled)),
+            Err(error) => {
+                failures.push(format!("at time {time_s}: {error}"));
+                None
+            }
+        },
+    }
+}
+
+fn compare_components<T: Into<f64> + Copy>(
+    entity: &str,
+    field: &str,
+    actual: [T; 3],
+    expected: [f64; 3],
+    tolerance: f64,
+    failures: &mut Vec<String>,
+) {
+    for axis in 0..3 {
+        let actual = actual[axis].into();
+        if (actual - expected[axis]).abs() > tolerance {
+            failures.push(format!(
+                "{entity}: {field}[{axis}] {actual} != {} (tolerance {tolerance})",
+                expected[axis]
+            ));
+        }
     }
 }
 
@@ -718,6 +1600,61 @@ mod tests {
     }
 
     #[test]
+    fn strict_track_errors_name_the_offending_field() {
+        let duplicate = entity(
+            1,
+            "duplicate",
+            serde_json::json!({"track": {"channels": {"translation": [
+                {"time_s": 0, "value": [0, 0, 0]},
+                {"time_s": 0, "value": [1, 0, 0]}
+            ]}}}),
+        );
+        let error = track_of(&duplicate).unwrap_err();
+        assert_eq!(
+            error.pointer,
+            "/ext-cinematography/track/channels/translation/1/time_s"
+        );
+        let unknown = entity(
+            2,
+            "unknown",
+            serde_json::json!({"track": {"channels": {"translation": [
+                {"time_s": 0, "value": [0, 0, 0], "tangents": []}
+            ]}}}),
+        );
+        assert_eq!(
+            track_of(&unknown).unwrap_err().pointer,
+            "/ext-cinematography/track/channels/translation/0/tangents"
+        );
+    }
+
+    #[test]
+    fn world_sampling_preserves_document_data_and_does_not_mutate_the_base() {
+        let manifest: WorldManifest = serde_json::from_str(
+            &std::fs::read_to_string(repo("conformance/cinematography-tracks.json")).unwrap(),
+        )
+        .unwrap();
+        let original = manifest.clone();
+        let sampled = sample_world_at(&manifest, 2.0).unwrap();
+        assert_eq!(manifest, original);
+        assert_eq!(sampled.entities.len(), original.entities.len());
+        for (before, after) in original.entities.iter().zip(&sampled.entities) {
+            assert_eq!(before.id, after.id);
+            assert_eq!(before.name, after.name);
+            assert_eq!(before.parent, after.parent);
+            assert_eq!(before.extra, after.extra);
+            assert_eq!(before.behaviors, after.behaviors);
+        }
+        let preserved = by_name(&original, "preserved");
+        assert!(!by_name(&original, "partial").transform.visible);
+        assert!(!by_name(&sampled, "partial").transform.visible);
+        assert_eq!(preserved.transform.position, [7.0, 8.0, 9.0]);
+        let round_tripped: WorldEntity =
+            serde_json::from_value(serde_json::to_value(preserved).unwrap()).unwrap();
+        assert_eq!(&round_tripped, preserved);
+        assert_eq!(sample_world_at(&original, 2.0).unwrap(), sampled);
+    }
+
+    #[test]
     fn camera_of_applies_the_defaults_per_absent_field_and_none_for_non_cameras() {
         let manifest = cinema_world();
         assert!(CameraComponent::of(by_name(&manifest, "maya")).is_none());
@@ -741,7 +1678,7 @@ mod tests {
         .unwrap();
         assert!(matches!(named.aim_entity, Some(wt::EntityRef::Name(_))));
         // The extension version the module implements.
-        assert_eq!(EXTENSION_VERSION, "0.3.0");
+        assert_eq!(EXTENSION_VERSION, "0.4.0");
     }
 
     #[test]
